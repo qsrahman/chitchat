@@ -22,7 +22,7 @@ tests/         pytest + httpx ASGI client + FakeLLM
 docs/          architecture.md, phase-N.md
 ```
 Seams that keep features additive:
-1. `llm.py` normalizes SDK events into ours (`delta`, `done`, `error`; later `reasoning_delta`, `tool_call`, `citation`, `usage`). Routes and the UI never see raw OpenAI events.
+1. `llm.py` normalizes SDK events into ours (`delta`, `reasoning_delta`, `done` with usage, `error`; later `tool_call`, `citation`). Routes and the UI never see raw OpenAI events.
 2. The LLM is injected (`app.state.llm`); tests swap in `FakeLLM`.
 3. SSE over `POST` + `fetch` stream, one frame format: `data: {json}\n\n`.
 4. `messages(id, conversation_id, role, content, meta JSON, created_at)`. `meta` carries attachments, tool calls and usage, so features don't force schema changes.
@@ -37,8 +37,8 @@ Seams that keep features additive:
 | 3 | done | Stop generation (partial message saved), regenerate, edit last user message, copy, retry |
 | 3b | done | UI/UX polish (`docs/ui-polish.md`) and Playwright browser tests |
 | 4 | done | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
-| 5 | next | Reasoning summaries (collapsible), token usage display |
-| 6 | | Attachments: images (`input_image`), files/PDF (`input_file`) |
+| 5 | done | Reasoning summaries (collapsible), token usage display |
+| 6 | next | Attachments: images (`input_image`), files/PDF (`input_file`) |
 | 7 | | Tools: built-in web search with citations, then a function-calling loop with a small registry (`tools.py`) |
 | 8 | | Context management (truncate/summarize old turns), FTS5 search, export (Markdown/JSON) |
 | 9 | | Optional: auth, multi-user, rate limits, Dockerfile |

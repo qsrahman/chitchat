@@ -140,3 +140,70 @@ async def test_list_models_hides_embedding_models_and_sorts():
 
 async def test_list_models_is_empty_when_listing_fails():
     assert await make_llm(lambda r: httpx.Response(404, json={"error": {"message": "no"}})).list_models() == []
+
+
+def completed(usage=None):
+    return {"type": "response.completed", "sequence_number": 9, "response": {"usage": usage} if usage else {}}
+
+
+def summary_delta(text, part=0):
+    return {"type": "response.reasoning_summary_text.delta", "delta": text, "summary_index": part, "item_id": "i",
+            "output_index": 0, "sequence_number": 1}
+
+
+USAGE = {"input_tokens": 77, "output_tokens": 43, "total_tokens": 120,
+         "input_tokens_details": {"cached_tokens": 0}, "output_tokens_details": {"reasoning_tokens": 12}}
+
+
+async def test_reasoning_summary_deltas_are_normalized_and_parts_are_separated():
+    llm = make_llm(streaming(
+        summary_delta("Check the", 0), summary_delta(" sum.", 0), summary_delta("Then divide.", 1),
+        delta("42"), completed(),
+    ))
+    assert await collect(llm) == [
+        {"type": "reasoning_delta", "text": "Check the"},
+        {"type": "reasoning_delta", "text": " sum."},
+        {"type": "reasoning_delta", "text": "\n\nThen divide."},
+        {"type": "delta", "text": "42"},
+        {"type": "done"},
+    ]
+
+
+async def test_usage_is_reported_on_done():
+    events = await collect(make_llm(streaming(delta("x"), completed(USAGE))))
+    assert events[-1] == {"type": "done", "usage": {"input_tokens": 77, "output_tokens": 43, "reasoning_tokens": 12}}
+
+
+async def test_usage_without_token_details_counts_zero_reasoning_tokens():
+    bare = {"input_tokens": 5, "output_tokens": 6, "total_tokens": 11}
+    events = await collect(make_llm(streaming(completed(bare))))
+    assert events[-1]["usage"] == {"input_tokens": 5, "output_tokens": 6, "reasoning_tokens": 0}
+
+
+async def test_incomplete_reply_keeps_its_usage():
+    incomplete = {"type": "response.incomplete", "sequence_number": 1,
+                  "response": {"incomplete_details": {"reason": "max_output_tokens"}, "usage": USAGE}}
+    done = (await collect(make_llm(streaming(incomplete))))[-1]
+    assert done["incomplete"] == "max_output_tokens" and done["usage"]["output_tokens"] == 43
+
+
+async def test_summaries_are_requested_only_from_reasoning_models():
+    sent = []
+    llm = make_llm(streaming(requests=sent))
+    async for _ in llm.stream_reply("gpt-5-mini", [{"role": "user", "content": "hi"}]):
+        pass
+    assert sent[-1]["reasoning"] == {"summary": "auto"}
+    async for _ in llm.stream_reply("gpt-5-mini", [{"role": "user", "content": "hi"}], reasoning_effort="low"):
+        pass
+    assert sent[-1]["reasoning"] == {"effort": "low", "summary": "auto"}
+    async for _ in llm.stream_reply("gemma4:cloud", [{"role": "user", "content": "hi"}]):
+        pass
+    assert "reasoning" not in sent[-1]
+
+
+async def test_summaries_can_be_switched_off():
+    sent = []
+    llm = make_llm(streaming(requests=sent), openai_reasoning_summaries=False)
+    async for _ in llm.stream_reply("gpt-5-mini", [{"role": "user", "content": "hi"}], reasoning_effort="high"):
+        pass
+    assert sent[-1]["reasoning"] == {"effort": "high"}

@@ -13,7 +13,8 @@ async def test_live_stream_normalization():
     events = [e async for e in OpenAILLM(s).stream_reply(
         s.openai_model, [{"role": "user", "content": "Say hi in one word."}])]
     assert any(e["type"] == "delta" for e in events)
-    assert events[-1] == {"type": "done"}
+    assert events[-1]["type"] == "done"
+    assert events[-1]["usage"]["output_tokens"] > 0
 
 
 @pytest.mark.live

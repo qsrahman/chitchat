@@ -8,7 +8,8 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Stop generation (partial reply kept), regenerate, retry, edit the last message, copy
 - Reading-focused UI: serif replies, highlighted code with copy, light/dark theme, mobile drawer, smart autoscroll
 - Model picker, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
-- Planned: reasoning summaries, attachments, web search and tools, search and export
+- Reasoning summaries in a collapsible block, and token usage under each reply
+- Planned: attachments, web search and tools, search and export
 
 ## Requirements
 Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key. For the browser tests, run `uv run playwright install chromium` once.
@@ -30,6 +31,7 @@ Environment variables or `.env`:
 | `OPENAI_BASE_URL` | SDK default | Point at a proxy or compatible endpoint |
 | `OPENAI_MAX_RETRIES` | `2` | SDK retries on transient errors |
 | `OPENAI_MAX_OUTPUT_TOKENS` | none | Cap on tokens per reply; a reply that hits it is kept and flagged |
+| `OPENAI_REASONING_SUMMARIES` | `true` | Ask reasoning models for a summary of their thinking; set `false` if your OpenAI organization isn't verified for it |
 | `DB_PATH` | `chitchat.db` | SQLite file |
 
 ## Test

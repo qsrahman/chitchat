@@ -30,7 +30,8 @@ messagesEl.addEventListener("scroll", () => {
 $("jump").onclick = () => { state.stick = true; scrollToBottom(); };
 
 // ---- messages ----
-// Each .msg = .body (rendered text) + .note (stopped / cut off) + .actions. el._text is the raw text.
+// Each .msg = [details.reasoning] + .body (rendered text) + .note (stopped / cut off / usage) + .actions.
+// el._text and el._reasoning are the raw texts.
 function addMessage(role, text = "", meta = {}) {
   const el = document.createElement("div");
   el.className = `msg ${role}`;
@@ -38,6 +39,7 @@ function addMessage(role, text = "", meta = {}) {
   thread.append(el);
   main.classList.add("is-started");
   setNote(el, meta);
+  if (meta.reasoning) setReasoning(el, meta.reasoning);
   setText(el, text);
   return el;
 }
@@ -46,24 +48,61 @@ const bodyOf = (el) => el.querySelector(".body");
 const noteOf = (el) => el.querySelector(".note");
 const actionsOf = (el) => el.querySelector(".actions");
 
+const tokens = new Intl.NumberFormat();
+const usageText = (u) => `${tokens.format(u.input_tokens)} in, ${tokens.format(u.output_tokens)} out` +
+  (u.reasoning_tokens ? ` (${tokens.format(u.reasoning_tokens)} reasoning)` : "");
+
 function setNote(el, meta) {
   const note = noteOf(el);
-  note.textContent = meta.stopped ? "Stopped." : meta.incomplete ? "Reply cut off: output limit reached." : "";
+  note.textContent = [
+    meta.stopped && "Stopped.",
+    meta.incomplete && "Reply cut off: output limit reached.",
+    meta.usage && usageText(meta.usage),
+  ].filter(Boolean).join(" ");
   note.hidden = !note.textContent;
 }
 
 // Re-rendering markdown on every delta is wasteful; coalesce to one render per frame.
+function schedule(el) {
+  el._frame ??= requestAnimationFrame(() => render(el));
+}
 function setText(el, text) {
   el._text = text;
-  el._frame ??= requestAnimationFrame(() => render(el));
+  schedule(el);
+}
+function setReasoning(el, text) {
+  el._reasoning = text;
+  schedule(el);
+}
+
+// The reasoning summary sits above the answer in a <details>: open and "Thinking…" while it streams,
+// collapsed and "Reasoning" once the answer starts or for a saved message.
+function reasoningOf(el) {
+  let details = el.querySelector(".reasoning");
+  if (!details) {
+    details = document.createElement("details");
+    details.className = "reasoning";
+    details.innerHTML = '<summary>Reasoning</summary><div class="reasoning-body"></div>';
+    el.prepend(details);
+  }
+  return details;
+}
+
+function finishReasoning(el) {
+  const details = el.querySelector(".reasoning");
+  if (!details) return;
+  details.open = false;
+  details.querySelector("summary").textContent = "Reasoning";
 }
 
 function render(el) {
   cancelAnimationFrame(el._frame);
   el._frame = null;
   const body = bodyOf(el);
+  if (el._reasoning) reasoningOf(el).querySelector(".reasoning-body").innerHTML = renderMarkdown(el._reasoning);
   if (el.classList.contains("assistant")) {
     if (el._text) body.innerHTML = renderMarkdown(el._text);
+    else if (el._reasoning) body.replaceChildren(); // the reasoning block is the progress indicator
     else body.innerHTML = '<span class="dots" role="status" aria-label="Thinking"><i></i><i></i><i></i></span>';
   } else body.textContent = el._text;
   if (state.stick) scrollToBottom();
@@ -201,8 +240,18 @@ async function runTurn(path, payload = {}) {
     });
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     for await (const ev of readSSE(res)) {
-      if (ev.type === "delta") { reply += ev.text; setText(el, reply); }
-      else if (ev.type === "done") { finished = true; setNote(el, ev); }
+      if (ev.type === "delta") {
+        if (!reply) finishReasoning(el);
+        reply += ev.text;
+        setText(el, reply);
+      } else if (ev.type === "reasoning_delta") {
+        if (!el._reasoning) { // first of the stream: show it live
+          const details = reasoningOf(el);
+          details.open = true;
+          details.querySelector("summary").textContent = "Thinking…";
+        }
+        setReasoning(el, (el._reasoning ?? "") + ev.text);
+      } else if (ev.type === "done") { finished = true; setNote(el, ev); }
       else if (ev.type === "error") throw new Error(ev.message);
     }
     if (!finished) throw new Error("The connection closed before the reply finished.");
@@ -210,11 +259,14 @@ async function runTurn(path, payload = {}) {
     if (err.name === "AbortError") setNote(el, { stopped: true });
     else {
       el.className = "msg error";
+      el.querySelector(".reasoning")?.remove();
+      el._reasoning = null;
       setText(el, `Couldn't get a reply. ${err.message}`);
     }
   } finally {
+    finishReasoning(el);
     render(el);
-    if (el.classList.contains("assistant") && !el._text) el.remove();
+    if (el.classList.contains("assistant") && !el._text && !el._reasoning) el.remove();
     if (state.abort === ctrl) { // a newer turn may already own the UI (e.g. after switching chats)
       state.busy = false;
       state.abort = null;

@@ -80,6 +80,12 @@ main.is-started #empty { display: none; }
 .msg.user .body { max-width: 85%; padding: 9px 14px; border-radius: 16px 16px 4px 16px; background: var(--bg); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.assistant .body { font: 1.0625rem/1.7 var(--serif); overflow-wrap: anywhere; }
 .msg.error .body { padding-left: 12px; border-left: 3px solid var(--danger); color: var(--danger); }
+.reasoning { margin: 0 0 12px; font: .9rem/1.55 var(--sans); color: var(--muted); }
+.reasoning summary { width: fit-content; padding: 2px 0; cursor: pointer; }
+.reasoning summary:hover { color: var(--ink); }
+.reasoning-body { margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--line); max-height: 16rem; overflow-y: auto; }
+.reasoning-body > * { margin: 0 0 .6em; }
+.reasoning-body > :last-child { margin-bottom: 0; }
 .note { margin: 4px 0 0; font-size: .85rem; color: var(--muted); }
 
 .body > :first-child { margin-top: 0; }

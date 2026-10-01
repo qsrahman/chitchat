@@ -187,18 +187,23 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
 
     Yields the events from llm.py, plus {"type": "title", "title": ...} after "done" when the
     conversation still has its default title. A reply that errors is not saved; a reply cut
-    short (client disconnect = Stop) is saved with meta {"stopped": true}.
+    short (client disconnect = Stop) is saved with meta {"stopped": true}. The message's meta also
+    keeps the reasoning summary and token usage when there are any.
     """
     cid, conn = turn.conv["id"], turn.conn
     needs_title = turn.conv["title"] == store.DEFAULT_TITLE
-    reply, finished = [], False
+    reply, reasoning, finished = [], [], False
     try:
         async for event in turn.llm.stream_reply(turn.model, turn.history, **turn.options):
             if event["type"] == "delta":
                 reply.append(event["text"])
+            elif event["type"] == "reasoning_delta":
+                reasoning.append(event["text"])
             elif event["type"] == "done":
                 text = "".join(reply)
-                meta = {"incomplete": event["incomplete"]} if "incomplete" in event else None
+                meta = {k: event[k] for k in ("incomplete", "usage") if k in event}
+                if reasoning:
+                    meta["reasoning"] = "".join(reasoning)
                 store.add_message(conn, cid, "assistant", text, meta)
                 finished = True
                 yield event
@@ -213,7 +218,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
             yield event
     finally:
         if not finished and reply:
-            store.add_message(conn, cid, "assistant", "".join(reply), {"stopped": True})
+            meta = {"stopped": True, **({"reasoning": "".join(reasoning)} if reasoning else {})}
+            store.add_message(conn, cid, "assistant", "".join(reply), meta)
 
 
 # Server-sent events over POST: FastAPI frames each yielded dict as `data: {json}` and adds keepalive pings.

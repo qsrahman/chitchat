@@ -11,4 +11,5 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.5"
     openai_max_retries: int = 2
     openai_max_output_tokens: int | None = None
+    openai_reasoning_summaries: bool = True  # ask reasoning models for a summary of their thinking
     db_path: str = "chitchat.db"

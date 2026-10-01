@@ -1,7 +1,9 @@
 """The only module that imports openai. Normalizes SDK stream events into ours:
 
     {"type": "delta", "text": str}
-    {"type": "done"}                      # "incomplete": reason, when the reply hit a limit
+    {"type": "reasoning_delta", "text": str}          # streamed reasoning summary
+    {"type": "done"}   # plus "incomplete": reason (hit a limit) and "usage": {input_tokens, output_tokens,
+                       # reasoning_tokens}, when there are any
     {"type": "error", "message": str}
 """
 import re
@@ -26,6 +28,19 @@ _REASONING = re.compile(r"^(o\d|gpt-5|gpt-oss)")
 
 def supports_reasoning(model: str) -> bool:
     return bool(_REASONING.match(model))
+
+
+def _usage(response) -> dict:
+    """{"usage": {...}} from a finished response, or {} when the endpoint reports none."""
+    u = response.usage
+    if not u:
+        return {}
+    details = u.output_tokens_details
+    return {"usage": {
+        "input_tokens": u.input_tokens,
+        "output_tokens": u.output_tokens,
+        "reasoning_tokens": (details.reasoning_tokens if details else 0) or 0,
+    }}
 
 
 class OpenAILLM:
@@ -63,8 +78,15 @@ class OpenAILLM:
         extra = {}
         if instructions:
             extra["instructions"] = instructions
+        reasoning = {}
         if reasoning_effort:
-            extra["reasoning"] = {"effort": reasoning_effort}
+            reasoning["effort"] = reasoning_effort
+        # Summaries are what the UI shows as "Reasoning". OpenAI refuses them for unverified organizations,
+        # hence the switch; non-reasoning models would reject the whole `reasoning` parameter.
+        if self.settings.openai_reasoning_summaries and supports_reasoning(model):
+            reasoning["summary"] = "auto"
+        if reasoning:
+            extra["reasoning"] = reasoning
         if temperature is not None:
             extra["temperature"] = temperature
         try:
@@ -76,18 +98,24 @@ class OpenAILLM:
                 max_output_tokens=self.settings.openai_max_output_tokens,
                 **extra,
             )
+            part = None  # summary part index, so consecutive parts don't run together
             async for ev in stream:
                 match ev.type:
                     case "response.output_text.delta":
                         yield {"type": "delta", "text": ev.delta}
+                    case "response.reasoning_summary_text.delta":
+                        gap = "\n\n" if part is not None and part != ev.summary_index else ""
+                        part = ev.summary_index
+                        yield {"type": "reasoning_delta", "text": gap + ev.delta}
                     case "response.completed":
-                        yield {"type": "done"}
+                        yield {"type": "done", **_usage(ev.response)}
                     case "response.failed":
                         err = ev.response.error
                         yield {"type": "error", "message": err.message if err else "response failed"}
                     case "response.incomplete":
                         details = ev.response.incomplete_details
-                        yield {"type": "done", "incomplete": details.reason if details else "unknown"}
+                        reason = details.reason if details else "unknown"
+                        yield {"type": "done", "incomplete": reason, **_usage(ev.response)}
                     case "error":
                         yield {"type": "error", "message": ev.message}
         except openai.OpenAIError as e:

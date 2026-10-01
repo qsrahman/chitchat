@@ -85,3 +85,43 @@ async def test_disconnect_before_any_text_saves_no_reply(client, llm):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert [m["role"] for m in await messages(client, cid)] == ["user"]
+
+
+async def test_reasoning_and_usage_are_saved_in_meta(client, llm):
+    usage = {"input_tokens": 10, "output_tokens": 20, "reasoning_tokens": 5}
+    llm.events = [
+        {"type": "reasoning_delta", "text": "Think "}, {"type": "reasoning_delta", "text": "hard."},
+        {"type": "delta", "text": "Answer"}, {"type": "done", "usage": usage},
+    ]
+    cid = await new_conv(client)
+    r = await chat(client, cid, "hi")
+    assert [e["type"] for e in parse_sse(r.text)] == ["reasoning_delta", "reasoning_delta", "delta", "done", "title"]
+    assert (await messages(client, cid))[-1]["meta"] == {"reasoning": "Think hard.", "usage": usage}
+
+
+async def test_plain_reply_has_empty_meta(client, llm):
+    cid = await new_conv(client)
+    await chat(client, cid, "hi")
+    assert (await messages(client, cid))[-1]["meta"] == {}
+
+
+async def test_stopped_reply_keeps_its_reasoning(client, llm):
+    llm.events = [{"type": "reasoning_delta", "text": "Hmm."}, {"type": "delta", "text": "part"}, {"type": "hang"}]
+    cid = await new_conv(client)
+    task = asyncio.create_task(chat(client, cid, "hi"))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert (await messages(client, cid))[-1]["meta"] == {"stopped": True, "reasoning": "Hmm."}
+
+
+async def test_reasoning_without_an_answer_is_not_saved_when_stopped(client, llm):
+    llm.events = [{"type": "reasoning_delta", "text": "Hmm."}, {"type": "hang"}]
+    cid = await new_conv(client)
+    task = asyncio.create_task(chat(client, cid, "hi"))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert [m["role"] for m in await messages(client, cid)] == ["user"]

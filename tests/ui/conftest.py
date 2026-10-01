@@ -48,6 +48,18 @@ class ScriptedLLM:
             for i in range(80):
                 await asyncio.sleep(0.04)
                 yield {"type": "delta", "text": f"Paragraph {i} of a long answer.\n\n"}
+        elif "ponder" in text:  # reasoning summary first, then the answer and its token usage
+            yield {"type": "reasoning_delta", "text": "**Weighing options.**"}
+            await asyncio.sleep(0.4)
+            yield {"type": "reasoning_delta", "text": "\n\nChecking the sums."}
+            if "broken" in text:
+                yield {"type": "error", "message": "model fell over"}
+                return
+            await asyncio.sleep(0.4)
+            yield {"type": "delta", "text": "The answer is 42."}
+            usage = {"input_tokens": 1234, "output_tokens": 567, "reasoning_tokens": 300}
+            yield {"type": "done", "usage": usage}
+            return
         elif "literal" in text:
             yield {"type": "delta", "text": "```weird\n<b>not bold</b> & 'q' <script>window.__xss=1</script>\n```"}
         elif "code" in text:
