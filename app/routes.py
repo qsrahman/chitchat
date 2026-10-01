@@ -84,7 +84,7 @@ def _stream_turn(request: Request, conv: dict, history: list[dict], model: str |
     short (client disconnect = Stop) is saved with meta {"stopped": true}.
     """
     cid = conv["id"]
-    model = model or request.app.state.settings.default_model
+    model = model or request.app.state.settings.openai_model
     needs_title = conv["title"] == store.DEFAULT_TITLE
     llm = request.app.state.llm
     db_path = request.app.state.settings.db_path
@@ -99,7 +99,8 @@ def _stream_turn(request: Request, conv: dict, history: list[dict], model: str |
                         reply.append(event["text"])
                     elif event["type"] == "done":
                         text = "".join(reply)
-                        store.add_message(conn, cid, "assistant", text)
+                        meta = {"incomplete": event["incomplete"]} if "incomplete" in event else None
+                        store.add_message(conn, cid, "assistant", text, meta)
                         finished = True
                         yield sse(event)
                         if needs_title:

@@ -1,7 +1,7 @@
 """The only module that imports openai. Normalizes SDK stream events into ours:
 
     {"type": "delta", "text": str}
-    {"type": "done"}
+    {"type": "done"}                      # "incomplete": reason, when the reply hit a limit
     {"type": "error", "message": str}
 """
 from collections.abc import AsyncIterator
@@ -9,25 +9,34 @@ from collections.abc import AsyncIterator
 import openai
 from openai import AsyncOpenAI
 
+from app.config import Settings
+
 Event = dict
 
 
 class OpenAILLM:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+    def __init__(self, settings: Settings):
+        self.settings = settings
         self._client: AsyncOpenAI | None = None
 
     @property
     def client(self) -> AsyncOpenAI:
         # Lazy: the SDK raises at construction when no key is set, which would break importing the app.
         if self._client is None:
-            self._client = AsyncOpenAI(api_key=self.api_key or None)
+            s = self.settings
+            self._client = AsyncOpenAI(
+                api_key=s.openai_api_key or None, base_url=s.openai_base_url, max_retries=s.openai_max_retries
+            )
         return self._client
 
     async def stream_reply(self, model: str, messages: list[dict]) -> AsyncIterator[Event]:
         try:
             stream = await self.client.responses.create(
-                model=model, input=messages, store=False, stream=True
+                model=model,
+                input=messages,
+                store=False,
+                stream=True,
+                max_output_tokens=self.settings.openai_max_output_tokens,
             )
             async for ev in stream:
                 match ev.type:
@@ -39,7 +48,8 @@ class OpenAILLM:
                         err = ev.response.error
                         yield {"type": "error", "message": err.message if err else "response failed"}
                     case "response.incomplete":
-                        yield {"type": "error", "message": "response incomplete"}
+                        details = ev.response.incomplete_details
+                        yield {"type": "done", "incomplete": details.reason if details else "unknown"}
                     case "error":
                         yield {"type": "error", "message": ev.message}
         except openai.OpenAIError as e:

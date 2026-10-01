@@ -85,3 +85,11 @@ async def test_failed_reply_keeps_user_message_only(client, llm):
 async def test_chat_rejects_empty_content(client):
     cid = await new_conv(client)
     assert (await client.post(f"/api/conversations/{cid}/chat", json={"content": ""})).status_code == 422
+
+
+async def test_incomplete_reply_is_saved_and_flagged(client, llm):
+    llm.events = [{"type": "delta", "text": "long"}, {"type": "done", "incomplete": "max_output_tokens"}]
+    cid = await new_conv(client)
+    await client.post(f"/api/conversations/{cid}/chat", json={"content": "hi"})
+    last = (await client.get(f"/api/conversations/{cid}")).json()["messages"][-1]
+    assert (last["content"], last["meta"]) == ("long", {"incomplete": "max_output_tokens"})

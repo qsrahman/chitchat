@@ -24,7 +24,10 @@ Environment variables or `.env`:
 | Variable | Default | Purpose |
 |---|---|---|
 | `OPENAI_API_KEY` | | OpenAI credentials |
-| `DEFAULT_MODEL` | `gpt-5.5` | Model used when a request doesn't name one |
+| `OPENAI_MODEL` | `gpt-5.5` | Model for chat replies and titles |
+| `OPENAI_BASE_URL` | SDK default | Point at a proxy or compatible endpoint |
+| `OPENAI_MAX_RETRIES` | `2` | SDK retries on transient errors |
+| `OPENAI_MAX_OUTPUT_TOKENS` | none | Cap on tokens per reply; a reply that hits it is kept and flagged |
 | `DB_PATH` | `chitchat.db` | SQLite file |
 
 ## Test

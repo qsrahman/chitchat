@@ -13,7 +13,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="ChitChat")
     app.state.settings = settings or Settings()
     db.init(app.state.settings.db_path)
-    app.state.llm = OpenAILLM(app.state.settings.openai_api_key)
+    app.state.llm = OpenAILLM(app.state.settings)
     app.include_router(router)
 
     @app.get("/healthz")

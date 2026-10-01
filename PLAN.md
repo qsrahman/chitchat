@@ -12,7 +12,7 @@ Every phase lands as **code + tests + `docs/phase-N.md` + one commit** (`phase N
 ```
 app/
   main.py      create_app(): routes + static + lifespan
-  config.py    Settings (env / .env)
+  config.py    Settings (env / .env; OPENAI_* names)
   db.py        sqlite connection + schema (PRAGMA user_version)
   store.py     plain functions: conversations + messages CRUD
   llm.py       the ONLY module importing openai; emits normalized events
@@ -57,6 +57,5 @@ Phases 0 to 3 give a usable ChatGPT-lite. Phases 4 onward can be reordered.
 5. Commit.
 
 ## Open items
-- Confirm `DEFAULT_MODEL` (currently `gpt-5.5`) is available on the account.
 - `marked` and `DOMPurify` load from a CDN. Vendor them if offline use matters.
 - Single local user until phase 9, so there is no auth before then.
