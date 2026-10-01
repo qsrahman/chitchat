@@ -11,11 +11,15 @@ class FakeLLM:
     def __init__(self, events=None):
         self.events = events or [{"type": "delta", "text": "Hello"}, {"type": "delta", "text": " world"}, {"type": "done"}]
         self.calls = []
+        self.title = "Fake title"
 
     async def stream_reply(self, model, messages):
         self.calls.append({"model": model, "messages": messages})
         for e in self.events:
             yield e
+
+    async def generate_title(self, model, user_text, reply_text):
+        return self.title
 
 
 @pytest.fixture
@@ -34,3 +38,4 @@ def app(tmp_path, llm):
 async def client(app):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         yield c
+

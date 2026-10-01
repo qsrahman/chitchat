@@ -4,7 +4,8 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 
 ## Features
 - Streaming replies (SSE) with markdown rendering
-- Planned: saved conversations and sidebar, stop/regenerate/edit, model and system-prompt settings, reasoning summaries, attachments, web search and tools, search and export
+- Saved conversations in SQLite, sidebar with new/rename/delete, auto-generated titles, shareable `#<id>` links
+- Planned: stop/regenerate/edit, model and system-prompt settings, reasoning summaries, attachments, web search and tools, search and export
 
 ## Requirements
 Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key.
@@ -23,7 +24,7 @@ Environment variables or `.env`:
 |---|---|---|
 | `OPENAI_API_KEY` | | OpenAI credentials |
 | `DEFAULT_MODEL` | `gpt-5.5` | Model used when a request doesn't name one |
-| `DB_PATH` | `chitchat.db` | SQLite file (used from phase 2) |
+| `DB_PATH` | `chitchat.db` | SQLite file |
 
 ## Test
 ```bash
@@ -35,6 +36,8 @@ uv run pytest -m live    # hits the real API, needs OPENAI_API_KEY
 ```
 app/llm.py      the only module that talks to OpenAI; emits normalized events
 app/routes.py   HTTP + SSE endpoints
+app/db.py       SQLite connection + migrations
+app/store.py    conversation/message CRUD
 app/static/     vanilla JS UI (no build step)
 tests/          pytest suite
 docs/           architecture.md and per-phase notes

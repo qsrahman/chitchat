@@ -12,7 +12,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 ## Layout
 - `app/llm.py`: the only module that imports `openai`. It yields our normalized events (`delta`, `done`, `error`, ...).
 - `app/routes.py`: HTTP and SSE endpoints. `app/main.py` is the `create_app()` factory.
-- `app/db.py` and `app/store.py` (from phase 2): SQLite schema and plain CRUD functions.
+- `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions.
 - `app/static/`: vanilla JS UI, no build step.
 
 ## Conventions

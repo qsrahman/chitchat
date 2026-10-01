@@ -4,7 +4,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ChitChat</title>
 <link rel="stylesheet" href="style.css">
+<body>
+<aside id="sidebar">
+  <button id="new-chat" type="button">+ New chat</button>
+  <nav id="conversations" aria-label="Conversations"></nav>
+</aside>
 <main>
+  <button id="toggle-nav" type="button" aria-label="Toggle conversations">☰</button>
   <div id="messages" aria-live="polite"></div>
   <form id="form">
     <textarea id="input" rows="1" placeholder="Message ChitChat" autofocus></textarea>

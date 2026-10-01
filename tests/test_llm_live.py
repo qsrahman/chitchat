@@ -14,3 +14,10 @@ async def test_live_stream_normalization():
         s.default_model, [{"role": "user", "content": "Say hi in one word."}])]
     assert any(e["type"] == "delta" for e in events)
     assert events[-1] == {"type": "done"}
+
+
+@pytest.mark.live
+async def test_live_generate_title():
+    s = Settings()
+    title = await OpenAILLM(s.openai_api_key).generate_title(s.default_model, "How do I sort a list in Python?", "Use sorted().")
+    assert title

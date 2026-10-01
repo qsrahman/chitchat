@@ -33,8 +33,8 @@ Seams that keep features additive:
 |---|---|---|
 | 0 | done | Scaffold: uv project, app factory, settings, `/healthz`, pytest harness |
 | 1 | done | Streaming chat over SSE, markdown rendering, history in browser memory |
-| 2 | next | SQLite persistence, conversation sidebar (create/list/rename/delete), auto-title, URL per conversation |
-| 3 | | Stop generation (partial message saved), regenerate, edit last user message, copy, retry |
+| 2 | done | SQLite persistence, conversation sidebar (create/list/rename/delete), auto-title, URL per conversation |
+| 3 | next | Stop generation (partial message saved), regenerate, edit last user message, copy, retry |
 | 4 | | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
 | 5 | | Reasoning summaries (collapsible), token usage display |
 | 6 | | Attachments: images (`input_image`), files/PDF (`input_file`) |

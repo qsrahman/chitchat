@@ -44,3 +44,16 @@ class OpenAILLM:
                         yield {"type": "error", "message": ev.message}
         except openai.OpenAIError as e:
             yield {"type": "error", "message": str(e)}
+
+    async def generate_title(self, model: str, user_text: str, reply_text: str) -> str | None:
+        """Short conversation title, or None on any API failure (titles are best-effort)."""
+        try:
+            r = await self.client.responses.create(
+                model=model,
+                instructions="Write a title of at most 6 words for this chat. Reply with the title only, no quotes or punctuation at the end.",
+                input=f"User: {user_text[:1000]}\n\nAssistant: {reply_text[:1000]}",
+                store=False,
+            )
+        except openai.OpenAIError:
+            return None
+        return r.output_text.strip().strip("\"'").strip() or None
