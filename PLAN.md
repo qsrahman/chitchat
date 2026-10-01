@@ -13,8 +13,8 @@ Every phase lands as **code + tests + `docs/phase-N.md` + one commit** (`phase N
 app/
   main.py      create_app(): routes + static + lifespan
   config.py    Settings (env / .env)
-  db.py        sqlite connection + schema (PRAGMA user_version)        [phase 2]
-  store.py     plain functions: conversations + messages CRUD          [phase 2]
+  db.py        sqlite connection + schema (PRAGMA user_version)
+  store.py     plain functions: conversations + messages CRUD
   llm.py       the ONLY module importing openai; emits normalized events
   routes.py    /api/* + SSE
   static/      index.html, app.js, style.css
