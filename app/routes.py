@@ -1,22 +1,22 @@
-import json
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
-from typing import Annotated, Literal
+from dataclasses import dataclass
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from fastapi.sse import EventSourceResponse
+from pydantic import BaseModel, StringConstraints, model_validator
 
 from app import db, store
-from app.llm import supports_reasoning
+from app.llm import REASONING_EFFORTS, supports_reasoning
+from app.store import ConversationSettings, Instructions
 
 router = APIRouter(prefix="/api")
 
 # Strip on the way in, so whitespace alone is neither a message nor a title.
 Content = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100_000)]
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-Instructions = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10_000)]  # may be empty = unset
 
 
 def get_db(request: Request) -> Iterator[sqlite3.Connection]:
@@ -25,15 +25,6 @@ def get_db(request: Request) -> Iterator[sqlite3.Connection]:
 
 
 Conn = Annotated[sqlite3.Connection, Depends(get_db)]
-
-
-class ConversationSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] | None = None
-    system_prompt: Instructions = ""
-    reasoning_effort: Literal["low", "medium", "high"] | None = None
-    temperature: Annotated[float, Field(ge=0, le=2)] | None = None
 
 
 class ConversationUpdate(BaseModel):
@@ -61,10 +52,6 @@ class EditRequest(BaseModel):
 
 class ChatRequest(EditRequest):
     model: str | None = None
-
-
-def sse(event: dict) -> str:
-    return f"data: {json.dumps(event)}\n\n"
 
 
 def _require(conn: sqlite3.Connection, cid: str) -> dict:
@@ -107,7 +94,11 @@ async def list_models(request: Request):
     """Models to offer in the picker: the configured default first, then whatever the endpoint lists."""
     default = request.app.state.settings.openai_model
     ids = [default] + [m for m in await request.app.state.llm.list_models() if m != default]
-    return {"default": default, "models": [{"id": m, "reasoning": supports_reasoning(m)} for m in ids]}
+    return {
+        "default": default,
+        "efforts": REASONING_EFFORTS,
+        "models": [{"id": m, "reasoning": supports_reasoning(m)} for m in ids],
+    }
 
 
 @router.get("/custom-instructions")
@@ -143,51 +134,24 @@ def _model_options(conn: sqlite3.Connection, conv: dict, model: str) -> dict:
     return options
 
 
-def _stream_turn(
-    request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], model: str | None = None
-) -> StreamingResponse:
-    """Stream a reply to `history` (which ends with a user message) and save it.
+@dataclass
+class Turn:
+    """Everything needed to stream one reply. Built by a dependency, so a missing conversation or a
+    bad request is a normal HTTP error: once a generator endpoint starts streaming, it is too late."""
 
-    Emits SSE events from llm.py, plus {"type": "title", "title": ...} after "done" when the
-    conversation still has its default title. A reply that errors is not saved; a reply cut
-    short (client disconnect = Stop) is saved with meta {"stopped": true}.
-    """
-    cid = conv["id"]
+    conn: sqlite3.Connection
+    llm: Any
+    default_model: str
+    conv: dict
+    history: list[dict]  # ends with the user message being answered
+    model: str
+    options: dict
+
+
+def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], model: str | None = None):
     default_model = request.app.state.settings.openai_model
     model = model or conv["settings"]["model"] or default_model
-    options = _model_options(conn, conv, model)
-    needs_title = conv["title"] == store.DEFAULT_TITLE
-    llm = request.app.state.llm
-    db_path = request.app.state.settings.db_path
-
-    async def body():
-        reply, finished = [], False
-        # Own connection: the dependency's one may be closed before the stream finishes.
-        with closing(db.connect(db_path)) as conn:
-            try:
-                async for event in llm.stream_reply(model, history, **options):
-                    if event["type"] == "delta":
-                        reply.append(event["text"])
-                    elif event["type"] == "done":
-                        text = "".join(reply)
-                        meta = {"incomplete": event["incomplete"]} if "incomplete" in event else None
-                        store.add_message(conn, cid, "assistant", text, meta)
-                        finished = True
-                        yield sse(event)
-                        if needs_title:
-                            asked = history[-1]["content"]
-                            title = await llm.generate_title(default_model, asked, text) or asked[:40]
-                            store.rename_conversation(conn, cid, title)
-                            yield sse({"type": "title", "title": title})
-                        return
-                    elif event["type"] == "error":
-                        finished = True
-                    yield sse(event)
-            finally:
-                if not finished and reply:
-                    store.add_message(conn, cid, "assistant", "".join(reply), {"stopped": True})
-
-    return StreamingResponse(body(), media_type="text/event-stream")
+    return Turn(conn, request.app.state.llm, default_model, conv, history, model, _model_options(conn, conv, model))
 
 
 def _redo_last_user_turn(conn: sqlite3.Connection, cid: str, content: str | None = None) -> tuple[dict, list[dict]]:
@@ -202,22 +166,72 @@ def _redo_last_user_turn(conn: sqlite3.Connection, cid: str, content: str | None
     return conv, _history(conn, cid)
 
 
-@router.post("/conversations/{cid}/chat")
-async def chat(cid: str, req: ChatRequest, request: Request, conn: Conn):
+def chat_turn(cid: str, req: ChatRequest, request: Request, conn: Conn) -> Turn:
     conv = _require(conn, cid)
     store.add_message(conn, cid, "user", req.content)
-    return _stream_turn(request, conn, conv, _history(conn, cid), req.model)
+    return _make_turn(request, conn, conv, _history(conn, cid), req.model)
 
 
-@router.post("/conversations/{cid}/regenerate")
-async def regenerate(cid: str, request: Request, conn: Conn):
-    """New reply to the last user message. Also serves as retry after a failed or stopped reply."""
+def regenerate_turn(cid: str, request: Request, conn: Conn) -> Turn:
     conv, history = _redo_last_user_turn(conn, cid)
-    return _stream_turn(request, conn, conv, history)
+    return _make_turn(request, conn, conv, history)
 
 
-@router.post("/conversations/{cid}/edit")
-async def edit(cid: str, req: EditRequest, request: Request, conn: Conn):
-    """Rewrite the last user message and get a new reply (no branching: later messages are dropped)."""
+def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
     conv, history = _redo_last_user_turn(conn, cid, req.content)
-    return _stream_turn(request, conn, conv, history)
+    return _make_turn(request, conn, conv, history)
+
+
+async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
+    """Stream the reply to turn.history and save it.
+
+    Yields the events from llm.py, plus {"type": "title", "title": ...} after "done" when the
+    conversation still has its default title. A reply that errors is not saved; a reply cut
+    short (client disconnect = Stop) is saved with meta {"stopped": true}.
+    """
+    cid, conn = turn.conv["id"], turn.conn
+    needs_title = turn.conv["title"] == store.DEFAULT_TITLE
+    reply, finished = [], False
+    try:
+        async for event in turn.llm.stream_reply(turn.model, turn.history, **turn.options):
+            if event["type"] == "delta":
+                reply.append(event["text"])
+            elif event["type"] == "done":
+                text = "".join(reply)
+                meta = {"incomplete": event["incomplete"]} if "incomplete" in event else None
+                store.add_message(conn, cid, "assistant", text, meta)
+                finished = True
+                yield event
+                if needs_title:
+                    asked = turn.history[-1]["content"]
+                    title = await turn.llm.generate_title(turn.default_model, asked, text) or asked[:40]
+                    store.rename_conversation(conn, cid, title)
+                    yield {"type": "title", "title": title}
+                return
+            elif event["type"] == "error":
+                finished = True
+            yield event
+    finally:
+        if not finished and reply:
+            store.add_message(conn, cid, "assistant", "".join(reply), {"stopped": True})
+
+
+# Server-sent events over POST: FastAPI frames each yielded dict as `data: {json}` and adds keepalive pings.
+@router.post("/conversations/{cid}/chat", response_class=EventSourceResponse)
+async def chat(turn: Annotated[Turn, Depends(chat_turn)]) -> AsyncIterator[dict]:
+    async for event in _stream_turn(turn):
+        yield event
+
+
+@router.post("/conversations/{cid}/regenerate", response_class=EventSourceResponse)
+async def regenerate(turn: Annotated[Turn, Depends(regenerate_turn)]) -> AsyncIterator[dict]:
+    """New reply to the last user message. Also serves as retry after a failed or stopped reply."""
+    async for event in _stream_turn(turn):
+        yield event
+
+
+@router.post("/conversations/{cid}/edit", response_class=EventSourceResponse)
+async def edit(turn: Annotated[Turn, Depends(edit_turn)]) -> AsyncIterator[dict]:
+    """Rewrite the last user message and get a new reply (no branching: later messages are dropped)."""
+    async for event in _stream_turn(turn):
+        yield event

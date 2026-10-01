@@ -3,10 +3,29 @@ import json
 import sqlite3
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from app.llm import ReasoningEffort
 
 DEFAULT_TITLE = "New chat"
-# Per-conversation settings; None / "" mean "use the default".
-DEFAULT_SETTINGS = {"model": None, "system_prompt": "", "reasoning_effort": None, "temperature": None}
+
+Instructions = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10_000)]  # may be empty = unset
+
+
+class ConversationSettings(BaseModel):
+    """Per-conversation settings. None / "" mean "use the default"."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] | None = None
+    system_prompt: Instructions = ""
+    reasoning_effort: ReasoningEffort = None
+    temperature: Annotated[float, Field(ge=0, le=2)] | None = None
+
+
+DEFAULT_SETTINGS = ConversationSettings().model_dump()
 
 
 def _now() -> str:

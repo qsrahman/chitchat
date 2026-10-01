@@ -1,16 +1,6 @@
 import re
-import time
 
 from playwright.sync_api import Page, expect
-
-
-def eventually(check, timeout=5.0):
-    """Poll `check()` until it returns truthy (Playwright's Python API has no expect.poll)."""
-    deadline = time.monotonic() + timeout
-    while not (result := check()):
-        assert time.monotonic() < deadline, "condition not met in time"
-        time.sleep(0.05)
-    return result
 
 
 def send(page: Page, text: str):
@@ -30,6 +20,14 @@ def open_sidebar(page: Page):
 
 def conv_id(page: Page) -> str:
     return page.url.split("#")[1]
+
+
+def wait_until_saved(page: Page, count: int):
+    """Wait until the server has stored `count` messages for the open conversation."""
+    page.wait_for_function(
+        "async ([url, n]) => (await (await fetch(url)).json()).messages.length === n",
+        arg=[f"{page.url.split('#')[0]}api/conversations/{conv_id(page)}", count],
+    )
 
 
 def saved_messages(page: Page) -> list[dict]:
@@ -84,6 +82,16 @@ def test_code_block_is_highlighted_and_copyable(page, app_url):
     assert page.evaluate("navigator.clipboard.readText()") == "for i in range(3):\n    print(i)"
 
 
+def test_code_block_text_is_shown_literally_whatever_the_language(page, app_url):
+    open_app(page, app_url)
+    send(page, "literal code")
+    block = page.locator(".code")
+    expect(block.locator(".code-bar span")).to_have_text("weird")
+    expect(block.locator("code")).to_have_text("<b>not bold</b> & 'q' <script>window.__xss=1</script>")
+    expect(block.locator("code b, code script")).to_have_count(0)
+    assert page.evaluate("window.__xss") is None
+
+
 def test_untrusted_markup_is_sanitized(page, app_url):
     open_app(page, app_url)
     send(page, "xss please")
@@ -117,7 +125,7 @@ def test_stop_button_keeps_partial_reply(page, app_url):
     expect(page.get_by_role("button", name="Regenerate")).to_be_visible()
     shown = page.locator(".msg.assistant .body").inner_text()
     assert "word2" in shown and "word59" not in shown
-    eventually(lambda: len(saved_messages(page)) == 2)
+    wait_until_saved(page, 2)
     page.reload()
     expect(page.locator(".msg.assistant .body")).to_contain_text("word2")
     expect(page.locator(".msg.assistant > .note")).to_have_text("Stopped.")
@@ -261,7 +269,9 @@ def test_reader_scrolling_up_is_not_yanked_down_and_can_jump_back(page, app_url)
     open_app(page, app_url)
     send(page, "long answer")
     messages = page.locator("#messages")
-    eventually(lambda: messages.evaluate("el => el.scrollHeight - el.clientHeight") > 300)
+    page.wait_for_function(
+        "() => { const el = document.getElementById('messages'); return el.scrollHeight - el.clientHeight > 300 }"
+    )
     messages.evaluate("el => { el.scrollTop = 0 }")
     jump = page.get_by_role("button", name="Jump to latest")
     expect(jump).to_be_visible()

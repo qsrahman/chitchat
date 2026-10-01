@@ -48,6 +48,8 @@ class ScriptedLLM:
             for i in range(80):
                 await asyncio.sleep(0.04)
                 yield {"type": "delta", "text": f"Paragraph {i} of a long answer.\n\n"}
+        elif "literal" in text:
+            yield {"type": "delta", "text": "```weird\n<b>not bold</b> & 'q' <script>window.__xss=1</script>\n```"}
         elif "code" in text:
             yield {"type": "delta", "text": CODE_REPLY}
         elif "xss" in text:
@@ -75,7 +77,7 @@ class ScriptedLLM:
 @pytest.fixture
 def app_url(tmp_path):
     app = create_app(Settings(
-        db_path=str(tmp_path / "ui.db"), openai_api_key="test", openai_model=ScriptedLLM.default_model
+        _env_file=None, db_path=str(tmp_path / "ui.db"), openai_api_key="test", openai_model=ScriptedLLM.default_model
     ))
     app.state.llm = ScriptedLLM()
     sock = socket.socket()

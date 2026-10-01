@@ -158,7 +158,8 @@ thread.addEventListener("click", async (e) => {
 });
 
 // ---- sse ----
-// POST + ReadableStream: yields parsed `data: {json}` SSE events.
+// Yields parsed `data: {json}` SSE events. Hand-written because EventSource is GET-only, and these turns
+// are POSTs; TextDecoderStream does the decoding. Comment frames (keepalive pings) are skipped.
 async function* readSSE(response) {
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = "";
@@ -396,12 +397,13 @@ function syncSettingsFields() {
 $("set-model").addEventListener("change", syncSettingsFields);
 
 async function openSettings() {
-  const { default: fallback, models } = await api("/models");
+  const { default: fallback, efforts, models } = await api("/models");
   const s = state.settings;
   reasoningModels = new Map([["", models[0].reasoning], ...models.map((m) => [m.id, m.reasoning])]);
   const options = models.slice(1).map((m) => new Option(m.id, m.id));
   if (s.model && !reasoningModels.has(s.model)) options.push(new Option(s.model, s.model)); // no longer listed
   $("set-model").replaceChildren(new Option(`Default (${fallback})`, ""), ...options);
+  $("set-effort").replaceChildren(new Option("Default", ""), ...efforts.map((e) => new Option(e, e)));
   $("set-model").value = s.model ?? "";
   $("set-system").value = s.system_prompt;
   $("set-effort").value = s.reasoning_effort ?? "";

@@ -9,7 +9,7 @@
 - `GET /api/models` -> `{default, models: [{id, reasoning}]}`. The configured `OPENAI_MODEL` comes first, then whatever the endpoint's `/models` lists (embedding models hidden). If the endpoint can't list models, only the default is offered.
 - `POST /api/conversations` takes an optional `{settings}`. `PATCH /api/conversations/{id}` takes `{title?, settings?}` (at least one); `settings` replaces the whole object.
 - `GET/PUT /api/custom-instructions` -> `{text}`.
-- Validation: `reasoning_effort` is `low|medium|high`, `temperature` 0 to 2, prompts and instructions up to 10,000 characters, unknown keys rejected.
+- Validation: `reasoning_effort` is the SDK's own `ReasoningEffort` type (the API also serves the list as `efforts`, which builds the dropdown), `temperature` 0 to 2, prompts and instructions up to 10,000 characters, unknown keys rejected.
 
 ## Design notes
 - **Which parameter applies:** the API can't be asked whether a model takes `reasoning.effort` or `temperature`, so `llm.supports_reasoning()` goes by name (`o<digit>`, `gpt-5*`, `gpt-oss*` are reasoning models). The server sends only the parameter that applies, so a stale setting never reaches a model that would reject it. The settings dialog shows the matching control, and both for a model that is no longer listed.

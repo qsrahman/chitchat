@@ -18,6 +18,7 @@ async def test_models_lists_default_first_with_reasoning_flags(client, llm):
     llm.models = ["gpt-5-mini", "llama3", "test-model", "o3"]
     got = (await client.get("/api/models")).json()
     assert got["default"] == "test-model"
+    assert {"low", "medium", "high"} <= set(got["efforts"])
     assert [(m["id"], m["reasoning"]) for m in got["models"]] == [
         ("test-model", False), ("gpt-5-mini", True), ("llama3", False), ("o3", True),
     ]
@@ -56,6 +57,7 @@ async def test_patch_title_keeps_settings_and_settings_keep_title(client):
     {},
     {"title": None},
     {"settings": {"reasoning_effort": "extreme"}},
+    {"settings": {"reasoning_effort": ""}},
     {"settings": {"temperature": 2.5}},
     {"settings": {"temperature": -0.1}},
     {"settings": {"unknown": 1}},

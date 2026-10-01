@@ -1,5 +1,6 @@
 // Markdown -> sanitized HTML. marked, DOMPurify and highlight.js are loaded as globals (vendor/).
-const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// highlight.js's "plaintext" language is its HTML escaper: no highlighting, entity-escaped output.
+const escapeHtml = (text) => hljs.highlight(text, { language: "plaintext" }).value;
 
 marked.use({
   renderer: {

@@ -5,14 +5,19 @@
     {"type": "error", "message": str}
 """
 import re
+import typing
 from collections.abc import AsyncIterator
 
 import openai
 from openai import AsyncOpenAI
+from openai.types.shared import ReasoningEffort
 
 from app.config import Settings
 
 Event = dict
+
+# The SDK's own list of effort levels (its type is Optional[Literal[...]]). Which of them a model accepts varies.
+REASONING_EFFORTS: list[str] = list(typing.get_args(typing.get_args(ReasoningEffort)[0]))
 
 # Which models take `reasoning.effort` (and reject `temperature`) can't be asked of the API, so go by name:
 # OpenAI's o-series and gpt-5 family, plus gpt-oss. Everything else is treated as a temperature model.
@@ -24,9 +29,9 @@ def supports_reasoning(model: str) -> bool:
 
 
 class OpenAILLM:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, client: AsyncOpenAI | None = None):
         self.settings = settings
-        self._client: AsyncOpenAI | None = None
+        self._client = client
 
     @property
     def client(self) -> AsyncOpenAI:

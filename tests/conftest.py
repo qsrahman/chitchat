@@ -41,7 +41,9 @@ def llm():
 
 @pytest.fixture
 def app(tmp_path, llm):
-    app = create_app(Settings(db_path=str(tmp_path / "test.db"), openai_api_key="test", openai_model="test-model"))
+    app = create_app(
+        Settings(_env_file=None, db_path=str(tmp_path / "test.db"), openai_api_key="test", openai_model="test-model")
+    )
     app.state.llm = llm
     return app
 
