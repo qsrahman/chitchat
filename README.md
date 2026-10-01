@@ -6,10 +6,11 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Streaming replies (SSE) with markdown rendering
 - Saved conversations in SQLite, sidebar with new/rename/delete, auto-generated titles, shareable `#<id>` links
 - Stop generation (partial reply kept), regenerate, retry, edit the last message, copy
+- Reading-focused UI: serif replies, highlighted code with copy, light/dark theme, mobile drawer, smart autoscroll
 - Planned: model and system-prompt settings, reasoning summaries, attachments, web search and tools, search and export
 
 ## Requirements
-Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key.
+Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key. For the browser tests, run `uv run playwright install chromium` once.
 
 ## Run
 ```bash
@@ -32,7 +33,8 @@ Environment variables or `.env`:
 
 ## Test
 ```bash
-uv run pytest            # no network, uses a fake LLM
+uv run pytest            # API + browser (Playwright) tests, no network, fake LLM
+uv run pytest tests/ui   # browser tests only
 uv run pytest -m live    # hits the real API, needs OPENAI_API_KEY
 ```
 
@@ -42,7 +44,8 @@ app/llm.py      the only module that talks to OpenAI; emits normalized events
 app/routes.py   HTTP + SSE endpoints
 app/db.py       SQLite connection + migrations
 app/store.py    conversation/message CRUD
-app/static/     vanilla JS UI (no build step)
+app/static/     vanilla JS UI, ES modules, vendored libs (no build step)
+tests/ui/       Playwright browser tests
 tests/          pytest suite
 docs/           architecture.md and per-phase notes
 ```

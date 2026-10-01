@@ -17,7 +17,7 @@ app/
   store.py     plain functions: conversations + messages CRUD
   llm.py       the ONLY module importing openai; emits normalized events
   routes.py    /api/* + SSE
-  static/      index.html, app.js, style.css
+  static/      index.html, app.js, markdown.js, style.css, vendor/ (marked, DOMPurify, highlight.js)
 tests/         pytest + httpx ASGI client + FakeLLM
 docs/          architecture.md, phase-N.md
 ```
@@ -35,6 +35,7 @@ Seams that keep features additive:
 | 1 | done | Streaming chat over SSE, markdown rendering, history in browser memory |
 | 2 | done | SQLite persistence, conversation sidebar (create/list/rename/delete), auto-title, URL per conversation |
 | 3 | done | Stop generation (partial message saved), regenerate, edit last user message, copy, retry |
+| 3b | done | UI/UX polish (`docs/ui-polish.md`) and Playwright browser tests |
 | 4 | next | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
 | 5 | | Reasoning summaries (collapsible), token usage display |
 | 6 | | Attachments: images (`input_image`), files/PDF (`input_file`) |
@@ -47,15 +48,14 @@ Phases 0 to 3 give a usable ChatGPT-lite. Phases 4 onward can be reordered.
 ## Testing
 - Default suite makes no network calls: pytest + `httpx.ASGITransport` + temp SQLite + `FakeLLM`.
 - One opt-in live test (`uv run pytest -m live`, needs `OPENAI_API_KEY`) checks event normalization against the real API.
-- Frontend: no JS test framework. Each phase gets a manual browser check (fake LLM server, DOM driven through the browser), which is a deliberate change from adding a Playwright suite, to avoid a heavy dependency.
+- Frontend: Playwright (`pytest-playwright`, Chromium) in `tests/ui/`, against the real app on a free port with a `ScriptedLLM`. Any new UI behavior gets a test there. One-time setup: `uv run playwright install chromium`.
 
 ## Per-phase checklist
-1. Write tests first where practical, then code.
-2. `uv run pytest` green.
-3. Run `uv run uvicorn app.main:app --reload` and exercise the feature in the browser.
+1. Write tests first where practical (API tests, plus a Playwright test for any UI change), then code.
+2. `uv run pytest` green (includes the browser tests).
+3. Run `uv run uvicorn app.main:app --reload` and try the feature against the real API.
 4. Add `docs/phase-N.md`, update the table above and the README feature list.
 5. Commit.
 
 ## Open items
-- `marked` and `DOMPurify` load from a CDN. Vendor them if offline use matters.
 - Single local user until phase 9, so there is no auth before then.

@@ -5,7 +5,8 @@ ChitChat: a ChatGPT-style web chat app on the OpenAI Responses API. Built in pha
 ## Commands
 ```
 uv run uvicorn app.main:app --reload   # dev server on :8000
-uv run pytest                          # default suite, no network
+uv run pytest                          # API + Playwright UI tests, no network
+uv run pytest tests/ui                 # UI tests only (needs: uv run playwright install chromium)
 uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 ```
 
@@ -13,7 +14,8 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - `app/llm.py`: the only module that imports `openai`. It yields our normalized events (`delta`, `done`, `error`, ...).
 - `app/routes.py`: HTTP and SSE endpoints. `app/main.py` is the `create_app()` factory.
 - `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions.
-- `app/static/`: vanilla JS UI, no build step.
+- `app/static/`: vanilla JS UI as ES modules (`app.js`, `markdown.js`), no build step. Libraries are vendored in `static/vendor/`; don't add CDN links.
+- `tests/ui/`: Playwright tests against the real app with a `ScriptedLLM` (`tests/ui/conftest.py`).
 
 ## Conventions
 - Work one phase at a time, as in `PLAN.md`. A phase is code + tests + `docs/phase-N.md` + one commit titled `phase N: <summary>`. Update the `PLAN.md` status table and the README feature list in the same commit.
@@ -21,6 +23,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - Every OpenAI call is stateless: `store=False`, with history sent as `input`. Don't use `previous_response_id` or the Conversations API.
 - Don't leak raw OpenAI events past `llm.py`. For a new feature, add a normalized event type there and handle it in `routes.py` and `app.js`.
 - Wire format is SSE over `POST`: `data: {json}\n\n`.
+- Every UI behavior change comes with a Playwright test in `tests/ui/`. Console errors fail those tests.
 - Tests must not touch the network. Inject `FakeLLM` through `app.state.llm` (see `tests/conftest.py`). Mark real-API tests `@pytest.mark.live`.
 - Anything the model or a user supplies is untrusted. Render assistant markdown through `DOMPurify`, and set user text with `textContent`.
 - Config comes from `Settings` (env / `.env`). Never commit `.env` or `*.db`.

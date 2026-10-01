@@ -1,11 +1,12 @@
-const messagesEl = document.getElementById("messages");
-const listEl = document.getElementById("conversations");
-const form = document.getElementById("form");
-const input = document.getElementById("input");
-const sendBtn = form.querySelector("button");
+import { renderMarkdown } from "./markdown.js";
+
+const $ = (id) => document.getElementById(id);
+const main = document.querySelector("main");
+const [messagesEl, thread, input, sendBtn, form] = ["messages", "thread", "input", "send", "form"].map($);
 
 // id: current conversation (null = new chat, created lazily on first send).
-const state = { id: null, busy: false, abort: null };
+// stick: keep the view pinned to the bottom unless the reader scrolled up.
+const state = { id: null, busy: false, abort: null, stick: true, convs: [] };
 
 async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -13,23 +14,53 @@ async function api(path, opts = {}) {
   return res.status === 204 ? null : res.json();
 }
 
+// ---- scrolling ----
+const nearBottom = () => messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+function scrollToBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+messagesEl.addEventListener("scroll", () => {
+  state.stick = nearBottom();
+  $("jump").hidden = state.stick;
+});
+$("jump").onclick = () => { state.stick = true; scrollToBottom(); };
+
 // ---- messages ----
-// Each .msg = .body (rendered text) + .actions (buttons). el._text keeps the raw text for copy/edit.
-function addMessage(role, text = "") {
+// Each .msg = .body (rendered text) + .note (stopped / cut off) + .actions. el._text is the raw text.
+function addMessage(role, text = "", meta = {}) {
   const el = document.createElement("div");
   el.className = `msg ${role}`;
-  for (const cls of ["body", "actions"]) el.append(Object.assign(document.createElement("div"), { className: cls }));
-  messagesEl.append(el);
+  for (const cls of ["body", "note", "actions"]) el.append(Object.assign(document.createElement("div"), { className: cls }));
+  thread.append(el);
+  main.classList.add("is-started");
+  setNote(el, meta);
   setText(el, text);
   return el;
 }
 
+const bodyOf = (el) => el.children[0];
+const noteOf = (el) => el.children[1];
+const actionsOf = (el) => el.children[2];
+
+function setNote(el, meta) {
+  const note = noteOf(el);
+  note.textContent = meta.stopped ? "Stopped." : meta.incomplete ? "Reply cut off: output limit reached." : "";
+  note.hidden = !note.textContent;
+}
+
+// Re-rendering markdown on every delta is wasteful; coalesce to one render per frame.
 function setText(el, text) {
   el._text = text;
-  const body = el.firstElementChild;
-  if (el.classList.contains("assistant")) body.innerHTML = DOMPurify.sanitize(marked.parse(text));
-  else body.textContent = text;
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  el._frame ??= requestAnimationFrame(() => render(el));
+}
+
+function render(el) {
+  cancelAnimationFrame(el._frame);
+  el._frame = null;
+  const body = bodyOf(el);
+  if (el.classList.contains("assistant")) {
+    if (el._text) body.innerHTML = renderMarkdown(el._text);
+    else body.innerHTML = '<span class="dots" role="status" aria-label="Thinking"><i></i><i></i><i></i></span>';
+  } else body.textContent = el._text;
+  if (state.stick) scrollToBottom();
 }
 
 function actionButton(label, onclick) {
@@ -40,17 +71,16 @@ function actionButton(label, onclick) {
   return b;
 }
 
-const clearActions = () => messagesEl.querySelectorAll(".actions").forEach((a) => a.replaceChildren());
+const clearActions = () => thread.querySelectorAll(".actions").forEach((a) => a.replaceChildren());
 
 // Copy on every reply; Edit on the last user message; Regenerate on the last reply, or
 // Retry when the conversation ends on a user message or an error.
 function updateActions() {
   clearActions();
   if (state.busy) return;
-  const msgs = [...messagesEl.children];
+  const msgs = [...thread.children];
   const last = msgs.at(-1);
   const lastUser = msgs.findLast((m) => m.classList.contains("user"));
-  const actionsOf = (m) => m.lastElementChild;
   for (const m of msgs.filter((m) => m.classList.contains("assistant"))) {
     actionsOf(m).append(actionButton("Copy", async (e) => {
       await navigator.clipboard.writeText(m._text);
@@ -58,7 +88,7 @@ function updateActions() {
       setTimeout(() => (e.target.textContent = "Copy"), 1200);
     }));
   }
-  lastUser?.lastElementChild.append(actionButton("Edit", () => startEdit(lastUser)));
+  if (lastUser) actionsOf(lastUser).append(actionButton("Edit", () => startEdit(lastUser)));
   if (last?.classList.contains("assistant")) actionsOf(last).append(actionButton("Regenerate", regenerate));
   else if (last) actionsOf(last).append(actionButton("Retry", regenerate));
 }
@@ -67,9 +97,10 @@ function startEdit(m) {
   clearActions();
   const ta = document.createElement("textarea");
   ta.className = "edit";
+  ta.setAttribute("aria-label", "Edit your message");
   ta.value = m._text;
-  m.firstElementChild.replaceChildren(ta);
-  m.lastElementChild.append(
+  bodyOf(m).replaceChildren(ta);
+  actionsOf(m).append(
     actionButton("Save", () => {
       const text = ta.value.trim();
       if (!text) return;
@@ -77,17 +108,26 @@ function startEdit(m) {
       setText(m, text);
       runTurn("edit", { content: text });
     }),
-    actionButton("Cancel", () => { setText(m, m._text); updateActions(); }),
+    actionButton("Cancel", () => { render(m); updateActions(); }),
   );
   ta.focus();
 }
 
 function regenerate() {
-  const msgs = messagesEl.children;
-  while (msgs.length && !msgs[msgs.length - 1].classList.contains("user")) msgs[msgs.length - 1].remove();
+  while (thread.lastElementChild && !thread.lastElementChild.classList.contains("user")) thread.lastElementChild.remove();
   runTurn("regenerate");
 }
 
+// Copy button inside rendered code blocks (event delegation: the HTML is re-rendered while streaming).
+thread.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".code-copy");
+  if (!btn) return;
+  await navigator.clipboard.writeText(btn.closest(".code").querySelector("code").innerText);
+  btn.textContent = "Copied";
+  setTimeout(() => (btn.textContent = "Copy"), 1200);
+});
+
+// ---- sse ----
 // POST + ReadableStream: yields parsed `data: {json}` SSE events.
 async function* readSSE(response) {
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -105,63 +145,14 @@ async function* readSSE(response) {
   }
 }
 
-// ---- sidebar ----
-async function refreshList() {
-  const convs = await api("/conversations");
-  listEl.replaceChildren(...convs.map(renderConv));
-}
-
-function renderConv(c) {
-  const row = document.createElement("div");
-  row.className = "conv" + (c.id === state.id ? " active" : "");
-  const link = document.createElement("a");
-  link.href = `#${c.id}`;
-  link.textContent = c.title;
-  const rename = document.createElement("button");
-  rename.textContent = "✎";
-  rename.title = "Rename";
-  rename.onclick = async () => {
-    const title = prompt("Rename conversation", c.title)?.trim();
-    if (title) { await api(`/conversations/${c.id}`, { method: "PATCH", body: JSON.stringify({ title }) }); refreshList(); }
-  };
-  const del = document.createElement("button");
-  del.textContent = "✕";
-  del.title = "Delete";
-  del.onclick = async () => {
-    if (!confirm(`Delete "${c.title}"?`)) return;
-    await api(`/conversations/${c.id}`, { method: "DELETE" });
-    if (c.id === state.id) openConversation(null);
-    refreshList();
-  };
-  row.append(link, rename, del);
-  return row;
-}
-
-async function openConversation(id) {
-  state.abort?.abort(); // a reply still streaming is saved as stopped
-  state.id = id;
-  messagesEl.replaceChildren();
-  document.body.classList.remove("nav-open");
-  if (location.hash.slice(1) !== (id ?? "")) history.replaceState(null, "", id ? `#${id}` : location.pathname);
-  if (id) {
-    try {
-      const conv = await api(`/conversations/${id}`);
-      conv.messages.forEach((m) => addMessage(m.role, m.content));
-      updateActions();
-    } catch {
-      return openConversation(null); // stale link
-    }
-  }
-  refreshList();
-  input.focus();
-}
-
 // ---- sending ----
 // Streams a reply from POST /api/conversations/{id}/{path} into a new assistant message.
 async function runTurn(path, payload = {}) {
+  const ctrl = (state.abort = new AbortController());
   state.busy = true;
-  sendBtn.textContent = "Stop";
-  state.abort = new AbortController();
+  state.stick = true;
+  thread.setAttribute("aria-busy", "true");
+  syncSend();
   updateActions();
   const el = addMessage("assistant");
   let reply = "";
@@ -174,37 +165,54 @@ async function runTurn(path, payload = {}) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: state.abort.signal,
+      signal: ctrl.signal,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
     for await (const ev of readSSE(res)) {
       if (ev.type === "delta") { reply += ev.text; setText(el, reply); }
+      else if (ev.type === "done") setNote(el, ev);
       else if (ev.type === "error") throw new Error(ev.message);
     }
   } catch (err) {
-    if (err.name !== "AbortError") { // Stop keeps the partial reply on screen
+    if (err.name === "AbortError") setNote(el, { stopped: true });
+    else {
       el.className = "msg error";
-      setText(el, `Error: ${err.message}`);
+      setText(el, `Couldn't get a reply. ${err.message}`);
     }
   } finally {
-    state.busy = false;
-    state.abort = null;
-    sendBtn.textContent = "Send";
+    render(el);
     if (el.classList.contains("assistant") && !el._text) el.remove();
-    updateActions();
-    input.focus();
+    if (state.abort === ctrl) { // a newer turn may already own the UI (e.g. after switching chats)
+      state.busy = false;
+      state.abort = null;
+      thread.removeAttribute("aria-busy");
+      syncSend();
+      updateActions();
+      input.focus();
+    }
   }
   refreshList(); // picks up the new title and recency order
 }
 
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-  if (state.busy) return state.abort?.abort(); // the button reads "Stop" while streaming
-  const text = input.value.trim();
-  if (!text) return;
+function syncSend() {
+  sendBtn.classList.toggle("is-stop", state.busy);
+  sendBtn.setAttribute("aria-label", state.busy ? "Stop generating" : "Send message");
+  sendBtn.disabled = !state.busy && !input.value.trim();
+}
+
+function submit(text) {
   input.value = "";
+  fit();
+  syncSend();
   addMessage("user", text);
   runTurn("chat", { content: text });
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (state.busy) return state.abort?.abort(); // the button is "Stop" while streaming
+  const text = input.value.trim();
+  if (text) submit(text);
 });
 
 input.addEventListener("keydown", (e) => {
@@ -214,11 +222,155 @@ input.addEventListener("keydown", (e) => {
   }
 });
 
-document.getElementById("new-chat").onclick = () => openConversation(null);
-document.getElementById("toggle-nav").onclick = () => document.body.classList.toggle("nav-open");
+// Browsers without `field-sizing: content` get a manual auto-grow.
+const fit = CSS.supports("field-sizing", "content") ? () => {} : () => {
+  input.style.height = "auto";
+  input.style.height = `${input.scrollHeight}px`;
+};
+input.addEventListener("input", () => { fit(); syncSend(); });
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && state.busy && !document.querySelector("dialog[open]")) state.abort?.abort();
+});
+
+const STARTERS = [
+  "Explain how database indexes work, with a short example",
+  "Write a Python script that renames files by their modified date",
+  "Compare SQLite and Postgres for a side project",
+  "Draft a polite email asking to move a meeting to next week",
+];
+$("starters").append(...STARTERS.map((text) => {
+  const li = document.createElement("li");
+  li.append(actionButton(text, () => !state.busy && submit(text)));
+  return li;
+}));
+
+// ---- sidebar ----
+const DAY = 864e5;
+function groupOf(iso) {
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const days = Math.round((startOfDay(new Date()) - startOfDay(new Date(iso))) / DAY);
+  return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days <= 7 ? "Previous 7 days" : "Older";
+}
+
+async function refreshList() {
+  state.convs = await api("/conversations");
+  renderList();
+  setTitle(state.convs.find((c) => c.id === state.id)?.title);
+}
+
+function setTitle(title) {
+  $("title").textContent = title || "New chat";
+  document.title = title ? `${title} · ChitChat` : "ChitChat";
+}
+
+function renderList() {
+  const nav = $("conversations");
+  if (!state.convs.length) {
+    nav.replaceChildren(Object.assign(document.createElement("p"), { className: "no-convs", textContent: "Your conversations will show up here." }));
+    return;
+  }
+  const groups = Map.groupBy(state.convs, (c) => groupOf(c.updated_at)); // list is already newest-first
+  nav.replaceChildren(...[...groups].flatMap(([name, convs]) => {
+    const h = Object.assign(document.createElement("h2"), { textContent: name });
+    const ul = document.createElement("ul");
+    ul.append(...convs.map(renderConv));
+    return [h, ul];
+  }));
+}
+
+function iconButton(label, path, onclick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "icon-btn";
+  b.setAttribute("aria-label", label);
+  b.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${path}"/></svg>`;
+  b.onclick = onclick;
+  return b;
+}
+
+function renderConv(c) {
+  const li = document.createElement("li");
+  li.className = "conv";
+  const link = document.createElement("a");
+  link.href = `#${c.id}`;
+  link.textContent = c.title;
+  link.title = c.title;
+  if (c.id === state.id) link.setAttribute("aria-current", "page");
+  link.onclick = () => setNavOpen(false);
+  li.append(
+    link,
+    iconButton(`Rename "${c.title}"`, "M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3", () => renameConv(c)),
+    iconButton(`Delete "${c.title}"`, "M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10", () => deleteConv(c)),
+  );
+  return li;
+}
+
+// ---- dialogs ----
+function showDialog(dlg) {
+  dlg.returnValue = "";
+  return new Promise((resolve) => {
+    dlg.addEventListener("close", () => resolve(dlg.returnValue), { once: true });
+    dlg.showModal();
+  });
+}
+document.querySelectorAll("dialog [data-cancel]").forEach((b) => (b.onclick = () => b.closest("dialog").close("cancel")));
+
+async function renameConv(c) {
+  $("rename-input").value = c.title;
+  if ((await showDialog($("rename-dialog"))) !== "save") return;
+  const title = $("rename-input").value.trim();
+  if (!title) return;
+  await api(`/conversations/${c.id}`, { method: "PATCH", body: JSON.stringify({ title }) });
+  refreshList();
+}
+
+async function deleteConv(c) {
+  $("delete-name").textContent = c.title;
+  if ((await showDialog($("delete-dialog"))) !== "delete") return;
+  await api(`/conversations/${c.id}`, { method: "DELETE" });
+  if (c.id === state.id) await openConversation(null);
+  else refreshList();
+}
+
+// ---- navigation ----
+function setNavOpen(open) {
+  document.body.classList.toggle("nav-open", open);
+  $("scrim").hidden = !open;
+  $("toggle-nav").setAttribute("aria-expanded", String(open));
+}
+$("toggle-nav").onclick = () => setNavOpen(!document.body.classList.contains("nav-open"));
+$("scrim").onclick = () => setNavOpen(false);
+
+async function openConversation(id) {
+  state.abort?.abort(); // a reply still streaming is saved as stopped
+  state.id = id;
+  state.stick = true;
+  thread.replaceChildren();
+  main.classList.remove("is-started");
+  setNavOpen(false);
+  if (location.hash.slice(1) !== (id ?? "")) history.replaceState(null, "", id ? `#${id}` : location.pathname);
+  if (id) {
+    try {
+      const conv = await api(`/conversations/${id}`);
+      conv.messages.forEach((m) => addMessage(m.role, m.content, m.meta));
+      thread.querySelectorAll(".msg").forEach(render);
+    } catch {
+      return openConversation(null); // stale link
+    }
+  }
+  updateActions();
+  scrollToBottom();
+  await refreshList();
+  setTitle(state.convs.find((c) => c.id === id)?.title);
+  input.focus();
+}
+
+$("new-chat").onclick = () => openConversation(null);
 window.addEventListener("hashchange", () => {
   const id = location.hash.slice(1) || null;
   if (id !== state.id) openConversation(id);
 });
 
+syncSend();
 openConversation(location.hash.slice(1) || null);

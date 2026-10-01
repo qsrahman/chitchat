@@ -1,22 +1,77 @@
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ChitChat</title>
 <link rel="stylesheet" href="style.css">
 <body>
-<aside id="sidebar">
-  <button id="new-chat" type="button">+ New chat</button>
-  <nav id="conversations" aria-label="Conversations"></nav>
+<aside id="sidebar" aria-label="Conversations">
+  <div class="side-head">
+    <span class="brand">ChitChat</span>
+    <button id="new-chat" type="button" class="btn">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+      New chat
+    </button>
+  </div>
+  <nav id="conversations"></nav>
 </aside>
+<div id="scrim" hidden></div>
+
 <main>
-  <button id="toggle-nav" type="button" aria-label="Toggle conversations">☰</button>
-  <div id="messages" aria-live="polite"></div>
+  <header class="topbar">
+    <button id="toggle-nav" type="button" class="icon-btn" aria-label="Show conversations" aria-expanded="false">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
+    </button>
+    <h1 id="title">New chat</h1>
+  </header>
+
+  <div id="messages" role="log" aria-label="Messages" tabindex="-1">
+    <div id="empty">
+      <h2>What are you working on?</h2>
+      <ul id="starters"></ul>
+    </div>
+    <div id="thread"></div>
+  </div>
+  <button id="jump" type="button" class="btn" hidden>
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M5 11l5 5 5-5"/></svg>
+    Jump to latest
+  </button>
+
   <form id="form">
-    <textarea id="input" rows="1" placeholder="Message ChitChat" autofocus></textarea>
-    <button type="submit">Send</button>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Message ChitChat" aria-label="Message" autofocus></textarea>
+      <button id="send" type="submit" aria-label="Send message" disabled>
+        <svg class="i-send" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg>
+        <svg class="i-stop" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>
+      </button>
+    </div>
+    <p class="hint">Enter to send, Shift+Enter for a new line. Esc stops a reply.</p>
   </form>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-<script src="app.js"></script>
+
+<dialog id="rename-dialog" closedby="any" aria-labelledby="rename-heading">
+  <form method="dialog">
+    <h2 id="rename-heading">Rename conversation</h2>
+    <input id="rename-input" required maxlength="200" autocomplete="off" aria-label="Conversation title" autofocus>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-cancel>Cancel</button>
+      <button type="submit" value="save" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="delete-dialog" closedby="any" aria-labelledby="delete-heading">
+  <form method="dialog">
+    <h2 id="delete-heading">Delete this conversation?</h2>
+    <p><strong id="delete-name"></strong> and all its messages will be removed. This can't be undone.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-cancel>Keep it</button>
+      <button type="submit" value="delete" class="btn danger">Delete</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script type="module" src="app.js"></script>
