@@ -5,7 +5,8 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 ## Features
 - Streaming replies (SSE) with markdown rendering
 - Saved conversations in SQLite, sidebar with new/rename/delete, auto-generated titles, shareable `#<id>` links
-- Planned: stop/regenerate/edit, model and system-prompt settings, reasoning summaries, attachments, web search and tools, search and export
+- Stop generation (partial reply kept), regenerate, retry, edit the last message, copy
+- Planned: model and system-prompt settings, reasoning summaries, attachments, web search and tools, search and export
 
 ## Requirements
 Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key.

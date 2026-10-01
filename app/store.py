@@ -54,3 +54,20 @@ def add_message(conn: sqlite3.Connection, cid: str, role: str, content: str, met
 def list_messages(conn: sqlite3.Connection, cid: str) -> list[dict]:
     rows = conn.execute("SELECT id, role, content, meta, created_at FROM messages WHERE conversation_id = ? ORDER BY id", (cid,))
     return [{**dict(r), "meta": json.loads(r["meta"])} for r in rows]
+
+
+def last_user_message(conn: sqlite3.Connection, cid: str) -> dict | None:
+    row = conn.execute(
+        "SELECT id, content FROM messages WHERE conversation_id = ? AND role = 'user' ORDER BY id DESC LIMIT 1", (cid,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def update_message_content(conn: sqlite3.Connection, message_id: int, content: str) -> None:
+    conn.execute("UPDATE messages SET content = ? WHERE id = ?", (content, message_id))
+    conn.commit()
+
+
+def delete_messages_after(conn: sqlite3.Connection, cid: str, message_id: int) -> None:
+    conn.execute("DELETE FROM messages WHERE conversation_id = ? AND id > ?", (cid, message_id))
+    conn.commit()

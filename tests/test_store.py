@@ -49,3 +49,17 @@ def test_delete_cascades_messages(conn):
     store.add_message(conn, c["id"], "user", "q")
     store.delete_conversation(conn, c["id"])
     assert conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0] == 0
+
+
+def test_redo_helpers(conn):
+    c = store.create_conversation(conn)["id"]
+    assert store.last_user_message(conn, c) is None
+    store.add_message(conn, c, "user", "q1")
+    store.add_message(conn, c, "assistant", "a1")
+    store.add_message(conn, c, "user", "q2")
+    store.add_message(conn, c, "assistant", "a2")
+    last = store.last_user_message(conn, c)
+    assert last["content"] == "q2"
+    store.update_message_content(conn, last["id"], "q2!")
+    store.delete_messages_after(conn, c, last["id"])
+    assert [m["content"] for m in store.list_messages(conn, c)] == ["q1", "a1", "q2!"]

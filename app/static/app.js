@@ -5,7 +5,7 @@ const input = document.getElementById("input");
 const sendBtn = form.querySelector("button");
 
 // id: current conversation (null = new chat, created lazily on first send).
-const state = { id: null, busy: false };
+const state = { id: null, busy: false, abort: null };
 
 async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -14,18 +14,78 @@ async function api(path, opts = {}) {
 }
 
 // ---- messages ----
+// Each .msg = .body (rendered text) + .actions (buttons). el._text keeps the raw text for copy/edit.
 function addMessage(role, text = "") {
   const el = document.createElement("div");
   el.className = `msg ${role}`;
+  for (const cls of ["body", "actions"]) el.append(Object.assign(document.createElement("div"), { className: cls }));
   messagesEl.append(el);
-  setText(el, role, text);
+  setText(el, text);
   return el;
 }
 
-function setText(el, role, text) {
-  if (role === "assistant") el.innerHTML = DOMPurify.sanitize(marked.parse(text));
-  else el.textContent = text;
+function setText(el, text) {
+  el._text = text;
+  const body = el.firstElementChild;
+  if (el.classList.contains("assistant")) body.innerHTML = DOMPurify.sanitize(marked.parse(text));
+  else body.textContent = text;
   messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function actionButton(label, onclick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = label;
+  b.onclick = onclick;
+  return b;
+}
+
+const clearActions = () => messagesEl.querySelectorAll(".actions").forEach((a) => a.replaceChildren());
+
+// Copy on every reply; Edit on the last user message; Regenerate on the last reply, or
+// Retry when the conversation ends on a user message or an error.
+function updateActions() {
+  clearActions();
+  if (state.busy) return;
+  const msgs = [...messagesEl.children];
+  const last = msgs.at(-1);
+  const lastUser = msgs.findLast((m) => m.classList.contains("user"));
+  const actionsOf = (m) => m.lastElementChild;
+  for (const m of msgs.filter((m) => m.classList.contains("assistant"))) {
+    actionsOf(m).append(actionButton("Copy", async (e) => {
+      await navigator.clipboard.writeText(m._text);
+      e.target.textContent = "Copied";
+      setTimeout(() => (e.target.textContent = "Copy"), 1200);
+    }));
+  }
+  lastUser?.lastElementChild.append(actionButton("Edit", () => startEdit(lastUser)));
+  if (last?.classList.contains("assistant")) actionsOf(last).append(actionButton("Regenerate", regenerate));
+  else if (last) actionsOf(last).append(actionButton("Retry", regenerate));
+}
+
+function startEdit(m) {
+  clearActions();
+  const ta = document.createElement("textarea");
+  ta.className = "edit";
+  ta.value = m._text;
+  m.firstElementChild.replaceChildren(ta);
+  m.lastElementChild.append(
+    actionButton("Save", () => {
+      const text = ta.value.trim();
+      if (!text) return;
+      while (m.nextElementSibling) m.nextElementSibling.remove();
+      setText(m, text);
+      runTurn("edit", { content: text });
+    }),
+    actionButton("Cancel", () => { setText(m, m._text); updateActions(); }),
+  );
+  ta.focus();
+}
+
+function regenerate() {
+  const msgs = messagesEl.children;
+  while (msgs.length && !msgs[msgs.length - 1].classList.contains("user")) msgs[msgs.length - 1].remove();
+  runTurn("regenerate");
 }
 
 // POST + ReadableStream: yields parsed `data: {json}` SSE events.
@@ -78,6 +138,7 @@ function renderConv(c) {
 }
 
 async function openConversation(id) {
+  state.abort?.abort(); // a reply still streaming is saved as stopped
   state.id = id;
   messagesEl.replaceChildren();
   document.body.classList.remove("nav-open");
@@ -86,6 +147,7 @@ async function openConversation(id) {
     try {
       const conv = await api(`/conversations/${id}`);
       conv.messages.forEach((m) => addMessage(m.role, m.content));
+      updateActions();
     } catch {
       return openConversation(null); // stale link
     }
@@ -95,44 +157,61 @@ async function openConversation(id) {
 }
 
 // ---- sending ----
-async function send(text) {
-  if (!state.id) {
-    state.id = (await api("/conversations", { method: "POST" })).id;
-    history.replaceState(null, "", `#${state.id}`);
-  }
-  addMessage("user", text);
+// Streams a reply from POST /api/conversations/{id}/{path} into a new assistant message.
+async function runTurn(path, payload = {}) {
+  state.busy = true;
+  sendBtn.textContent = "Stop";
+  state.abort = new AbortController();
+  updateActions();
   const el = addMessage("assistant");
   let reply = "";
   try {
-    const res = await fetch(`/api/conversations/${state.id}/chat`, {
+    if (!state.id) {
+      state.id = (await api("/conversations", { method: "POST" })).id;
+      history.replaceState(null, "", `#${state.id}`);
+    }
+    const res = await fetch(`/api/conversations/${state.id}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: text }),
+      body: JSON.stringify(payload),
+      signal: state.abort.signal,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     for await (const ev of readSSE(res)) {
-      if (ev.type === "delta") { reply += ev.text; setText(el, "assistant", reply); }
+      if (ev.type === "delta") { reply += ev.text; setText(el, reply); }
       else if (ev.type === "error") throw new Error(ev.message);
     }
   } catch (err) {
-    el.className = "msg error";
-    el.textContent = `Error: ${err.message}`;
+    if (err.name !== "AbortError") { // Stop keeps the partial reply on screen
+      el.className = "msg error";
+      setText(el, `Error: ${err.message}`);
+    }
+  } finally {
+    state.busy = false;
+    state.abort = null;
+    sendBtn.textContent = "Send";
+    if (el.classList.contains("assistant") && !el._text) el.remove();
+    updateActions();
+    input.focus();
   }
   refreshList(); // picks up the new title and recency order
 }
 
-form.addEventListener("submit", async (e) => {
+form.addEventListener("submit", (e) => {
   e.preventDefault();
+  if (state.busy) return state.abort?.abort(); // the button reads "Stop" while streaming
   const text = input.value.trim();
-  if (!text || state.busy) return;
+  if (!text) return;
   input.value = "";
-  state.busy = sendBtn.disabled = true;
-  try { await send(text); }
-  finally { state.busy = sendBtn.disabled = false; input.focus(); }
+  addMessage("user", text);
+  runTurn("chat", { content: text });
 });
 
 input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    if (!state.busy) form.requestSubmit();
+  }
 });
 
 document.getElementById("new-chat").onclick = () => openConversation(null);

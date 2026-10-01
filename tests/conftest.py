@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 
@@ -16,6 +18,8 @@ class FakeLLM:
     async def stream_reply(self, model, messages):
         self.calls.append({"model": model, "messages": messages})
         for e in self.events:
+            if e["type"] == "hang":  # simulates a slow stream so a test can disconnect mid-reply
+                await asyncio.Event().wait()
             yield e
 
     async def generate_title(self, model, user_text, reply_text):

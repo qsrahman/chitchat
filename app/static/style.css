@@ -17,13 +17,19 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; max-width: 
 #toggle-nav { display: none; align-self: flex-start; padding: 8px 0; }
 #messages { flex: 1; overflow-y: auto; padding: 24px 0; }
 .msg { margin: 0 0 20px; }
-.msg.user { background: var(--tint); padding: 8px 14px; border-radius: 16px; margin-left: 20%; white-space: pre-wrap; }
+.msg.user { margin-left: 20%; }
+.msg.user .body { background: var(--tint); padding: 8px 14px; border-radius: 16px; white-space: pre-wrap; }
+.msg.user .actions { justify-content: flex-end; }
+.actions { display: flex; gap: 4px; min-height: 1.8em; }
+.actions button { padding: 0 8px; border-radius: 6px; font-size: .8em; opacity: .6; }
+.actions button:hover, .actions button:focus-visible { opacity: 1; background: var(--tint); }
+.edit { width: 100%; font: inherit; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); field-sizing: content; min-height: 3em; max-height: 40dvh; resize: none; }
 .msg.error { color: #c0392b; }
 .msg pre { overflow-x: auto; padding: 12px; border-radius: 8px; background: var(--tint); }
 .msg code { font-family: ui-monospace, monospace; font-size: .9em; }
 #form { display: flex; gap: 8px; padding: 12px 0 20px; }
 #input { flex: 1; resize: none; padding: 10px 12px; font: inherit; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); max-height: 40dvh; field-sizing: content; }
-#form button { padding: 0 18px; border-radius: 12px; background: CanvasText; color: Canvas; }
+#form button { min-width: 4.5em; padding: 0 18px; border-radius: 12px; background: CanvasText; color: Canvas; }
 
 @media (max-width: 700px) {
   #sidebar { position: fixed; inset: 0 auto 0 0; z-index: 1; transform: translateX(-100%); transition: transform .2s; background: color-mix(in srgb, CanvasText 8%, Canvas); }

@@ -25,8 +25,11 @@ class TitleUpdate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
 
 
-class ChatRequest(BaseModel):
+class EditRequest(BaseModel):
     content: str = Field(min_length=1)
+
+
+class ChatRequest(EditRequest):
     model: str | None = None
 
 
@@ -69,37 +72,79 @@ def delete_conversation(cid: str, conn: Conn):
     store.delete_conversation(conn, cid)
 
 
-@router.post("/conversations/{cid}/chat")
-async def chat(cid: str, req: ChatRequest, request: Request, conn: Conn):
-    """Save the user message, stream the reply, save it when complete.
+def _history(conn: sqlite3.Connection, cid: str) -> list[dict]:
+    return [{"role": m["role"], "content": m["content"]} for m in store.list_messages(conn, cid)]
 
-    Emits SSE events from llm.py, plus {"type": "title", "title": ...} after "done"
-    when this was the conversation's first exchange. A failed or interrupted reply is not saved.
+
+def _stream_turn(request: Request, conv: dict, history: list[dict], model: str | None = None) -> StreamingResponse:
+    """Stream a reply to `history` (which ends with a user message) and save it.
+
+    Emits SSE events from llm.py, plus {"type": "title", "title": ...} after "done" when the
+    conversation still has its default title. A reply that errors is not saved; a reply cut
+    short (client disconnect = Stop) is saved with meta {"stopped": true}.
     """
-    conv = _require(conn, cid)
-    store.add_message(conn, cid, "user", req.content)
-    history = [{"role": m["role"], "content": m["content"]} for m in store.list_messages(conn, cid)]
+    cid = conv["id"]
+    model = model or request.app.state.settings.default_model
     needs_title = conv["title"] == store.DEFAULT_TITLE
-    model = req.model or request.app.state.settings.default_model
     llm = request.app.state.llm
     db_path = request.app.state.settings.db_path
 
     async def body():
-        reply = []
+        reply, finished = [], False
         # Own connection: the dependency's one may be closed before the stream finishes.
         with closing(db.connect(db_path)) as conn:
-            async for event in llm.stream_reply(model, history):
-                if event["type"] == "delta":
-                    reply.append(event["text"])
-                elif event["type"] == "done":
-                    text = "".join(reply)
-                    store.add_message(conn, cid, "assistant", text)
+            try:
+                async for event in llm.stream_reply(model, history):
+                    if event["type"] == "delta":
+                        reply.append(event["text"])
+                    elif event["type"] == "done":
+                        text = "".join(reply)
+                        store.add_message(conn, cid, "assistant", text)
+                        finished = True
+                        yield sse(event)
+                        if needs_title:
+                            title = await llm.generate_title(model, history[-1]["content"], text) or history[-1]["content"][:40]
+                            store.rename_conversation(conn, cid, title)
+                            yield sse({"type": "title", "title": title})
+                        return
+                    elif event["type"] == "error":
+                        finished = True
                     yield sse(event)
-                    if needs_title:
-                        title = await llm.generate_title(model, req.content, text) or req.content[:40]
-                        store.rename_conversation(conn, cid, title)
-                        yield sse({"type": "title", "title": title})
-                    return
-                yield sse(event)
+            finally:
+                if not finished and reply:
+                    store.add_message(conn, cid, "assistant", "".join(reply), {"stopped": True})
 
     return StreamingResponse(body(), media_type="text/event-stream")
+
+
+def _redo_last_user_turn(conn: sqlite3.Connection, cid: str, content: str | None = None) -> tuple[dict, list[dict]]:
+    """Drop everything after the last user message (optionally rewriting it); return (conv, history)."""
+    conv = _require(conn, cid)
+    last = store.last_user_message(conn, cid)
+    if not last:
+        raise HTTPException(409, "no user message to reply to")
+    if content is not None:
+        store.update_message_content(conn, last["id"], content)
+    store.delete_messages_after(conn, cid, last["id"])
+    return conv, _history(conn, cid)
+
+
+@router.post("/conversations/{cid}/chat")
+async def chat(cid: str, req: ChatRequest, request: Request, conn: Conn):
+    conv = _require(conn, cid)
+    store.add_message(conn, cid, "user", req.content)
+    return _stream_turn(request, conv, _history(conn, cid), req.model)
+
+
+@router.post("/conversations/{cid}/regenerate")
+async def regenerate(cid: str, request: Request, conn: Conn):
+    """New reply to the last user message. Also serves as retry after a failed or stopped reply."""
+    conv, history = _redo_last_user_turn(conn, cid)
+    return _stream_turn(request, conv, history)
+
+
+@router.post("/conversations/{cid}/edit")
+async def edit(cid: str, req: EditRequest, request: Request, conn: Conn):
+    """Rewrite the last user message and get a new reply (no branching: later messages are dropped)."""
+    conv, history = _redo_last_user_turn(conn, cid, req.content)
+    return _stream_turn(request, conv, history)
