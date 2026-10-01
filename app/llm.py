@@ -4,6 +4,7 @@
     {"type": "done"}                      # "incomplete": reason, when the reply hit a limit
     {"type": "error", "message": str}
 """
+import re
 from collections.abc import AsyncIterator
 
 import openai
@@ -12,6 +13,14 @@ from openai import AsyncOpenAI
 from app.config import Settings
 
 Event = dict
+
+# Which models take `reasoning.effort` (and reject `temperature`) can't be asked of the API, so go by name:
+# OpenAI's o-series and gpt-5 family, plus gpt-oss. Everything else is treated as a temperature model.
+_REASONING = re.compile(r"^(o\d|gpt-5|gpt-oss)")
+
+
+def supports_reasoning(model: str) -> bool:
+    return bool(_REASONING.match(model))
 
 
 class OpenAILLM:
@@ -29,7 +38,30 @@ class OpenAILLM:
             )
         return self._client
 
-    async def stream_reply(self, model: str, messages: list[dict]) -> AsyncIterator[Event]:
+    async def list_models(self) -> list[str]:
+        """Model ids the endpoint offers, minus embedding models; [] if it can't be listed."""
+        try:
+            ids = [m.id async for m in self.client.models.list()]
+        except openai.OpenAIError:
+            return []
+        return sorted(i for i in ids if "embed" not in i)
+
+    async def stream_reply(
+        self,
+        model: str,
+        messages: list[dict],
+        instructions: str | None = None,
+        reasoning_effort: str | None = None,
+        temperature: float | None = None,
+    ) -> AsyncIterator[Event]:
+        # Only send what was set: a parameter the model doesn't know is an API error.
+        extra = {}
+        if instructions:
+            extra["instructions"] = instructions
+        if reasoning_effort:
+            extra["reasoning"] = {"effort": reasoning_effort}
+        if temperature is not None:
+            extra["temperature"] = temperature
         try:
             stream = await self.client.responses.create(
                 model=model,
@@ -37,6 +69,7 @@ class OpenAILLM:
                 store=False,
                 stream=True,
                 max_output_tokens=self.settings.openai_max_output_tokens,
+                **extra,
             )
             async for ev in stream:
                 match ev.type:

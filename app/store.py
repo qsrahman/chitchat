@@ -5,33 +5,61 @@ import uuid
 from datetime import UTC, datetime
 
 DEFAULT_TITLE = "New chat"
+# Per-conversation settings; None / "" mean "use the default".
+DEFAULT_SETTINGS = {"model": None, "system_prompt": "", "reasoning_effort": None, "temperature": None}
 
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def create_conversation(conn: sqlite3.Connection, title: str = DEFAULT_TITLE) -> dict:
+def _conversation(row: sqlite3.Row) -> dict:
+    return {**dict(row), "settings": {**DEFAULT_SETTINGS, **json.loads(row["settings"])}}
+
+
+def create_conversation(conn: sqlite3.Connection, title: str = DEFAULT_TITLE, settings: dict | None = None) -> dict:
     cid, now = uuid.uuid4().hex, _now()
-    conn.execute("INSERT INTO conversations VALUES (?, ?, ?, ?)", (cid, title, now, now))
+    conn.execute(
+        "INSERT INTO conversations (id, title, created_at, updated_at, settings) VALUES (?, ?, ?, ?, ?)",
+        (cid, title, now, now, json.dumps(settings or {})),
+    )
     conn.commit()
     return get_conversation(conn, cid)
 
 
 def get_conversation(conn: sqlite3.Connection, cid: str) -> dict | None:
     row = conn.execute("SELECT * FROM conversations WHERE id = ?", (cid,)).fetchone()
-    return dict(row) if row else None
+    return _conversation(row) if row else None
 
 
 def list_conversations(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute("SELECT * FROM conversations ORDER BY updated_at DESC, rowid DESC")
-    return [dict(r) for r in rows]
+    return [_conversation(r) for r in rows]
 
 
 def rename_conversation(conn: sqlite3.Connection, cid: str, title: str) -> dict | None:
     conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, cid))
     conn.commit()
     return get_conversation(conn, cid)
+
+
+def update_conversation_settings(conn: sqlite3.Connection, cid: str, settings: dict) -> dict | None:
+    conn.execute("UPDATE conversations SET settings = ? WHERE id = ?", (json.dumps(settings), cid))
+    conn.commit()
+    return get_conversation(conn, cid)
+
+
+def get_app_setting(conn: sqlite3.Connection, key: str, default: str = "") -> str:
+    row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_app_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+    conn.commit()
 
 
 def delete_conversation(conn: sqlite3.Connection, cid: str) -> bool:

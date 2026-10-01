@@ -18,9 +18,10 @@ class FakeLLM:
         ]
         self.calls = []
         self.title = "Fake title"
+        self.models = []
 
-    async def stream_reply(self, model, messages):
-        self.calls.append({"model": model, "messages": messages})
+    async def stream_reply(self, model, messages, **options):
+        self.calls.append({"model": model, "messages": messages, "options": options})
         for e in self.events:
             if e["type"] == "hang":  # simulates a slow stream so a test can disconnect mid-reply
                 await asyncio.Event().wait()
@@ -28,6 +29,9 @@ class FakeLLM:
 
     async def generate_title(self, model, user_text, reply_text):
         return self.title
+
+    async def list_models(self):
+        return self.models
 
 
 @pytest.fixture

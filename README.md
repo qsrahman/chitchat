@@ -7,7 +7,8 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Saved conversations in SQLite, sidebar with new/rename/delete, auto-generated titles, shareable `#<id>` links
 - Stop generation (partial reply kept), regenerate, retry, edit the last message, copy
 - Reading-focused UI: serif replies, highlighted code with copy, light/dark theme, mobile drawer, smart autoscroll
-- Planned: model and system-prompt settings, reasoning summaries, attachments, web search and tools, search and export
+- Model picker, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
+- Planned: reasoning summaries, attachments, web search and tools, search and export
 
 ## Requirements
 Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key. For the browser tests, run `uv run playwright install chromium` once.

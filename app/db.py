@@ -19,8 +19,14 @@ CREATE TABLE messages (
 CREATE INDEX messages_by_conversation ON messages(conversation_id, id);
 """
 
+# v2: per-conversation settings (JSON) and a small key/value table for app-wide settings.
+SETTINGS = """
+ALTER TABLE conversations ADD COLUMN settings TEXT NOT NULL DEFAULT '{}';
+CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+"""
+
 # Each entry upgrades the schema by one version; PRAGMA user_version records how many ran.
-MIGRATIONS = [SCHEMA]
+MIGRATIONS = [SCHEMA, SETTINGS]
 
 
 def connect(path: str) -> sqlite3.Connection:

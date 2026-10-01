@@ -36,8 +36,8 @@ Seams that keep features additive:
 | 2 | done | SQLite persistence, conversation sidebar (create/list/rename/delete), auto-title, URL per conversation |
 | 3 | done | Stop generation (partial message saved), regenerate, edit last user message, copy, retry |
 | 3b | done | UI/UX polish (`docs/ui-polish.md`) and Playwright browser tests |
-| 4 | next | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
-| 5 | | Reasoning summaries (collapsible), token usage display |
+| 4 | done | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
+| 5 | next | Reasoning summaries (collapsible), token usage display |
 | 6 | | Attachments: images (`input_image`), files/PDF (`input_file`) |
 | 7 | | Tools: built-in web search with citations, then a function-calling loop with a small registry (`tools.py`) |
 | 8 | | Context management (truncate/summarize old turns), FTS5 search, export (Markdown/JSON) |

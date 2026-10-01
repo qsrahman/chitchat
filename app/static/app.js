@@ -10,7 +10,9 @@ const form = $("form");
 
 // id: current conversation (null = new chat, created lazily on first send).
 // stick: keep the view pinned to the bottom unless the reader scrolled up.
-const state = { id: null, busy: false, abort: null, stick: true, convs: [] };
+// settings: the current conversation's settings (kept client-side until a new chat's first send creates it).
+const DEFAULT_SETTINGS = { model: null, system_prompt: "", reasoning_effort: null, temperature: null };
+const state = { id: null, busy: false, abort: null, stick: true, convs: [], settings: { ...DEFAULT_SETTINGS } };
 
 async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -187,7 +189,7 @@ async function runTurn(path, payload = {}) {
   let finished = false;
   try {
     if (!state.id) {
-      state.id = (await api("/conversations", { method: "POST" })).id;
+      state.id = (await api("/conversations", { method: "POST", body: JSON.stringify({ settings: state.settings }) })).id;
       history.replaceState(null, "", `#${state.id}`);
     }
     const res = await fetch(`/api/conversations/${state.id}/${path}`, {
@@ -363,6 +365,73 @@ async function deleteConv(c) {
   else refreshList();
 }
 
+// ---- settings ----
+function setSettings(settings) {
+  state.settings = settings;
+  $("settings-btn").toggleAttribute("data-active", Object.keys(DEFAULT_SETTINGS).some((k) => settings[k] !== DEFAULT_SETTINGS[k]));
+}
+
+// Dialogs that save to the server stay open until the save succeeds.
+function bindSave(dlg, save) {
+  const error = dlg.querySelector(".field-error");
+  dlg.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    error.hidden = true;
+    try {
+      await save();
+      dlg.close("save");
+    } catch {
+      error.textContent = "Couldn't save. Check your connection and try again.";
+      error.hidden = false;
+    }
+  });
+}
+
+let reasoningModels = new Map(); // model id -> takes reasoning effort (otherwise temperature)
+function syncSettingsFields() {
+  const reasoning = reasoningModels.get($("set-model").value); // "" = the default model
+  $("effort-field").hidden = reasoning === false;
+  $("temp-field").hidden = reasoning === true; // unknown model: show both, the server sends the one that applies
+}
+$("set-model").addEventListener("change", syncSettingsFields);
+
+async function openSettings() {
+  const { default: fallback, models } = await api("/models");
+  const s = state.settings;
+  reasoningModels = new Map([["", models[0].reasoning], ...models.map((m) => [m.id, m.reasoning])]);
+  const options = models.slice(1).map((m) => new Option(m.id, m.id));
+  if (s.model && !reasoningModels.has(s.model)) options.push(new Option(s.model, s.model)); // no longer listed
+  $("set-model").replaceChildren(new Option(`Default (${fallback})`, ""), ...options);
+  $("set-model").value = s.model ?? "";
+  $("set-system").value = s.system_prompt;
+  $("set-effort").value = s.reasoning_effort ?? "";
+  $("set-temp").value = s.temperature ?? "";
+  syncSettingsFields();
+  $("settings-dialog").querySelector(".field-error").hidden = true;
+  $("settings-dialog").showModal();
+}
+$("settings-btn").onclick = openSettings;
+
+bindSave($("settings-dialog"), async () => {
+  const next = {
+    model: $("set-model").value || null,
+    system_prompt: $("set-system").value.trim(),
+    reasoning_effort: $("set-effort").value || null,
+    temperature: $("set-temp").value === "" ? null : Number($("set-temp").value),
+  };
+  if (state.id) setSettings((await api(`/conversations/${state.id}`, { method: "PATCH", body: JSON.stringify({ settings: next }) })).settings);
+  else setSettings(next);
+});
+
+$("instructions-btn").onclick = async () => {
+  const dlg = $("instructions-dialog");
+  $("set-instructions").value = (await api("/custom-instructions")).text;
+  dlg.querySelector(".field-error").hidden = true;
+  dlg.showModal();
+};
+bindSave($("instructions-dialog"), () =>
+  api("/custom-instructions", { method: "PUT", body: JSON.stringify({ text: $("set-instructions").value }) }));
+
 // ---- navigation ----
 // The sidebar starts closed. On narrow screens it is an overlay, so choosing something closes it.
 function setNavOpen(open) {
@@ -386,9 +455,11 @@ async function openConversation(id) {
   main.classList.remove("is-started");
   closeNavIfOverlay();
   if (location.hash.slice(1) !== (id ?? "")) history.replaceState(null, "", id ? `#${id}` : location.pathname);
+  setSettings({ ...DEFAULT_SETTINGS });
   if (id) {
     try {
       const conv = await api(`/conversations/${id}`);
+      setSettings(conv.settings);
       conv.messages.forEach((m) => addMessage(m.role, m.content, m.meta));
       thread.querySelectorAll(".msg").forEach(render);
     } catch {

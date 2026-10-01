@@ -20,6 +20,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 ## Conventions
 - Work one phase at a time, as in `PLAN.md`. A phase is code + tests + `docs/phase-N.md` + one commit titled `phase N: <summary>`. Update the `PLAN.md` status table and the README feature list in the same commit.
 - Keep it flat. No ORM, no repository classes, no new abstraction until a phase needs it. Don't hand-roll what the stdlib, FastAPI, pydantic or the openai SDK already provide.
+- Per-conversation settings live in `conversations.settings` (JSON, defaults in `store.DEFAULT_SETTINGS`); app-wide ones in `app_settings`. Add a setting by extending `ConversationSettings` (routes.py) and `DEFAULT_SETTINGS`, then pass it through `_model_options` and `llm.stream_reply`.
 - Every OpenAI call is stateless: `store=False`, with history sent as `input`. Don't use `previous_response_id` or the Conversations API.
 - Don't leak raw OpenAI events past `llm.py`. For a new feature, add a normalized event type there and handle it in `routes.py` and `app.js`.
 - Wire format is SSE over `POST`: `data: {json}\n\n`.

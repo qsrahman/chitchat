@@ -15,6 +15,9 @@
     </button>
   </div>
   <nav id="conversations"></nav>
+  <div class="side-foot">
+    <button id="instructions-btn" type="button" class="btn">Custom instructions</button>
+  </div>
 </aside>
 <div id="scrim" hidden></div>
 
@@ -24,6 +27,9 @@
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
     </button>
     <h1 id="title">New chat</h1>
+    <button id="settings-btn" type="button" class="icon-btn" aria-label="Chat settings">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
+    </button>
   </header>
 
   <div id="messages" role="log" aria-label="Messages" tabindex="-1">
@@ -68,6 +74,46 @@
     <div class="dialog-actions">
       <button type="button" class="btn" data-cancel>Keep it</button>
       <button type="submit" value="delete" class="btn danger">Delete</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settings-dialog" closedby="any" aria-labelledby="settings-heading">
+  <form method="dialog">
+    <h2 id="settings-heading">Chat settings</h2>
+    <label>Model <select id="set-model"></select></label>
+    <label>System prompt
+      <textarea id="set-system" rows="4" maxlength="10000" placeholder="Optional. Applies to this conversation only."></textarea>
+    </label>
+    <label id="effort-field">Reasoning effort
+      <select id="set-effort">
+        <option value="">Default</option><option value="low">Low</option>
+        <option value="medium">Medium</option><option value="high">High</option>
+      </select>
+    </label>
+    <label id="temp-field">Temperature
+      <input id="set-temp" type="number" min="0" max="2" step="0.1" placeholder="Default">
+    </label>
+    <p class="field-note">Changes apply from your next message.</p>
+    <p class="field-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-cancel>Cancel</button>
+      <button type="submit" value="save" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="instructions-dialog" closedby="any" aria-labelledby="instructions-heading">
+  <form method="dialog">
+    <h2 id="instructions-heading">Custom instructions</h2>
+    <label>What should the model know about you or how you like answers?
+      <textarea id="set-instructions" rows="6" maxlength="10000"></textarea>
+    </label>
+    <p class="field-note">Sent with every conversation, before its own system prompt.</p>
+    <p class="field-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-cancel>Cancel</button>
+      <button type="submit" value="save" class="btn primary">Save</button>
     </div>
   </form>
 </dialog>

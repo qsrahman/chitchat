@@ -21,12 +21,14 @@ XSS_REPLY = (
 class ScriptedLLM:
     """Reply depends on keywords in the last user message, so each test picks its scenario."""
 
+    default_model = "scripted-default"
+
     def __init__(self):
         self.n = 0
         self.failed = set()
         self.dropped = set()
 
-    async def stream_reply(self, model, messages):
+    async def stream_reply(self, model, messages, instructions=None, reasoning_effort=None, temperature=None):
         text = messages[-1]["content"]
         self.n += 1
         if "fail" in text and text not in self.failed:
@@ -56,16 +58,25 @@ class ScriptedLLM:
             return
         else:
             await asyncio.sleep(0.05)
-            yield {"type": "delta", "text": f"Reply #{self.n} to **{text}**"}
+            # Echo the settings that reached the model, so tests can see them in the reply.
+            used = {"model": model if model != self.default_model else None, "instructions": instructions,
+                    "effort": reasoning_effort, "temperature": temperature}
+            echo = "".join(f" [{k}={v}]" for k, v in used.items() if v is not None)
+            yield {"type": "delta", "text": f"Reply #{self.n} to **{text}**{echo}"}
         yield {"type": "done"}
 
     async def generate_title(self, model, user_text, reply_text):
         return user_text[:30]
 
+    async def list_models(self):
+        return ["alpha-model", "gpt-5-mini"]
+
 
 @pytest.fixture
 def app_url(tmp_path):
-    app = create_app(Settings(db_path=str(tmp_path / "ui.db"), openai_api_key="test"))
+    app = create_app(Settings(
+        db_path=str(tmp_path / "ui.db"), openai_api_key="test", openai_model=ScriptedLLM.default_model
+    ))
     app.state.llm = ScriptedLLM()
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
