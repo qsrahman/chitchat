@@ -24,6 +24,7 @@ class ScriptedLLM:
     def __init__(self):
         self.n = 0
         self.failed = set()
+        self.dropped = set()
 
     async def stream_reply(self, model, messages):
         text = messages[-1]["content"]
@@ -31,6 +32,10 @@ class ScriptedLLM:
         if "fail" in text and text not in self.failed:
             self.failed.add(text)
             yield {"type": "error", "message": "simulated failure"}
+            return
+        if "drop" in text and text not in self.dropped:  # the stream ends without a "done" event
+            self.dropped.add(text)
+            yield {"type": "delta", "text": "Half an ans"}
             return
         if "slow" in text:  # a thinking pause, then a stream long enough to stop mid-way
             await asyncio.sleep(0.5)

@@ -122,13 +122,28 @@ function regenerate() {
   runTurn("regenerate");
 }
 
-// Retry differs from Regenerate: a turn whose POST never landed leaves the user message in
-// the DOM only, and regenerating that would 409 forever. Ask the server what it actually has.
+// Retry differs from Regenerate: after a failed send or edit the server may not have what the page
+// shows, so regenerating would 409 (message never saved) or reply to stale text (edit never saved).
+// Compare the page with what the server stored, and redo the turn the way that makes them agree.
 async function retry(user) {
-  const last = state.id && (await api(`/conversations/${state.id}`)).messages.at(-1);
-  if (last?.role === "user" && last.content === user._text) return regenerate();
-  while (thread.lastElementChild !== user) thread.lastElementChild.remove();
-  runTurn("chat", { content: user._text });
+  const dropAfterUser = () => { while (thread.lastElementChild !== user) thread.lastElementChild.remove(); };
+  let saved;
+  try {
+    saved = state.id ? (await api(`/conversations/${state.id}`)).messages.filter((m) => m.role === "user") : [];
+  } catch {
+    dropAfterUser();
+    addMessage("error", "Couldn't reach the server. Check your connection and retry.");
+    return updateActions();
+  }
+  if (saved.length < thread.querySelectorAll(".msg.user").length) { // this message never landed
+    dropAfterUser();
+    runTurn("chat", { content: user._text });
+  } else if (saved.at(-1).content === user._text) { // it landed; any reply (or partial one) is replaced
+    regenerate();
+  } else { // an edit that never landed
+    dropAfterUser();
+    runTurn("edit", { content: user._text });
+  }
 }
 
 // Copy button inside rendered code blocks (event delegation: the HTML is re-rendered while streaming).
@@ -169,6 +184,7 @@ async function runTurn(path, payload = {}) {
   updateActions();
   const el = addMessage("assistant");
   let reply = "";
+  let finished = false;
   try {
     if (!state.id) {
       state.id = (await api("/conversations", { method: "POST" })).id;
@@ -183,9 +199,10 @@ async function runTurn(path, payload = {}) {
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     for await (const ev of readSSE(res)) {
       if (ev.type === "delta") { reply += ev.text; setText(el, reply); }
-      else if (ev.type === "done") setNote(el, ev);
+      else if (ev.type === "done") { finished = true; setNote(el, ev); }
       else if (ev.type === "error") throw new Error(ev.message);
     }
+    if (!finished) throw new Error("The connection closed before the reply finished.");
   } catch (err) {
     if (err.name === "AbortError") setNote(el, { stopped: true });
     else {

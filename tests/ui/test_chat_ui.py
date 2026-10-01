@@ -202,6 +202,58 @@ def test_retry_resends_when_the_send_never_reached_the_server(page, app_url, exp
     ]
 
 
+def test_reply_that_ends_without_done_is_an_error_and_retry_does_not_duplicate_the_turn(page, app_url):
+    """The server saves the partial reply when a stream breaks; Retry must replace it, not append to it."""
+    open_app(page, app_url)
+    send(page, "please drop")
+    expect(page.locator(".msg.error")).to_contain_text("closed before the reply finished")
+    page.get_by_role("button", name="Retry").click()
+    expect(page.locator(".msg.error")).to_have_count(0)
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply #2 to please drop")
+    assert [(m["role"], m["content"]) for m in saved_messages(page)] == [
+        ("user", "please drop"),
+        ("assistant", "Reply #2 to **please drop**"),
+    ]
+
+
+def test_retry_after_an_edit_that_never_landed_replaces_the_old_turn(page, app_url, expected_console_errors):
+    open_app(page, app_url)
+    send(page, "first")
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expected_console_errors.append("net::ERR_FAILED")
+    page.route("**/api/conversations/*/edit", lambda route: route.abort())
+    page.get_by_role("button", name="Edit").click()
+    page.get_by_label("Edit your message").fill("first, reworded")
+    page.get_by_role("button", name="Save").click()
+    expect(page.locator(".msg.error")).to_contain_text("Couldn't get a reply")
+    page.unroute("**/api/conversations/*/edit")
+    page.get_by_role("button", name="Retry").click()
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply #2 to first, reworded")
+    assert [(m["role"], m["content"]) for m in saved_messages(page)] == [
+        ("user", "first, reworded"),
+        ("assistant", "Reply #2 to **first, reworded**"),
+    ]
+
+
+def test_retry_when_the_server_cannot_be_reached_says_so_and_can_be_retried(page, app_url, expected_console_errors):
+    open_app(page, app_url)
+    expected_console_errors.append("net::ERR_FAILED")
+    page.route("**/api/conversations/*/chat", lambda route: route.abort())
+    send(page, "hello")
+    expect(page.locator(".msg.error")).to_contain_text("Couldn't get a reply")
+    page.unroute("**/api/conversations/*/chat")
+
+    def abort_reads(route):
+        route.abort() if route.request.method == "GET" else route.continue_()
+
+    page.route("**/api/conversations/*", abort_reads)
+    page.get_by_role("button", name="Retry").click()
+    expect(page.locator(".msg.error")).to_contain_text("Couldn't reach the server")
+    page.unroute("**/api/conversations/*")
+    page.get_by_role("button", name="Retry").click()
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply #1 to hello")
+
+
 # ---- scrolling ----
 
 def test_reader_scrolling_up_is_not_yanked_down_and_can_jump_back(page, app_url):
