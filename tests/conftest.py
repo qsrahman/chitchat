@@ -5,9 +5,29 @@ from app.config import Settings
 from app.main import create_app
 
 
+class FakeLLM:
+    """Yields scripted events; records the calls it received."""
+
+    def __init__(self, events=None):
+        self.events = events or [{"type": "delta", "text": "Hello"}, {"type": "delta", "text": " world"}, {"type": "done"}]
+        self.calls = []
+
+    async def stream_reply(self, model, messages):
+        self.calls.append({"model": model, "messages": messages})
+        for e in self.events:
+            yield e
+
+
 @pytest.fixture
-def app(tmp_path):
-    return create_app(Settings(db_path=str(tmp_path / "test.db"), openai_api_key="test"))
+def llm():
+    return FakeLLM()
+
+
+@pytest.fixture
+def app(tmp_path, llm):
+    app = create_app(Settings(db_path=str(tmp_path / "test.db"), openai_api_key="test", default_model="test-model"))
+    app.state.llm = llm
+    return app
 
 
 @pytest.fixture
