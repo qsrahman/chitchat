@@ -11,7 +11,11 @@ class FakeLLM:
     """Yields scripted events; records the calls it received."""
 
     def __init__(self, events=None):
-        self.events = events or [{"type": "delta", "text": "Hello"}, {"type": "delta", "text": " world"}, {"type": "done"}]
+        self.events = events or [
+            {"type": "delta", "text": "Hello"},
+            {"type": "delta", "text": " world"},
+            {"type": "done"},
+        ]
         self.calls = []
         self.title = "Fake title"
 

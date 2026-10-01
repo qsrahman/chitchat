@@ -52,7 +52,9 @@ def add_message(conn: sqlite3.Connection, cid: str, role: str, content: str, met
 
 
 def list_messages(conn: sqlite3.Connection, cid: str) -> list[dict]:
-    rows = conn.execute("SELECT id, role, content, meta, created_at FROM messages WHERE conversation_id = ? ORDER BY id", (cid,))
+    rows = conn.execute(
+        "SELECT id, role, content, meta, created_at FROM messages WHERE conversation_id = ? ORDER BY id", (cid,)
+    )
     return [{**dict(r), "meta": json.loads(r["meta"])} for r in rows]
 
 

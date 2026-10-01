@@ -60,7 +60,10 @@ class OpenAILLM:
         try:
             r = await self.client.responses.create(
                 model=model,
-                instructions="Write a title of at most 6 words for this chat. Reply with the title only, no quotes or punctuation at the end.",
+                instructions=(
+                    "Write a title of at most 6 words for this chat. "
+                    "Reply with the title only, no quotes or punctuation at the end."
+                ),
                 input=f"User: {user_text[:1000]}\n\nAssistant: {reply_text[:1000]}",
                 store=False,
             )

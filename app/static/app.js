@@ -2,7 +2,11 @@ import { renderMarkdown } from "./markdown.js";
 
 const $ = (id) => document.getElementById(id);
 const main = document.querySelector("main");
-const [messagesEl, thread, input, sendBtn, form] = ["messages", "thread", "input", "send", "form"].map($);
+const messagesEl = $("messages");
+const thread = $("thread");
+const input = $("input");
+const sendBtn = $("send");
+const form = $("form");
 
 // id: current conversation (null = new chat, created lazily on first send).
 // stick: keep the view pinned to the bottom unless the reader scrolled up.
@@ -36,9 +40,9 @@ function addMessage(role, text = "", meta = {}) {
   return el;
 }
 
-const bodyOf = (el) => el.children[0];
-const noteOf = (el) => el.children[1];
-const actionsOf = (el) => el.children[2];
+const bodyOf = (el) => el.querySelector(".body");
+const noteOf = (el) => el.querySelector(".note");
+const actionsOf = (el) => el.querySelector(".actions");
 
 function setNote(el, meta) {
   const note = noteOf(el);
@@ -90,7 +94,7 @@ function updateActions() {
   }
   if (lastUser) actionsOf(lastUser).append(actionButton("Edit", () => startEdit(lastUser)));
   if (last?.classList.contains("assistant")) actionsOf(last).append(actionButton("Regenerate", regenerate));
-  else if (last) actionsOf(last).append(actionButton("Retry", regenerate));
+  else if (last && lastUser) actionsOf(last).append(actionButton("Retry", () => retry(lastUser)));
 }
 
 function startEdit(m) {
@@ -116,6 +120,15 @@ function startEdit(m) {
 function regenerate() {
   while (thread.lastElementChild && !thread.lastElementChild.classList.contains("user")) thread.lastElementChild.remove();
   runTurn("regenerate");
+}
+
+// Retry differs from Regenerate: a turn whose POST never landed leaves the user message in
+// the DOM only, and regenerating that would 409 forever. Ask the server what it actually has.
+async function retry(user) {
+  const last = state.id && (await api(`/conversations/${state.id}`)).messages.at(-1);
+  if (last?.role === "user" && last.content === user._text) return regenerate();
+  while (thread.lastElementChild !== user) thread.lastElementChild.remove();
+  runTurn("chat", { content: user._text });
 }
 
 // Copy button inside rendered code blocks (event delegation: the HTML is re-rendered while streaming).
@@ -368,7 +381,6 @@ async function openConversation(id) {
   updateActions();
   scrollToBottom();
   await refreshList();
-  setTitle(state.convs.find((c) => c.id === id)?.title);
   input.focus();
 }
 

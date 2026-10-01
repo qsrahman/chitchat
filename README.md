@@ -15,7 +15,7 @@ Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key. For the b
 ## Run
 ```bash
 cp .env.example .env   # set OPENAI_API_KEY
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:create_app --factory --reload
 ```
 Open http://127.0.0.1:8000.
 

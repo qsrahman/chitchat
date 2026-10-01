@@ -6,11 +6,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, StringConstraints
 
 from app import db, store
 
 router = APIRouter(prefix="/api")
+
+# Strip on the way in, so whitespace alone is neither a message nor a title.
+Content = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100_000)]
+Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 def get_db(request: Request) -> Iterator[sqlite3.Connection]:
@@ -22,11 +26,11 @@ Conn = Annotated[sqlite3.Connection, Depends(get_db)]
 
 
 class TitleUpdate(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
+    title: Title
 
 
 class EditRequest(BaseModel):
-    content: str = Field(min_length=1)
+    content: Content
 
 
 class ChatRequest(EditRequest):
@@ -63,7 +67,7 @@ def get_conversation(cid: str, conn: Conn):
 @router.patch("/conversations/{cid}")
 def rename_conversation(cid: str, body: TitleUpdate, conn: Conn):
     _require(conn, cid)
-    return store.rename_conversation(conn, cid, body.title.strip())
+    return store.rename_conversation(conn, cid, body.title)
 
 
 @router.delete("/conversations/{cid}", status_code=204)
@@ -104,7 +108,8 @@ def _stream_turn(request: Request, conv: dict, history: list[dict], model: str |
                         finished = True
                         yield sse(event)
                         if needs_title:
-                            title = await llm.generate_title(model, history[-1]["content"], text) or history[-1]["content"][:40]
+                            asked = history[-1]["content"]
+                            title = await llm.generate_title(model, asked, text) or asked[:40]
                             store.rename_conversation(conn, cid, title)
                             yield sse({"type": "title", "title": title})
                         return

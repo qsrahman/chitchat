@@ -1,12 +1,4 @@
-import json
-
-
-def parse_sse(text):
-    return [json.loads(f[6:]) for f in text.split("\n\n") if f.startswith("data: ")]
-
-
-async def new_conv(client):
-    return (await client.post("/api/conversations")).json()["id"]
+from tests.helpers import new_conv, parse_sse
 
 
 async def test_conversation_lifecycle(client):
@@ -31,6 +23,7 @@ async def test_unknown_conversation_404(client):
 async def test_rename_rejects_empty(client):
     cid = await new_conv(client)
     assert (await client.patch(f"/api/conversations/{cid}", json={"title": ""})).status_code == 422
+    assert (await client.patch(f"/api/conversations/{cid}", json={"title": "   "})).status_code == 422
 
 
 async def test_chat_streams_saves_and_titles(client, llm):
@@ -85,6 +78,14 @@ async def test_failed_reply_keeps_user_message_only(client, llm):
 async def test_chat_rejects_empty_content(client):
     cid = await new_conv(client)
     assert (await client.post(f"/api/conversations/{cid}/chat", json={"content": ""})).status_code == 422
+
+
+async def test_chat_rejects_blank_and_oversized_content(client):
+    cid = await new_conv(client)
+    url = f"/api/conversations/{cid}/chat"
+    assert (await client.post(url, json={"content": "   "})).status_code == 422
+    assert (await client.post(url, json={"content": "\n\t "})).status_code == 422
+    assert (await client.post(url, json={"content": "x" * 100_001})).status_code == 422
 
 
 async def test_incomplete_reply_is_saved_and_flagged(client, llm):

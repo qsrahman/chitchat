@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from tests.test_api import new_conv, parse_sse
+from tests.helpers import new_conv, parse_sse
 
 
 async def messages(client, cid):
@@ -19,7 +19,8 @@ async def test_regenerate_replaces_last_reply(client, llm):
     llm.events = [{"type": "delta", "text": "second try"}, {"type": "done"}]
     r = await client.post(f"/api/conversations/{cid}/regenerate")
     assert parse_sse(r.text)[:2] == llm.events
-    assert [(m["role"], m["content"]) for m in await messages(client, cid)] == [("user", "hi"), ("assistant", "second try")]
+    got = [(m["role"], m["content"]) for m in await messages(client, cid)]
+    assert got == [("user", "hi"), ("assistant", "second try")]
     assert llm.calls[-1]["messages"] == [{"role": "user", "content": "hi"}]
 
 

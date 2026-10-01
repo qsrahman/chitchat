@@ -175,6 +175,33 @@ def test_error_offers_retry(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #2 to please fail")
 
 
+def test_retry_resends_when_the_send_never_reached_the_server(page, app_url, expected_console_errors):
+    """The user message is in the DOM only, so regenerate would 409 forever; Retry must resend."""
+    open_app(page, app_url)
+    expected_console_errors.append("net::ERR_FAILED")  # the aborted POST below
+    first = []
+
+    def kill_first(route):
+        if first:
+            route.continue_()
+        else:
+            first.append(1)
+            route.abort()
+
+    page.route("**/api/conversations/*/chat", kill_first)
+    send(page, "hello")
+    expect(page.locator(".msg.error")).to_contain_text("Couldn't get a reply")
+    assert saved_messages(page) == []
+
+    page.get_by_role("button", name="Retry").click()
+    expect(page.locator(".msg.error")).to_have_count(0)
+    expect(page.locator(".msg.assistant")).to_contain_text("hello")
+    assert [(m["role"], m["content"]) for m in saved_messages(page)] == [
+        ("user", "hello"),
+        ("assistant", "Reply #1 to **hello**"),
+    ]
+
+
 # ---- scrolling ----
 
 def test_reader_scrolling_up_is_not_yanked_down_and_can_jump_back(page, app_url):

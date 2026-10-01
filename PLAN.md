@@ -53,7 +53,7 @@ Phases 0 to 3 give a usable ChatGPT-lite. Phases 4 onward can be reordered.
 ## Per-phase checklist
 1. Write tests first where practical (API tests, plus a Playwright test for any UI change), then code.
 2. `uv run pytest` green (includes the browser tests).
-3. Run `uv run uvicorn app.main:app --reload` and try the feature against the real API.
+3. Run `uv run uvicorn app.main:create_app --factory --reload` and try the feature against the real API.
 4. Add `docs/phase-N.md`, update the table above and the README feature list.
 5. Commit.
 

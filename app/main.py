@@ -23,6 +23,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Mounted last so /api and /healthz routes win.
     app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
     return app
-
-
-app = create_app()

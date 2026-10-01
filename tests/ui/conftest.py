@@ -12,7 +12,8 @@ from app.main import create_app
 
 CODE_REPLY = "Here is a loop:\n\n```python\nfor i in range(3):\n    print(i)\n```\n\nThat's it, with `inline` code.\n"
 XSS_REPLY = (
-    'Hi <img src=x onerror="window.__xss=1"> ![pixel](https://example.invalid/leak.png) <script>window.__xss=1</script> '
+    'Hi <img src=x onerror="window.__xss=1"> ![pixel](https://example.invalid/leak.png) '
+    "<script>window.__xss=1</script> "
     "[docs](https://example.com) <a href=\"javascript:window.__xss=1\">bad</a>"
 )
 
@@ -80,10 +81,17 @@ def browser_context_args(browser_context_args):
 
 
 @pytest.fixture
-def page(page):
-    """pytest-playwright's page, plus: any JS error or console error fails the test."""
+def expected_console_errors():
+    """A test that deliberately breaks the network appends the errors it expects here."""
+    return []
+
+
+@pytest.fixture
+def page(page, expected_console_errors):
+    """pytest-playwright's page, plus: any JS error or unexpected console error fails the test."""
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("console", lambda m: m.type == "error" and errors.append(m.text))
     yield page
-    assert not errors, errors
+    unexpected = [e for e in errors if not any(w in e for w in expected_console_errors)]
+    assert not unexpected, unexpected
