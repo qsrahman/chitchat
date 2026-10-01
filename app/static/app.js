@@ -297,7 +297,7 @@ function renderConv(c) {
   link.textContent = c.title;
   link.title = c.title;
   if (c.id === state.id) link.setAttribute("aria-current", "page");
-  link.onclick = () => setNavOpen(false);
+  link.onclick = closeNavIfOverlay;
   li.append(
     link,
     iconButton(`Rename "${c.title}"`, "M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3", () => renameConv(c)),
@@ -334,10 +334,16 @@ async function deleteConv(c) {
 }
 
 // ---- navigation ----
+// The sidebar starts closed. On narrow screens it is an overlay, so choosing something closes it.
 function setNavOpen(open) {
   document.body.classList.toggle("nav-open", open);
   $("scrim").hidden = !open;
-  $("toggle-nav").setAttribute("aria-expanded", String(open));
+  const toggle = $("toggle-nav");
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", open ? "Hide conversations" : "Show conversations");
+}
+function closeNavIfOverlay() {
+  if (matchMedia("(max-width: 760px)").matches) setNavOpen(false);
 }
 $("toggle-nav").onclick = () => setNavOpen(!document.body.classList.contains("nav-open"));
 $("scrim").onclick = () => setNavOpen(false);
@@ -348,7 +354,7 @@ async function openConversation(id) {
   state.stick = true;
   thread.replaceChildren();
   main.classList.remove("is-started");
-  setNavOpen(false);
+  closeNavIfOverlay();
   if (location.hash.slice(1) !== (id ?? "")) history.replaceState(null, "", id ? `#${id}` : location.pathname);
   if (id) {
     try {

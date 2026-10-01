@@ -17,7 +17,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; height: 100dvh; display: grid; grid-template: minmax(0, 1fr) / 17rem minmax(0, 1fr); background: var(--surface); color: var(--ink); font: 15px/1.5 var(--sans); }
+body { margin: 0; height: 100dvh; display: grid; grid-template: minmax(0, 1fr) / 0 minmax(0, 1fr); background: var(--surface); color: var(--ink); font: 15px/1.5 var(--sans); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 button:disabled { cursor: default; }
@@ -31,8 +31,10 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .icon-btn { padding: 6px; border-radius: 8px; display: inline-grid; place-items: center; }
 .icon-btn:hover { background: var(--hover); }
 
-/* sidebar */
-#sidebar { display: flex; flex-direction: column; min-height: 0; background: var(--bg); border-right: 1px solid var(--line); }
+/* sidebar: closed by default; on wide screens it pushes the content, on narrow ones it overlays (below) */
+body.nav-open { grid-template-columns: 17rem minmax(0, 1fr); }
+#sidebar { display: flex; flex-direction: column; min-height: 0; overflow: hidden; visibility: hidden; background: var(--bg); border-right: 1px solid var(--line); }
+body.nav-open #sidebar { visibility: visible; }
 .side-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 10px 16px; }
 .brand { font-weight: 650; letter-spacing: -.01em; }
 #conversations { flex: 1; overflow-y: auto; padding: 0 8px 16px; }
@@ -51,7 +53,6 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 /* main column */
 main { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; position: relative; }
 .topbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; min-height: 52px; border-bottom: 1px solid var(--line); }
-#toggle-nav { display: none; }
 #title { margin: 0; font-size: .95rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #messages { overflow-y: auto; scroll-behavior: auto; overscroll-behavior: contain; }
@@ -133,12 +134,13 @@ dialog p { margin: 0 0 4px; color: var(--muted); overflow-wrap: anywhere; }
 dialog input { width: 100%; padding: 8px 10px; font: inherit; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
+@media (min-width: 761px) { #scrim { display: none !important; } }
+
 @media (max-width: 760px) {
-  body { grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
-  #sidebar { position: fixed; inset: 0 auto 0 0; z-index: 3; width: min(18rem, 86vw); translate: -100% 0; transition: translate .2s; }
+  body, body.nav-open { grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+  #sidebar { position: fixed; inset: 0 auto 0 0; z-index: 3; width: min(18rem, 86vw); translate: -100% 0; transition: translate .2s, visibility .2s; }
   body.nav-open #sidebar { translate: 0 0; }
   #scrim { position: fixed; inset: 0; z-index: 2; background: light-dark(#0005, #0008); }
-  #toggle-nav { display: inline-grid; }
   .conv .icon-btn { opacity: 1; }
   #jump { bottom: 128px; }
   .hint { display: none; }

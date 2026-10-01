@@ -23,6 +23,11 @@ def open_app(page: Page, app_url: str):
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
 
 
+def open_sidebar(page: Page):
+    page.get_by_role("button", name="Show conversations").click()
+    expect(page.locator("#sidebar")).to_be_visible()
+
+
 def conv_id(page: Page) -> str:
     return page.url.split("#")[1]
 
@@ -207,6 +212,7 @@ def test_new_chat_returns_to_empty_state_and_keeps_old_chat(page, app_url):
     open_app(page, app_url)
     send(page, "first topic")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    open_sidebar(page)
     page.get_by_role("button", name="New chat").click()
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
     expect(page.locator("#title")).to_have_text("New chat")
@@ -220,6 +226,7 @@ def test_rename_via_dialog_with_enter(page, app_url):
     open_app(page, app_url)
     send(page, "old name")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    open_sidebar(page)
     page.get_by_role("button", name='Rename "old name"').click()
     dialog = page.get_by_role("dialog", name="Rename conversation")
     expect(dialog.get_by_label("Conversation title")).to_be_focused()
@@ -236,6 +243,7 @@ def test_rename_can_be_cancelled_with_escape(page, app_url):
     open_app(page, app_url)
     send(page, "stay put")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    open_sidebar(page)
     page.get_by_role("button", name='Rename "stay put"').click()
     page.get_by_label("Conversation title").fill("nope")
     page.keyboard.press("Escape")
@@ -247,6 +255,7 @@ def test_delete_asks_first_then_removes(page, app_url):
     open_app(page, app_url)
     send(page, "doomed chat")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    open_sidebar(page)
     page.get_by_role("button", name='Delete "doomed chat"').click()
     dialog = page.get_by_role("dialog", name="Delete this conversation?")
     expect(dialog).to_contain_text("doomed chat")
@@ -260,10 +269,39 @@ def test_delete_asks_first_then_removes(page, app_url):
 
 # ---- layout and theme ----
 
+def test_sidebar_is_closed_by_default_and_toggles(page, app_url):
+    open_app(page, app_url)
+    sidebar, toggle = page.locator("#sidebar"), page.get_by_role("button", name="Show conversations")
+    expect(sidebar).to_be_hidden()
+    expect(toggle).to_have_attribute("aria-expanded", "false")
+    page.keyboard.press("Tab")  # focus goes to the toggle / composer, never into the hidden sidebar
+    assert not page.evaluate("document.activeElement.closest('#sidebar')")
+    width_closed = page.locator("main").bounding_box()["width"]
+    toggle.click()
+    expect(sidebar).to_be_visible()
+    expect(page.get_by_role("button", name="Hide conversations")).to_have_attribute("aria-expanded", "true")
+    assert page.locator("main").bounding_box()["width"] < width_closed  # pushes content, no overlay
+    page.get_by_role("button", name="Hide conversations").click()
+    expect(sidebar).to_be_hidden()
+
+
+def test_sidebar_stays_open_when_switching_chats_on_desktop(page, app_url):
+    open_app(page, app_url)
+    send(page, "alpha")
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    open_sidebar(page)
+    page.get_by_role("button", name="New chat").click()
+    send(page, "beta")
+    expect(page.locator("#conversations li")).to_have_count(2)
+    page.get_by_role("link", name="alpha").click()
+    expect(page.locator(".msg.user .body")).to_have_text("alpha")
+    expect(page.locator("#sidebar")).to_be_visible()
+
+
 def test_mobile_sidebar_is_a_drawer(page, app_url):
     page.set_viewport_size({"width": 390, "height": 800})
     open_app(page, app_url)
-    sidebar, toggle = page.locator("#sidebar"), page.get_by_role("button", name="Show conversations")
+    sidebar, toggle = page.locator("#sidebar"), page.locator("#toggle-nav")
     expect(sidebar).not_to_be_in_viewport()
     toggle.click()
     expect(sidebar).to_be_in_viewport()
