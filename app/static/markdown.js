@@ -2,10 +2,13 @@
 // highlight.js's "plaintext" language is its HTML escaper: no highlighting, entity-escaped output.
 const escapeHtml = (text) => hljs.highlight(text, { language: "plaintext" }).value;
 
-// Math as models write it: \( inline \), \[ block \] and $$ either $$. marked would otherwise read "\(" as an
-// escaped paren and drop the backslash, and marked-katex-extension only knows $...$, so this is ours. A single
-// $ is deliberately not math ("costs $5 and $10"). An unfinished formula stays literal until its closing
-// delimiter streams in. Code spans and fences are consumed by marked before these rules see them.
+// Math as models write it: \( inline \), $inline$, \[ block \] and $$ either $$. marked would otherwise read
+// "\(" as an escaped paren and drop the backslash, and marked-katex-extension has no \( \), so this is ours.
+// Single $ follows Pandoc's rule so prices stay text: the opening $ needs a non-space after it, and the
+// closing $ a non-space before it and no digit after it. "costs $5 and $10" and "$20,000 and $30,000" are
+// not math; "$x$" and "$1 / \ln(x)$" are. \$ is a literal dollar sign (marked's own escape).
+// An unfinished formula stays literal until its closing delimiter streams in. Code spans and fences are
+// consumed by marked before these rules see them.
 const renderMath = (tex, displayMode) => katex.renderToString(tex, {
   displayMode, throwOnError: false, strict: "ignore", maxSize: 20, // trust stays false: no \href / \url
 });
@@ -25,10 +28,10 @@ const math = {
     {
       name: "inlineMath",
       level: "inline",
-      start: (src) => src.match(/\\\(|\$\$/)?.index,
+      start: (src) => src.match(/\\\(|(?<!\\)\$/)?.index, // an escaped \$ does not start math
       tokenizer(src) {
-        const m = /^(?:\\\(([\s\S]+?)\\\)|\$\$([\s\S]+?)\$\$)/.exec(src);
-        if (m) return { type: "inlineMath", raw: m[0], tex: (m[1] ?? m[2]).trim(), display: m[2] !== undefined };
+        const m = /^(?:\\\(([\s\S]+?)\\\)|\$\$([\s\S]+?)\$\$|\$(?!\s)((?:\\.|[^$\\])+?)(?<!\s)\$(?!\d))/.exec(src);
+        if (m) return { type: "inlineMath", raw: m[0], tex: (m[1] ?? m[2] ?? m[3]).trim(), display: m[2] !== undefined };
       },
       renderer: (token) => renderMath(token.tex, token.display),
     },

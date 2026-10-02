@@ -18,6 +18,17 @@ MATH_REPLY = (
     "```\n\\(y\\)\n```\n\n"
     "Unsafe: \\(\\href{javascript:window.__xss=1}{click me}\\)."
 )
+# Adapted from a real reply (gemma4) to "What is the distribution of prime numbers?": $...$ math, a $$ block, math
+# inside emphasis, an escaped dollar sign, and prices that must stay text.
+PRIMES_REPLY = (
+    "The number of primes up to a number $x$ is approximately:\n\n"
+    "$$\\pi(x) \\approx \\frac{x}{\\ln(x)}$$\n\n"
+    "*(Where $\\pi(x)$ is the prime-counting function and $\\ln(x)$ is the natural logarithm of $x$.)*\n\n"
+    "The chance that a number near $x$ is prime is roughly $1 / \\ln(x)$.\n\n"
+    "For any number $n$, you can find $n$ consecutive composite numbers.\n\n"
+    "The Clay Institute will pay \\$1 million to whoever proves it. "
+    "Tickets cost $5 and $10; budgets are $20,000 and $30,000."
+)
 XSS_REPLY = (
     'Hi <img src=x onerror="window.__xss=1"> ![pixel](https://example.invalid/leak.png) '
     "<script>window.__xss=1</script> "
@@ -59,6 +70,12 @@ class ScriptedLLM:
             yield {"type": "delta", "text": "Here: \\(a^2"}
             await asyncio.sleep(0.8)
             yield {"type": "delta", "text": " + b^2\\) is the sum."}
+        elif "dollarstream" in text:  # a $...$ formula split across deltas
+            yield {"type": "delta", "text": "Here: $a^2"}
+            await asyncio.sleep(0.8)
+            yield {"type": "delta", "text": " + b^2$ is the sum."}
+        elif "primes" in text:
+            yield {"type": "delta", "text": PRIMES_REPLY}
         elif "math" in text:
             yield {"type": "delta", "text": MATH_REPLY}
         elif "ponder" in text:  # reasoning summary first, then the answer and its token usage
