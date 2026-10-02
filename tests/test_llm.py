@@ -45,7 +45,9 @@ async def collect(llm, **kwargs):
 
 @pytest.mark.parametrize("model,expected", [
     ("o3", True), ("o4-mini", True), ("gpt-5.5", True), ("gpt-5-mini", True), ("gpt-oss:20b", True),
-    ("gpt-4o", False), ("gemma4:cloud", False), ("qwen3.5:9b", False), ("llama3", False),
+    ("gpt-5.6-sol", True), ("gpt-6-luna", True), ("gpt-6.1-sol", True),
+    ("gpt-4o", False), ("gpt-4.1", False), ("gpt-4.1-nano", False),
+    ("gemma4:cloud", False), ("qwen3.5:9b", False), ("llama3", False),
 ])
 def test_supports_reasoning(model, expected):
     assert supports_reasoning(model) is expected
@@ -129,14 +131,50 @@ async def test_title_is_none_when_the_call_fails_or_is_blank():
     assert await make_llm(lambda r: message_response("  ")).generate_title("m", "q", "a") is None
 
 
-def models_response(*ids):
-    return httpx.Response(200, json={"object": "list", "data": [
-        {"id": i, "object": "model", "created": 0, "owned_by": "x"} for i in ids]})
+def models_response(*models):
+    """GET /models. Each model is an id, or an (id, created) pair."""
+    data = [{"id": m, "object": "model", "created": 0, "owned_by": "x"} if isinstance(m, str)
+            else {"id": m[0], "object": "model", "created": m[1], "owned_by": "x"} for m in models]
+    return httpx.Response(200, json={"object": "list", "data": data})
 
 
-async def test_list_models_hides_embedding_models_and_sorts():
-    llm = make_llm(lambda r: models_response("qwen3.5:9b", "nomic-embed-text:latest", "gemma4:cloud"))
-    assert await llm.list_models() == ["gemma4:cloud", "qwen3.5:9b"]
+async def listed(*models):
+    return await make_llm(lambda r: models_response(*models)).list_models()
+
+
+async def test_list_models_hides_what_a_text_chat_cannot_use():
+    not_chat = [
+        "text-embedding-3-small", "omni-moderation-latest", "babbage-002", "davinci-002", "gpt-3.5-turbo-instruct",
+        "tts-1-hd", "gpt-4o-mini-tts", "whisper-1", "gpt-4o-transcribe", "gpt-4o-transcribe-diarize",
+        "gpt-audio-mini", "gpt-realtime-2", "gpt-realtime-whisper", "gpt-live-1",
+        "gpt-image-1", "chatgpt-image-latest", "sora-2", "gpt-4o-search-preview", "gpt-5-search-api",
+    ]
+    chat = [
+        "gpt-5.5", "gpt-5.5-pro", "gpt-5.1-codex", "gpt-4.1-nano", "o3", "o1-pro", "chat-latest", "gpt-5-chat-latest",
+    ]
+    assert sorted(await listed(*not_chat, *chat)) == sorted(chat)
+
+
+async def test_list_models_hides_dated_copies_only_when_the_alias_is_listed():
+    got = await listed("gpt-4o", "gpt-4o-2024-08-06", "gpt-4-0613", "gpt-4", "gpt-9-2030-01-01", "o3", "o3-2025-04-16")
+    assert sorted(got) == ["gpt-4", "gpt-4o", "gpt-9-2030-01-01", "o3"]  # gpt-9-... has no alias, so it stays
+
+
+async def test_list_models_is_newest_first_and_alphabetical_on_ties():
+    got = await listed(("gpt-4o", 100), ("gpt-6", 300), ("o3", 200), ("gpt-5", 200), ("zzz", 100))
+    assert got == ["gpt-6", "gpt-5", "o3", "gpt-4o", "zzz"]
+
+
+async def test_list_models_copes_with_servers_that_omit_created():
+    bare = httpx.Response(200, json={"object": "list", "data": [
+        {"id": "b-model", "object": "model", "owned_by": "x"}, {"id": "a-model", "object": "model", "owned_by": "x"}]})
+    assert await make_llm(lambda r: bare).list_models() == ["a-model", "b-model"]
+
+
+async def test_list_models_leaves_local_model_names_alone():
+    local = ["gemma4:cloud", "gemma4:12b", "qwen2.5-coder:1.5b", "qwen3.5:9b-instruct", "llama3-instruct",
+             "llama3.2-vision", "gpt-oss:20b", "ornith-1.5:9b", "minimax-m3:cloud"]
+    assert sorted(await listed(*local, "nomic-embed-text:latest")) == sorted(local)  # only the embedding model goes
 
 
 async def test_list_models_is_empty_when_listing_fails():

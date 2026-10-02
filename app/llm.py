@@ -28,8 +28,20 @@ Event = dict
 REASONING_EFFORTS: list[str] = list(typing.get_args(typing.get_args(ReasoningEffort)[0]))
 
 # Which models take `reasoning.effort` (and reject `temperature`) can't be asked of the API, so go by name:
-# OpenAI's o-series and gpt-5 family, plus gpt-oss. Everything else is treated as a temperature model.
-_REASONING = re.compile(r"^(o\d|gpt-5|gpt-oss)")
+# OpenAI's o-series and gpt-5 and later, plus gpt-oss. Everything else is treated as a temperature model.
+_REASONING = re.compile(r"^(o\d|gpt-[5-9]|gpt-oss)")
+
+# What GET /models lists but a text chat can't use, as OpenAI names it: embeddings, moderation, speech and
+# audio, image and video generation, completion-only models and search-only models. The word rules match whole
+# hyphen-separated words, and "instruct" is only matched for OpenAI's own model, so a local model such as
+# "llama3-instruct" or "llama3.2-vision" is left alone.
+_NOT_CHAT = re.compile(
+    r"embed|moderation|^(babbage|davinci)|^gpt-3\.5-turbo-instruct"
+    r"|(^|-)(tts|whisper|transcribe|diarize|realtime|audio|live|image|sora)(-|$)"
+    r"|search-(preview|api)"
+)
+# "gpt-4o-2024-08-06" is a dated copy of "gpt-4o"; it is hidden when the alias is listed too.
+_SNAPSHOT = re.compile(r"^(?P<alias>.+)-(?:\d{4}-\d{2}-\d{2}|\d{4})$")
 
 
 def supports_reasoning(model: str) -> bool:
@@ -106,12 +118,18 @@ class OpenAILLM:
         return self._client
 
     async def list_models(self) -> list[str]:
-        """Model ids the endpoint offers, minus embedding models; [] if it can't be listed."""
+        """Chat models the endpoint offers, newest first; [] if it can't be listed."""
         try:
-            ids = [m.id async for m in self.client.models.list()]
+            models = [m async for m in self.client.models.list()]
         except openai.OpenAIError:
             return []
-        return sorted(i for i in ids if "embed" not in i)
+        listed = {m.id for m in models}
+
+        def wanted(model) -> bool:
+            snapshot = _SNAPSHOT.match(model.id)
+            return not _NOT_CHAT.search(model.id) and not (snapshot and snapshot["alias"] in listed)
+
+        return [m.id for m in sorted(filter(wanted, models), key=lambda m: (-(getattr(m, "created", 0) or 0), m.id))]
 
     async def stream_reply(
         self,
