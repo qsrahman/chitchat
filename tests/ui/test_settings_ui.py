@@ -159,3 +159,18 @@ def test_custom_instructions_apply_to_every_chat_and_persist(page, app_url):
     save(dialog)
     send(page, "again")
     expect(page.locator(".msg.assistant .body")).to_contain_text("[instructions=Call me Que Be brief]")
+
+
+def test_the_dialog_opens_at_once_even_when_the_model_list_is_slow(page, app_url):
+    open_app(page, app_url)
+    expect(page.get_by_role("button", name="scripted-default")).to_be_visible()  # the startup list has loaded
+    page.route("**/api/models", lambda route: (page.wait_for_timeout(1500), route.continue_()))
+    page.get_by_role("button", name="Chat settings").click()
+    dialog = page.get_by_role("dialog", name="Chat settings")
+    expect(dialog).to_be_visible(timeout=500)
+    expect(dialog.get_by_label("Model").locator("option")).to_have_count(3, timeout=500)
+    dialog.get_by_label("Model").select_option("alpha-model")  # picked while the refresh is still in flight
+    dialog.get_by_label("System prompt").fill("kept")
+    page.wait_for_timeout(1800)  # the refresh lands and rebuilds the choices
+    expect(dialog.get_by_label("Model")).to_have_value("alpha-model")
+    expect(dialog.get_by_label("System prompt")).to_have_value("kept")

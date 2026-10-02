@@ -850,25 +850,34 @@ function syncSettingsFields() {
 }
 $("set-model").addEventListener("change", syncSettingsFields);
 
-async function openSettings() {
-  const { default: fallback, efforts, models } = (modelInfo = await api("/models"));
-  syncModelButton();
-  const s = state.settings;
-  reasoningModels = new Map([["", models[0].reasoning], ...models.map((m) => [m.id, m.reasoning])]);
+// The model and effort choices come from the list the page already has, so the dialog opens at once; the list is
+// refreshed in the background and the choices rebuilt, keeping what has been picked meanwhile.
+function fillModelChoices(model, effort) {
+  const { default: fallback, efforts = [], models } = modelInfo;
+  reasoningModels = new Map([["", models[0]?.reasoning], ...models.map((m) => [m.id, m.reasoning])]);
   const options = models.slice(1).map((m) => new Option(m.id, m.id));
-  if (s.model && !reasoningModels.has(s.model)) options.push(new Option(s.model, s.model)); // no longer listed
-  $("set-model").replaceChildren(new Option(`Default (${fallback})`, ""), ...options);
+  if (model && !reasoningModels.has(model)) options.push(new Option(model, model)); // no longer listed
+  $("set-model").replaceChildren(new Option(`Default (${fallback ?? "…"})`, ""), ...options);
   $("set-effort").replaceChildren(new Option("Default", ""), ...efforts.map((e) => new Option(e, e)));
-  $("set-model").value = s.model ?? "";
-  $("set-system").value = s.system_prompt;
-  $("set-effort").value = s.reasoning_effort ?? "";
-  $("set-temp").value = s.temperature ?? "";
+  $("set-model").value = model ?? "";
+  $("set-effort").value = effort ?? "";
   syncSettingsFields();
+}
+
+function openSettings() {
+  const s = state.settings;
+  const dialog = $("settings-dialog");
+  fillModelChoices(s.model, s.reasoning_effort);
+  $("set-system").value = s.system_prompt;
+  $("set-temp").value = s.temperature ?? "";
   $("export-row").hidden = !state.id;
   $("export-md").href = `/api/conversations/${state.id}/export?format=md`;
   $("export-json").href = `/api/conversations/${state.id}/export?format=json`;
-  $("settings-dialog").querySelector(".field-error").hidden = true;
-  $("settings-dialog").showModal();
+  dialog.querySelector(".field-error").hidden = true;
+  dialog.showModal();
+  refreshModels().then(() => {
+    if (dialog.open) fillModelChoices($("set-model").value || null, $("set-effort").value || null);
+  });
 }
 $("settings-btn").onclick = openSettings;
 
