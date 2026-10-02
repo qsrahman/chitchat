@@ -59,7 +59,27 @@ body.nav-open { grid-template-columns: 17rem minmax(0, 1fr); }
 /* main column */
 main { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; position: relative; }
 .topbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; min-height: 52px; border-bottom: 1px solid var(--line); }
-#title { flex: 1; margin: 0; font-size: .95rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#title { flex: 1; min-width: 0; margin: 0; font-size: .9rem; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+main:not(.is-started) #title { visibility: hidden; }
+
+.model-btn { display: flex; align-items: center; gap: 6px; flex: 0 1 auto; min-width: 0; max-width: 60%; padding: 6px 10px; border-radius: 10px; font-weight: 600; }
+.model-btn:hover { background: var(--hover); }
+.model-btn #model-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-btn svg { width: 16px; height: 16px; color: var(--muted); }
+
+/* model menu: a popover under the header button (placed from app.js: CSS anchor positioning is not widely available) */
+#model-menu { position: fixed; inset: auto; margin: 0; width: min(22rem, 100vw - 16px); padding: 6px; border: 1px solid var(--line); border-radius: 16px; background: var(--raised); color: var(--ink); box-shadow: 0 8px 30px light-dark(#0002, #0008); }
+#model-list { max-height: min(20rem, 50dvh); overflow-y: auto; }
+.menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 10px; text-align: left; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--hover); }
+.menu-item:focus-visible { outline-offset: -2px; }
+.menu-item .check { visibility: hidden; color: var(--accent); }
+.menu-item[aria-checked="true"] .check { visibility: visible; }
+.menu-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-tag { flex: none; font-size: .75rem; color: var(--muted); }
+.menu-note { margin: 4px 10px 6px; font-size: .8rem; color: var(--muted); }
+#more-settings { margin-top: 2px; border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; padding-top: 10px; }
+#model-menu .field-error { margin: 4px 10px; }
 
 #settings-btn { position: relative; color: var(--muted); }
 #settings-btn:hover { color: var(--ink); }

@@ -33,6 +33,10 @@
     <button id="toggle-nav" type="button" class="icon-btn nav-toggle" aria-label="Show conversations" title="Show conversations" aria-expanded="false">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
     </button>
+    <button id="model-btn" type="button" class="model-btn" popovertarget="model-menu" aria-haspopup="menu" aria-label="Model">
+      <span id="model-name">Model</span>
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
+    </button>
     <h1 id="title">New chat</h1>
     <button id="settings-btn" type="button" class="icon-btn" aria-label="Chat settings">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
@@ -60,6 +64,16 @@
     <p class="hint">Enter to send, Shift+Enter for a new line. Esc stops a reply.</p>
   </form>
 </main>
+
+<div id="model-menu" popover role="menu" aria-label="Choose a model">
+  <div id="model-list"></div>
+  <p class="menu-note">Applies from your next message.</p>
+  <p class="field-error" role="alert" hidden></p>
+  <button id="more-settings" type="button" role="menuitem" class="menu-item">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
+    <span class="menu-name">Chat settings…</span>
+  </button>
+</div>
 
 <dialog id="rename-dialog" closedby="any" aria-labelledby="rename-heading">
   <form method="dialog">

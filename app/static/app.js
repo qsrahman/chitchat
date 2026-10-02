@@ -475,7 +475,10 @@ async function deleteConv(c) {
 // ---- settings ----
 function setSettings(settings) {
   state.settings = settings;
-  $("settings-btn").toggleAttribute("data-active", Object.keys(DEFAULT_SETTINGS).some((k) => settings[k] !== DEFAULT_SETTINGS[k]));
+  // The dot on the settings button means "something besides the model is customized"; the model has its own button.
+  const customized = Object.keys(DEFAULT_SETTINGS).some((k) => k !== "model" && settings[k] !== DEFAULT_SETTINGS[k]);
+  $("settings-btn").toggleAttribute("data-active", customized);
+  syncModelButton();
 }
 
 // Dialogs that save to the server stay open until the save succeeds.
@@ -494,6 +497,93 @@ function bindSave(dlg, save) {
   });
 }
 
+// ---- model picker ----
+// The header button shows the model this conversation uses and opens a menu to switch it. null in the
+// settings means "the default", so choosing the default row stores null and keeps following it.
+const modelBtn = $("model-btn");
+const modelMenu = $("model-menu");
+let modelInfo = { default: null, models: [] }; // from GET /api/models
+
+const currentModel = () => state.settings.model ?? modelInfo.default;
+
+function syncModelButton() {
+  const name = currentModel();
+  $("model-name").textContent = name ?? "Model";
+  modelBtn.setAttribute("aria-label", name ? `Model: ${name}` : "Model");
+  modelBtn.title = name ? `Model: ${name}` : "Model";
+}
+
+async function refreshModels() {
+  try { modelInfo = await api("/models"); } catch { /* keep what we have; the settings dialog reports real problems */ }
+  syncModelButton();
+}
+
+function modelRow(id, tags) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.setAttribute("role", "menuitemradio");
+  row.setAttribute("aria-checked", String(id === currentModel()));
+  row.className = "menu-item";
+  row.innerHTML = `<svg class="check" viewBox="0 0 20 20" aria-hidden="true"><path d="${ICONS.check}"/></svg>` +
+    '<span class="menu-name"></span>' + tags.map(() => '<span class="menu-tag"></span>').join("");
+  row.querySelector(".menu-name").textContent = id;
+  row.querySelectorAll(".menu-tag").forEach((el, i) => (el.textContent = tags[i]));
+  row.onclick = () => chooseModel(id);
+  return row;
+}
+
+function renderModelMenu() {
+  const saved = state.settings.model;
+  const rows = modelInfo.models.map((m) =>
+    modelRow(m.id, [m.id === modelInfo.default && "default", m.reasoning && "reasoning"].filter(Boolean)));
+  if (saved && !modelInfo.models.some((m) => m.id === saved)) rows.push(modelRow(saved, ["not listed"]));
+  $("model-list").replaceChildren(...rows);
+}
+
+async function chooseModel(id) {
+  const error = modelMenu.querySelector(".field-error");
+  error.hidden = true;
+  const next = { ...state.settings, model: id === modelInfo.default ? null : id };
+  try {
+    if (state.id) setSettings((await api(`/conversations/${state.id}`, { method: "PATCH", body: JSON.stringify({ settings: next }) })).settings);
+    else setSettings(next);
+    modelMenu.hidePopover(); // the browser returns focus to the button
+  } catch {
+    error.textContent = "Couldn't switch model. Check your connection and try again.";
+    error.hidden = false;
+  }
+}
+
+modelMenu.addEventListener("beforetoggle", (e) => {
+  if (e.newState !== "open") return;
+  modelMenu.querySelector(".field-error").hidden = true;
+  renderModelMenu();
+});
+modelMenu.addEventListener("toggle", async (e) => {
+  if (e.newState !== "open") return;
+  const r = modelBtn.getBoundingClientRect(); // under the button, kept inside the viewport
+  modelMenu.style.top = `${r.bottom + 6}px`;
+  modelMenu.style.left = `${Math.max(8, Math.min(r.left, innerWidth - modelMenu.offsetWidth - 8))}px`;
+  (modelMenu.querySelector('[aria-checked="true"]') ?? modelMenu.querySelector("button"))?.focus();
+  await refreshModels(); // the list may have changed since the page loaded
+  if (modelMenu.matches(":popover-open")) {
+    const focused = document.activeElement?.textContent;
+    renderModelMenu();
+    [...modelMenu.querySelectorAll("button")].find((b) => b.textContent === focused)?.focus();
+  }
+});
+// A menu's keyboard contract: arrows, Home and End move between items; Tab leaves; Escape is the popover's own.
+modelMenu.addEventListener("keydown", (e) => {
+  const items = [...modelMenu.querySelectorAll('[role^="menuitem"]')];
+  const i = items.indexOf(document.activeElement);
+  const target = { ArrowDown: (i + 1) % items.length, ArrowUp: (i - 1 + items.length) % items.length, Home: 0, End: items.length - 1 }[e.key];
+  if (target !== undefined) {
+    e.preventDefault();
+    items[target].focus();
+  } else if (e.key === "Tab") modelMenu.hidePopover();
+});
+$("more-settings").onclick = () => { modelMenu.hidePopover(); openSettings(); };
+
 let reasoningModels = new Map(); // model id -> takes reasoning effort (otherwise temperature)
 function syncSettingsFields() {
   const reasoning = reasoningModels.get($("set-model").value); // "" = the default model
@@ -503,7 +593,8 @@ function syncSettingsFields() {
 $("set-model").addEventListener("change", syncSettingsFields);
 
 async function openSettings() {
-  const { default: fallback, efforts, models } = await api("/models");
+  const { default: fallback, efforts, models } = (modelInfo = await api("/models"));
+  syncModelButton();
   const s = state.settings;
   reasoningModels = new Map([["", models[0].reasoning], ...models.map((m) => [m.id, m.reasoning])]);
   const options = models.slice(1).map((m) => new Option(m.id, m.id));
@@ -593,4 +684,5 @@ window.addEventListener("hashchange", () => {
 });
 
 syncSend();
+refreshModels();
 openConversation(location.hash.slice(1) || null);
