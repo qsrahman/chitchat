@@ -18,6 +18,7 @@
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3"/></svg>
     <span class="label">New chat</span>
   </button>
+  <input id="search" type="search" class="side-search" placeholder="Search chats" aria-label="Search conversations" autocomplete="off" maxlength="200">
   <nav id="conversations"></nav>
   <div class="side-foot">
     <button id="instructions-btn" type="button" class="side-item" aria-label="Custom instructions" title="Custom instructions">
@@ -127,6 +128,9 @@
       <input id="set-temp" type="number" min="0" max="2" step="0.1" placeholder="Default">
     </label>
     <p class="field-note">Changes apply from your next message.</p>
+    <p id="export-row" class="field-note" hidden>Export this chat:
+      <a id="export-md" download>Markdown</a> · <a id="export-json" download>JSON</a>
+    </p>
     <p class="field-error" role="alert" hidden></p>
     <div class="dialog-actions">
       <button type="button" class="btn" data-cancel>Cancel</button>

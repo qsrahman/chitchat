@@ -4,6 +4,8 @@
     {"type": "reasoning_delta", "text": str}          # streamed reasoning summary
     {"type": "tool_call", "id", "name", "arguments", "status": "running" | "done" | "error",
         "display": {...} | "error": str}              # a tool the model called, see tools.py
+    {"type": "compaction", "item": {...}, "after_reply": bool}   # just before "done": OpenAI compacted the context,
+                       # see docs/phase-8.md. `after_reply`: the item also covers this reply's text.
     {"type": "done"}   # plus "incomplete": reason (hit a limit) and "usage": {input_tokens, output_tokens,
                        # reasoning_tokens}, when there are any
     {"type": "error", "message": str}
@@ -80,7 +82,8 @@ def _content(message: dict) -> str | list[ResponseInputContentParam]:
 
 
 def _inputs(messages: list[dict]) -> list[dict]:
-    return [{"role": m["role"], "content": _content(m)} for m in messages]
+    # A {"compaction": item} entry stands for every earlier turn: it is sent as the item OpenAI gave us.
+    return [m["compaction"] if "compaction" in m else {"role": m["role"], "content": _content(m)} for m in messages]
 
 
 def _error_message(error: openai.OpenAIError) -> str:
@@ -216,9 +219,12 @@ class OpenAILLM:
             extra["tools"] = [_tool_spec(t) for t in tools.values()]
             if supports_reasoning(model):  # calls are stateless, so reasoning items travel back to the model
                 extra["include"] = ["reasoning.encrypted_content"]
+        if self.settings.compact_threshold:
+            extra["context_management"] = [{"type": "compaction", "compact_threshold": self.settings.compact_threshold}]
         try:
             items = await asyncio.to_thread(_inputs, messages)  # reads attachment files
             usage, calls_run, break_before_text = None, 0, False
+            compaction = None  # the last compaction item of the reply, and whether it came after the reply text
             for _ in range(max_tool_calls + 3 if tools else 1):
                 stream = await self.client.responses.create(
                     model=model, input=items, store=False, stream=True,
@@ -240,6 +246,10 @@ class OpenAILLM:
                             yield {"type": "reasoning_delta", "text": gap + ev.delta}
                         case "response.output_item.done":
                             output.append(ev.item.model_dump(exclude_none=True))
+                            if ev.item.type == "compaction":
+                                compaction = {"item": output[-1], "after_reply": True}
+                            elif ev.item.type == "message" and compaction:
+                                compaction["after_reply"] = False  # the text came after it
                             if ev.item.type == "function_call":
                                 calls.append(ev.item)
                         case "response.completed":
@@ -252,12 +262,16 @@ class OpenAILLM:
                             details = ev.response.incomplete_details
                             reason = details.reason if details else "unknown"
                             usage = _add_usage(usage, _usage(ev.response))
+                            if compaction:
+                                yield {"type": "compaction", **compaction}
                             yield {"type": "done", "incomplete": reason, **({"usage": usage} if usage else {})}
                             return
                         case "error":
                             yield {"type": "error", "message": ev.message}
                             return
                 if not calls:
+                    if compaction:
+                        yield {"type": "compaction", **compaction}
                     yield {"type": "done", **({"usage": usage} if usage else {})}
                     return
                 items += output

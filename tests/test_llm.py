@@ -522,3 +522,53 @@ async def test_several_calls_in_one_round_all_get_their_outputs_in_order():
     kinds = [i["type"] for i in tail]
     assert kinds.count("function_call") == 2 and kinds.count("function_call_output") == 2
     assert {i["call_id"] for i in tail if i["type"] == "function_call_output"} == {"a", "b"}
+
+
+# ---- compaction ----
+
+def item_done(item):
+    return {"type": "response.output_item.done", "item": item, "output_index": 0, "sequence_number": 2}
+
+
+COMPACTION = {"id": "cmp_1", "type": "compaction", "encrypted_content": "opaque"}
+MESSAGE = {"id": "msg_1", "type": "message", "role": "assistant", "status": "completed", "content": []}
+
+
+async def test_compaction_is_requested_when_a_threshold_is_set():
+    requests = []
+    llm = make_llm(streaming(delta("a"), completed(), requests=requests), compact_threshold=1000)
+    await collect(llm)
+    assert requests[0]["context_management"] == [{"type": "compaction", "compact_threshold": 1000}]
+    assert requests[0]["store"] is False
+
+
+async def test_compaction_is_not_requested_when_the_threshold_is_zero():
+    requests = []
+    await collect(make_llm(streaming(delta("a"), completed(), requests=requests), compact_threshold=0))
+    assert "context_management" not in requests[0]
+
+
+async def test_a_compaction_before_the_reply_text_is_reported_as_not_covering_it():
+    llm = make_llm(streaming(item_done(COMPACTION), delta("a"), item_done(MESSAGE), completed()))
+    events = await collect(llm)
+    assert events[-2:] == [{"type": "compaction", "item": COMPACTION, "after_reply": False}, {"type": "done"}]
+
+
+async def test_the_last_compaction_wins_and_one_after_the_reply_covers_it():
+    later = {**COMPACTION, "id": "cmp_2"}
+    llm = make_llm(streaming(item_done(COMPACTION), delta("a"), item_done(MESSAGE), item_done(later), completed()))
+    events = await collect(llm)
+    assert events[-2] == {"type": "compaction", "item": later, "after_reply": True}
+
+
+async def test_no_compaction_event_without_a_compaction_item():
+    events = await collect(make_llm(streaming(delta("a"), item_done(MESSAGE), completed())))
+    assert all(e["type"] != "compaction" for e in events)
+
+
+async def test_a_stored_compaction_item_is_sent_as_it_is_in_place_of_earlier_turns():
+    requests = []
+    llm = make_llm(streaming(delta("a"), completed(), requests=requests))
+    messages = [{"compaction": COMPACTION}, {"role": "user", "content": "next"}]
+    [e async for e in llm.stream_reply("m", messages)]
+    assert requests[0]["input"] == [COMPACTION, {"role": "user", "content": "next"}]

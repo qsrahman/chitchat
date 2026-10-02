@@ -96,6 +96,9 @@ class ScriptedLLM:
                 yield {"type": "delta", "text": "It is **3.14**, per [python.org](https://www.python.org/)."}
             yield {"type": "done"}
             return
+        elif "compactme" in text:  # the context was compacted during this reply
+            yield {"type": "delta", "text": "Done, and compacted."}
+            yield {"type": "compaction", "item": {"type": "compaction", "encrypted_content": "x"}, "after_reply": True}
         elif "dollarstream" in text:  # a $...$ formula split across deltas
             yield {"type": "delta", "text": "Here: $a^2"}
             await asyncio.sleep(0.8)

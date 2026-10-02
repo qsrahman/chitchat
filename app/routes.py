@@ -1,12 +1,14 @@
+import json
+import re
 import sqlite3
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, Response
 from fastapi.sse import EventSourceResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
@@ -82,10 +84,48 @@ def create_conversation(conn: Conn, body: NewConversation | None = None):
     return store.create_conversation(conn, settings=settings)
 
 
+def _public(m: dict) -> dict:
+    """A message for the browser or an export: OpenAI's encrypted compaction item is only for the model."""
+    c = m["meta"].get("compaction")
+    return {**m, "meta": {**m["meta"], "compaction": {"after_reply": c["after_reply"]}}} if c else m
+
+
 @router.get("/conversations/{cid}")
 def get_conversation(cid: str, conn: Conn):
     conv = _require(conn, cid)
-    return {**conv, "messages": store.list_messages(conn, cid)}
+    return {**conv, "messages": [_public(m) for m in store.list_messages(conn, cid)]}
+
+
+@router.get("/search")
+def search(q: Annotated[str, Query(min_length=1, max_length=200)], conn: Conn):
+    """Conversations whose messages match; `snippet` marks the matched words with STX/ETX characters."""
+    return store.search_conversations(conn, q)
+
+
+def _markdown(conv: dict, messages: list[dict]) -> str:
+    parts = [f"# {conv['title']}"]
+    for m in messages:
+        parts.append("## " + ("You" if m["role"] == "user" else "Assistant"))
+        if files := m["meta"].get("attachments"):
+            parts.append("*Attached: " + ", ".join(a["name"] for a in files) + "*")
+        parts.append(m["content"])
+    return "\n\n".join(parts) + "\n"
+
+
+@router.get("/conversations/{cid}/export")
+def export_conversation(cid: str, conn: Conn, format: Literal["md", "json"] = "md"):
+    """The conversation as a Markdown or JSON download. Attachments are listed by name, not included."""
+    conv = _require(conn, cid)
+    messages = [_public(m) for m in store.list_messages(conn, cid)]
+    if format == "md":
+        body, media_type = _markdown(conv, messages), "text/markdown"
+    else:
+        body, media_type = json.dumps({**conv, "messages": messages}, indent=2, ensure_ascii=False), "application/json"
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", conv["title"]).strip("-") or "chat"
+    return Response(
+        body, media_type=f"{media_type}; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{name}.{format}"'},
+    )
 
 
 @router.patch("/conversations/{cid}")
@@ -180,8 +220,16 @@ def delete_conversation(cid: str, request: Request, conn: Conn):
 def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]:
     """The conversation as llm.py takes it. Earlier attachments are sent again each turn: calls are stateless."""
     settings = request.app.state.settings
-    history = []
-    for m in store.list_messages(conn, cid):
+    messages = store.list_messages(conn, cid)
+    head = []
+    # The latest compaction stands for the turns before it (see docs/phase-8.md); the messages stay in the
+    # database and the UI, but they are no longer sent. `after_reply`: it also covers the message it is saved on.
+    for i, m in reversed(list(enumerate(messages))):
+        if c := m["meta"].get("compaction"):
+            head, messages = [{"compaction": c["item"]}], messages[i + 1 if c["after_reply"] else i :]
+            break
+    history = head
+    for m in messages:
         item = {"role": m["role"], "content": m["content"]}
         if m["meta"].get("attachments"):
             item["attachments"] = [
@@ -289,7 +337,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     """
     cid, conn = turn.conv["id"], turn.conn
     needs_title = turn.conv["title"] == store.DEFAULT_TITLE
-    reply, reasoning, tool_calls, finished = [], [], {}, False
+    reply, reasoning, tool_calls, compaction, finished = [], [], {}, None, False
     try:
         async for event in turn.llm.stream_reply(turn.model, turn.history, **turn.options):
             if event["type"] == "delta":
@@ -298,6 +346,9 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                 reasoning.append(event["text"])
             elif event["type"] == "tool_call":
                 tool_calls[event["id"]] = event  # the last event for an id is its outcome
+            elif event["type"] == "compaction":
+                compaction = event  # kept for the next turns; the browser only hears that it happened
+                event = {"type": "compaction", "after_reply": event["after_reply"]}
             elif event["type"] == "done":
                 text = "".join(reply)
                 meta = {k: event[k] for k in ("incomplete", "usage") if k in event}
@@ -305,6 +356,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                     meta["reasoning"] = "".join(reasoning)
                 if tool_calls:
                     meta["tools"] = _tool_meta(tool_calls)
+                if compaction:
+                    meta["compaction"] = {"item": compaction["item"], "after_reply": compaction["after_reply"]}
                 store.add_message(conn, cid, "assistant", text, meta)
                 finished = True
                 yield event

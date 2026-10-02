@@ -104,6 +104,7 @@ function setNote(el, meta) {
   note.textContent = [
     meta.stopped && "Stopped.",
     meta.incomplete && "Reply cut off: output limit reached.",
+    meta.compaction && "Earlier messages were compacted to save context.",
     meta.usage && usageText(meta.usage),
   ].filter(Boolean).join(" ");
   note.hidden = !note.textContent;
@@ -340,6 +341,7 @@ async function runTurn(path, payload = {}) {
   const el = addMessage("assistant");
   let reply = "";
   let finished = false;
+  let compaction = false;
   try {
     if (!state.id) {
       state.id = (await api("/conversations", { method: "POST", body: JSON.stringify({ settings: state.settings }) })).id;
@@ -367,7 +369,8 @@ async function runTurn(path, payload = {}) {
       } else if (ev.type === "tool_call") {
         renderToolCall(el, ev);
         render(el);
-      } else if (ev.type === "done") { finished = true; setNote(el, ev); }
+      } else if (ev.type === "compaction") compaction = true;
+      else if (ev.type === "done") { finished = true; setNote(el, { ...ev, compaction }); }
       else if (ev.type === "error") throw new Error(ev.message);
     }
     if (!finished) throw new Error("The connection closed before the reply finished.");
@@ -612,7 +615,46 @@ function setTitle(title) {
   document.title = title ? `${title} · ChitChat` : "ChitChat";
 }
 
+// Search replaces the list while the box has text: results are conversations with the matched message's snippet.
+// The server marks matches with STX/ETX characters; the snippet is built as DOM, never as HTML.
+const searchBox = $("search");
+let searchTimer;
+searchBox.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(runSearch, 200);
+});
+
+async function runSearch() {
+  const q = searchBox.value.trim();
+  if (!q) return renderList();
+  const results = await api(`/search?q=${encodeURIComponent(q)}`);
+  if (q !== searchBox.value.trim()) return; // typed on meanwhile
+  const nav = $("conversations");
+  if (!results.length) {
+    nav.replaceChildren(Object.assign(document.createElement("p"), { className: "no-convs", textContent: "No chats match." }));
+    return;
+  }
+  const ul = document.createElement("ul");
+  ul.append(...results.map((r) => {
+    const li = document.createElement("li");
+    li.className = "conv";
+    const a = document.createElement("a");
+    a.className = "result";
+    a.href = `#${r.id}`;
+    a.onclick = closeNavIfOverlay;
+    const snippet = document.createElement("span");
+    // split() puts the captured (matched) parts at the odd indexes
+    snippet.append(...r.snippet.split(/\x02(.*?)\x03/s).map((t, i) =>
+      i % 2 ? Object.assign(document.createElement("mark"), { textContent: t }) : t));
+    a.append(Object.assign(document.createElement("strong"), { textContent: r.title }), snippet);
+    li.append(a);
+    return li;
+  }));
+  nav.replaceChildren(ul);
+}
+
 function renderList() {
+  if (searchBox.value.trim()) return; // results are showing; they stay until the box is cleared
   const nav = $("conversations");
   if (!state.convs.length) {
     nav.replaceChildren(Object.assign(document.createElement("p"), { className: "no-convs", textContent: "Your conversations will show up here." }));
@@ -825,6 +867,9 @@ async function openSettings() {
   $("set-effort").value = s.reasoning_effort ?? "";
   $("set-temp").value = s.temperature ?? "";
   syncSettingsFields();
+  $("export-row").hidden = !state.id;
+  $("export-md").href = `/api/conversations/${state.id}/export?format=md`;
+  $("export-json").href = `/api/conversations/${state.id}/export?format=json`;
   $("settings-dialog").querySelector(".field-error").hidden = true;
   $("settings-dialog").showModal();
 }

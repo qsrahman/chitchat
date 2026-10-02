@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # How a PDF reaches the model: "text" extracts its text here and sends that (works with any model); "file"
     # sends the PDF itself as an input_file, which OpenAI reads with page images but local servers often reject.
     openai_pdf_input: Literal["text", "file"] = "text"
+    # Server-side compaction: once a request's context passes this many tokens, OpenAI replaces the older turns
+    # with an opaque summary item. 0 turns it off. Servers that don't implement it ignore the parameter.
+    compact_threshold: int = 150_000
     brave_api_key: str = ""  # enables the web_search tool (Brave Search API)
     max_tool_calls: int = 4  # per reply: each web search is billed by Brave
     db_path: str = "chitchat.db"

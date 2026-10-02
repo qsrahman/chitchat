@@ -42,7 +42,7 @@ Seams that keep features additive:
 | 5 | done | Reasoning summaries (collapsible), token usage display |
 | 6 | done | Attachments: images (`input_image`), files/PDF (`input_file`) |
 | 7 | done | Tools: built-in web search with citations, then a function-calling loop with a small registry (`tools.py`) |
-| 8 | next | Context management (truncate/summarize old turns), FTS5 search, export (Markdown/JSON) |
+| 8 | done | Context management (OpenAI server-side compaction), FTS5 search, export (Markdown/JSON) |
 | 9 | | Optional: auth, multi-user, rate limits, Dockerfile |
 
 Phases 0 to 3 give a usable ChatGPT-lite. Phases 4 onward can be reordered.

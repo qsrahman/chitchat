@@ -15,6 +15,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - `app/routes.py`: HTTP and SSE endpoints. `app/main.py` is the `create_app()` factory.
 - `app/attachments.py`: upload classification (from bytes), files on disk, PDF text, and `for_model()`, which turns a stored attachment into what `llm.py` sends. `llm.py` builds the API input parts.
 - `app/tools.py`: tools the model can call (schema + async function returning `ToolResult(output, display)`). `llm.stream_reply` runs the tool loop; a new tool is registered in `build()` and named in `NAMES`. See `docs/phase-7.md`.
+- Context management is OpenAI's server-side compaction, not our own summarizing: `llm.py` asks for it, `routes._history` starts from the latest saved compaction item. See `docs/phase-8.md`.
 - `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions.
 - `app/static/`: vanilla JS UI as ES modules (`app.js`, `markdown.js`), no build step. Libraries are vendored in `static/vendor/`; don't add CDN links. Rendering rules (math, reasoning text, sanitizing) are in `docs/rendering.md`.
 - `tests/ui/`: Playwright tests against the real app with a `ScriptedLLM` (`tests/ui/conftest.py`).

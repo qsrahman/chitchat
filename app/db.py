@@ -40,8 +40,27 @@ CREATE TABLE attachments (
 CREATE INDEX attachments_by_conversation ON attachments(conversation_id);
 """
 
+# v4: full-text search over message text. An external-content FTS5 index (the text is not stored twice) that
+# triggers keep in step with `messages`, which includes the cascade when a conversation is deleted.
+SEARCH = """
+CREATE VIRTUAL TABLE messages_fts USING fts5(
+    content, content='messages', content_rowid='id', tokenize='porter unicode61'
+);
+INSERT INTO messages_fts(rowid, content) SELECT id, content FROM messages;
+CREATE TRIGGER messages_fts_insert AFTER INSERT ON messages BEGIN
+    INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+END;
+CREATE TRIGGER messages_fts_delete AFTER DELETE ON messages BEGIN
+    INSERT INTO messages_fts(messages_fts, rowid, content) VALUES ('delete', old.id, old.content);
+END;
+CREATE TRIGGER messages_fts_update AFTER UPDATE OF content ON messages BEGIN
+    INSERT INTO messages_fts(messages_fts, rowid, content) VALUES ('delete', old.id, old.content);
+    INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+END;
+"""
+
 # Each entry upgrades the schema by one version; PRAGMA user_version records how many ran.
-MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS]
+MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS, SEARCH]
 
 
 def connect(path: str) -> sqlite3.Connection:

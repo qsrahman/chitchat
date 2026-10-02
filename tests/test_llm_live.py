@@ -68,3 +68,23 @@ async def test_live_brave_search():
     result = await tools.build(s)["web_search"].run({"query": "python programming language", "freshness": None})
     assert result.display["results"] and all(r["url"].startswith("http") for r in result.display["results"])
     assert result.output.startswith("Web search results")
+
+
+@pytest.mark.live
+async def test_live_compaction_round_trip():
+    """A tiny threshold forces compaction; the compaction item then stands in for the earlier turns and the
+    model still knows what they said."""
+    s = Settings(compact_threshold=1000)
+    llm = OpenAILLM(s)
+    facts = " ".join(f"Fact {i}: the code word for item {i} is zeta{i * 7}." for i in range(150))
+    history = [
+        {"role": "user", "content": "Remember these facts. " + facts},
+        {"role": "assistant", "content": "Noted."},
+        {"role": "user", "content": "What is the code word for item 42? Answer with just the word."},
+    ]
+    events = [e async for e in llm.stream_reply(s.openai_model, history)]
+    compaction = next(e for e in events if e["type"] == "compaction")
+    assert compaction["item"]["type"] == "compaction" and compaction["item"]["encrypted_content"]
+    follow_up = [{"compaction": compaction["item"]}, {"role": "user", "content": "And item 100?"}]
+    answer = [e async for e in llm.stream_reply(s.openai_model, follow_up)]
+    assert "zeta700" in "".join(e["text"] for e in answer if e["type"] == "delta")
