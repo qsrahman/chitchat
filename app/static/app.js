@@ -25,7 +25,10 @@ const ICONS = {
   code: "M7 6l-4 4 4 4M13 6l4 4-4 4",
   chat: "M4 5h12v8H9l-4 3v-3H4z",
   scale: "M10 4v12M5 16h10M4 7h12M4 7l-2 5h4zM16 7l-2 5h4z",
+  file: "M6 3h6l4 4v10H6zM12 3v4h4",
+  close: "M5 5l10 10M15 5L5 15",
 };
+const icon = (path) => `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${path}"/></svg>`;
 
 async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -51,10 +54,40 @@ function addMessage(role, text = "", meta = {}) {
   for (const cls of ["body", "note", "actions"]) el.append(Object.assign(document.createElement("div"), { className: cls }));
   thread.append(el);
   main.classList.add("is-started");
+  if (meta.attachments?.length) {
+    el._attachments = meta.attachments;
+    el.prepend(attachmentTiles(meta.attachments));
+  }
   setNote(el, meta);
   if (meta.reasoning) setReasoning(el, meta.reasoning);
   setText(el, text);
   return el;
+}
+
+// Sent attachments: images as thumbnails that open full size, everything else as a download link. Names are
+// untrusted, so they only ever go in as text.
+function attachmentTiles(files) {
+  const tiles = document.createElement("div");
+  tiles.className = "attachments";
+  for (const f of files) {
+    const link = document.createElement("a");
+    link.href = `/api/attachments/${f.id}`;
+    if (f.kind === "image") {
+      link.className = "tile-image";
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.title = f.name;
+      const img = Object.assign(document.createElement("img"), { src: link.href, alt: f.name });
+      link.append(img);
+    } else {
+      link.className = "tile-file";
+      link.title = `Download ${f.name}`;
+      link.innerHTML = icon(ICONS.file);
+      link.append(Object.assign(document.createElement("span"), { className: "chip-name", textContent: f.name }));
+    }
+    tiles.append(link);
+  }
+  return tiles;
 }
 
 const bodyOf = (el) => el.querySelector(".body");
@@ -201,7 +234,7 @@ async function retry(user) {
   }
   if (saved.length < thread.querySelectorAll(".msg.user").length) { // this message never landed
     dropAfterUser();
-    runTurn("chat", { content: user._text });
+    runTurn("chat", { content: user._text, attachments: (user._attachments ?? []).map((a) => a.id) });
   } else if (saved.at(-1).content === user._text) { // it landed; any reply (or partial one) is replaced
     regenerate();
   } else { // an edit that never landed
@@ -305,24 +338,30 @@ async function runTurn(path, payload = {}) {
 function syncSend() {
   sendBtn.classList.toggle("is-stop", state.busy);
   sendBtn.setAttribute("aria-label", state.busy ? "Stop generating" : "Send message");
-  sendBtn.disabled = !state.busy && !input.value.trim();
+  const ready = pending.filter((p) => p.status === "done").length;
+  const uploading = pending.some((p) => p.status === "uploading");
+  sendBtn.disabled = !state.busy && (uploading || !(input.value.trim() || ready));
 }
 
 function submit(text) {
+  const files = pending.filter((p) => p.status === "done").map((p) => p.file);
   input.value = "";
   saveDraft();
   fit();
+  clearPending();
   syncComposer();
   syncSend();
-  addMessage("user", text);
-  runTurn("chat", { content: text });
+  addMessage("user", text, { attachments: files });
+  runTurn("chat", { content: text, attachments: files.map((f) => f.id) });
 }
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   if (state.busy) return state.abort?.abort(); // the button is "Stop" while streaming
   const text = input.value.trim();
-  if (text) submit(text);
+  const ready = pending.some((p) => p.status === "done");
+  if (pending.some((p) => p.status === "uploading")) return;
+  if (text || ready) submit(text);
 });
 
 input.addEventListener("keydown", (e) => {
@@ -367,6 +406,113 @@ function loadDraft() {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && state.busy && !document.querySelector("dialog[open]")) state.abort?.abort();
+});
+
+// ---- attachments ----
+// Files upload as soon as they are chosen and show as chips in the composer; sending refers to them by id.
+// pending: [{ name, size, status: "uploading" | "done" | "error", file (the server's record), error, preview, ctrl }]
+const pending = [];
+let maxFiles = 5; // replaced by the server's limit
+
+const bytes = (n) => {
+  const [unit, size] = n < 1024 ? ["byte", n] : n < 1024 ** 2 ? ["kilobyte", n / 1024] : ["megabyte", n / 1024 ** 2];
+  return new Intl.NumberFormat(undefined, { style: "unit", unit, unitDisplay: "narrow", maximumFractionDigits: 1 }).format(size);
+};
+
+function renderChips() {
+  const chips = $("chips");
+  chips.hidden = !pending.length;
+  chips.replaceChildren(...pending.map((p) => {
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.setAttribute("aria-busy", String(p.status === "uploading"));
+    if (p.preview) {
+      chip.classList.add("chip-image");
+      chip.append(Object.assign(document.createElement("img"), { src: p.preview, alt: p.name }));
+    } else {
+      chip.classList.add("chip-file");
+      chip.innerHTML = icon(ICONS.file);
+      chip.append(Object.assign(document.createElement("span"), { className: "chip-name", textContent: p.name }));
+      const note = p.status === "error" ? p.error : bytes(p.size);
+      chip.append(Object.assign(document.createElement("span"), {
+        className: p.status === "error" ? "chip-error-text" : "chip-size", textContent: note,
+      }));
+    }
+    chip.classList.toggle("is-error", p.status === "error");
+    const remove = iconButton(`Remove ${p.name}`, ICONS.close, () => removePending(p));
+    remove.className = "chip-remove";
+    chip.append(remove);
+    return chip;
+  }));
+  syncSend();
+}
+
+function removePending(p) {
+  p.ctrl?.abort();
+  if (p.preview) URL.revokeObjectURL(p.preview);
+  pending.splice(pending.indexOf(p), 1);
+  renderChips();
+}
+
+function clearPending() {
+  for (const p of pending) { p.ctrl?.abort(); if (p.preview) URL.revokeObjectURL(p.preview); }
+  pending.length = 0;
+  renderChips();
+}
+
+async function upload(p, file) {
+  const body = new FormData();
+  body.append("file", file);
+  try {
+    const res = await fetch("/api/attachments", { method: "POST", body, signal: p.ctrl.signal });
+    if (!res.ok) {
+      const { detail } = await res.json().catch(() => ({}));
+      throw new Error(typeof detail === "string" ? detail : `Upload failed (${res.status}).`);
+    }
+    p.file = await res.json();
+    p.status = "done";
+  } catch (err) {
+    if (err.name === "AbortError") return; // removed while uploading
+    p.status = "error";
+    p.error = err instanceof TypeError ? "Couldn't reach the server." : err.message;
+  }
+  renderChips();
+}
+
+function addFiles(files) {
+  for (const file of files) {
+    const p = { name: file.name || "pasted file", size: file.size, status: "uploading", ctrl: new AbortController() };
+    if (pending.length >= maxFiles) {
+      Object.assign(p, { status: "error", error: `You can attach up to ${maxFiles} files.` });
+    } else {
+      if (file.type.startsWith("image/")) p.preview = URL.createObjectURL(file); // a quick local preview
+      upload(p, file);
+    }
+    pending.push(p);
+  }
+  renderChips();
+}
+
+$("attach").onclick = () => $("file-input").click();
+$("file-input").onchange = (e) => { addFiles([...e.target.files]); e.target.value = ""; };
+input.addEventListener("paste", (e) => { // pasted screenshots and copied files; plain text pastes as usual
+  if (!e.clipboardData.files.length) return;
+  e.preventDefault();
+  addFiles([...e.clipboardData.files]);
+});
+
+// Dropping files anywhere on the page attaches them; the overlay shows while files are dragged over.
+let dragDepth = 0;
+const hasFiles = (e) => e.dataTransfer?.types.includes("Files");
+document.addEventListener("dragenter", (e) => { if (hasFiles(e)) { dragDepth++; $("drop").hidden = false; } });
+document.addEventListener("dragleave", (e) => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; $("drop").hidden = true; } });
+document.addEventListener("dragover", (e) => { if (hasFiles(e)) e.preventDefault(); });
+document.addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  $("drop").hidden = true;
+  addFiles([...e.dataTransfer.files]);
 });
 
 const STARTERS = [
@@ -656,6 +802,7 @@ async function openConversation(id) {
   state.id = id;
   state.stick = true;
   thread.replaceChildren();
+  clearPending();
   main.classList.remove("is-started");
   closeNavIfOverlay();
   if (location.hash.slice(1) !== (id ?? "")) history.replaceState(null, "", id ? `#${id}` : location.pathname);
@@ -685,4 +832,5 @@ window.addEventListener("hashchange", () => {
 
 syncSend();
 refreshModels();
+api("/attachments/limits").then((limits) => { maxFiles = limits.max_files; }).catch(() => {});
 openConversation(location.hash.slice(1) || null);

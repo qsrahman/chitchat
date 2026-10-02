@@ -1,14 +1,16 @@
 import sqlite3
+import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse
-from pydantic import BaseModel, StringConstraints, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app import db, store
+from app import attachments, db, store
 from app.llm import REASONING_EFFORTS, supports_reasoning
 from app.store import ConversationSettings, Instructions
 
@@ -50,8 +52,16 @@ class EditRequest(BaseModel):
     content: Content
 
 
-class ChatRequest(EditRequest):
+class ChatRequest(BaseModel):
+    content: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100_000)] = ""
     model: str | None = None
+    attachments: list[str] = Field(default_factory=list, max_length=attachments.MAX_FILES)  # uploaded ids
+
+    @model_validator(mode="after")
+    def _something_to_send(self):
+        if not self.content and not self.attachments:
+            raise ValueError("send a message, an attachment, or both")
+        return self
 
 
 def _require(conn: sqlite3.Connection, cid: str) -> dict:
@@ -101,6 +111,47 @@ async def list_models(request: Request):
     }
 
 
+@router.get("/attachments/limits")
+def attachment_limits():
+    return {"max_files": attachments.MAX_FILES}
+
+
+@router.post("/attachments", status_code=201)
+async def upload_attachment(file: UploadFile, request: Request, conn: Conn):
+    """Store an upload and say what it is; it is sent later, by id, with a chat message."""
+    settings = request.app.state.settings
+    data = await file.read(max(attachments.LIMITS.values()) + 1)
+    aid = uuid.uuid4().hex
+    try:
+        kind, mime = attachments.classify(data)
+        attachments.save(settings.attachments_dir, aid, data)
+        if kind == "pdf" and settings.openai_pdf_input == "text":
+            attachments.pdf_text(settings.attachments_dir, aid)  # fail now if there is nothing to read
+    except attachments.Rejected as e:
+        attachments.delete_files(settings.attachments_dir, [aid])
+        raise HTTPException(e.status, e.message) from e
+    name = (file.filename or "attachment").replace("\\", "/").rsplit("/", 1)[-1].strip()[:200] or "attachment"
+    row = store.add_attachment(conn, aid, name, mime, kind, len(data))
+    return {k: row[k] for k in store.ATTACHMENT_FIELDS}
+
+
+@router.get("/attachments/{aid}")
+def get_attachment(aid: str, request: Request, conn: Conn):
+    """Images show inline; everything else downloads. Served as the type we detected, never what was uploaded
+    as, and sandboxed, so an uploaded file can't run script on this origin."""
+    row = store.get_attachment(conn, aid)
+    file = attachments.path(request.app.state.settings.attachments_dir, aid)
+    if not row or not file.exists():
+        raise HTTPException(404, "attachment not found")
+    return FileResponse(
+        file,
+        media_type="text/plain; charset=utf-8" if row["kind"] == "text" else row["mime"],
+        filename=row["name"],
+        content_disposition_type="inline" if row["kind"] == "image" else "attachment",
+        headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"},
+    )
+
+
 @router.get("/custom-instructions")
 def get_custom_instructions(conn: Conn):
     return {"text": store.get_app_setting(conn, "custom_instructions")}
@@ -113,13 +164,26 @@ def put_custom_instructions(body: CustomInstructions, conn: Conn):
 
 
 @router.delete("/conversations/{cid}", status_code=204)
-def delete_conversation(cid: str, conn: Conn):
+def delete_conversation(cid: str, request: Request, conn: Conn):
     _require(conn, cid)
-    store.delete_conversation(conn, cid)
+    files = store.attachment_ids(conn, cid)
+    store.delete_conversation(conn, cid)  # the attachment rows go with it (ON DELETE CASCADE)
+    attachments.delete_files(request.app.state.settings.attachments_dir, files)
 
 
-def _history(conn: sqlite3.Connection, cid: str) -> list[dict]:
-    return [{"role": m["role"], "content": m["content"]} for m in store.list_messages(conn, cid)]
+def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]:
+    """The conversation as llm.py takes it. Earlier attachments are sent again each turn: calls are stateless."""
+    settings = request.app.state.settings
+    history = []
+    for m in store.list_messages(conn, cid):
+        item = {"role": m["role"], "content": m["content"]}
+        if m["meta"].get("attachments"):
+            item["attachments"] = [
+                attachments.for_model(a, settings.attachments_dir, settings.openai_pdf_input)
+                for a in m["meta"]["attachments"]
+            ]
+        history.append(item)
+    return history
 
 
 def _model_options(conn: sqlite3.Connection, conv: dict, model: str) -> dict:
@@ -154,7 +218,9 @@ def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: 
     return Turn(conn, request.app.state.llm, default_model, conv, history, model, _model_options(conn, conv, model))
 
 
-def _redo_last_user_turn(conn: sqlite3.Connection, cid: str, content: str | None = None) -> tuple[dict, list[dict]]:
+def _redo_last_user_turn(
+    request: Request, conn: sqlite3.Connection, cid: str, content: str | None = None
+) -> tuple[dict, list[dict]]:
     """Drop everything after the last user message (optionally rewriting it); return (conv, history)."""
     conv = _require(conn, cid)
     last = store.last_user_message(conn, cid)
@@ -163,22 +229,27 @@ def _redo_last_user_turn(conn: sqlite3.Connection, cid: str, content: str | None
     if content is not None:
         store.update_message_content(conn, last["id"], content)
     store.delete_messages_after(conn, cid, last["id"])
-    return conv, _history(conn, cid)
+    return conv, _history(request, conn, cid)
 
 
 def chat_turn(cid: str, req: ChatRequest, request: Request, conn: Conn) -> Turn:
     conv = _require(conn, cid)
-    store.add_message(conn, cid, "user", req.content)
-    return _make_turn(request, conn, conv, _history(conn, cid), req.model)
+    files = store.pending_attachments(conn, req.attachments)
+    if len(files) != len(req.attachments):
+        raise HTTPException(422, "An attachment is unknown or was already sent. Attach the file again.")
+    meta = {"attachments": [{k: f[k] for k in store.ATTACHMENT_FIELDS} for f in files]} if files else None
+    store.add_message(conn, cid, "user", req.content, meta)
+    store.link_attachments(conn, cid, req.attachments)
+    return _make_turn(request, conn, conv, _history(request, conn, cid), req.model)
 
 
 def regenerate_turn(cid: str, request: Request, conn: Conn) -> Turn:
-    conv, history = _redo_last_user_turn(conn, cid)
+    conv, history = _redo_last_user_turn(request, conn, cid)
     return _make_turn(request, conn, conv, history)
 
 
 def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
-    conv, history = _redo_last_user_turn(conn, cid, req.content)
+    conv, history = _redo_last_user_turn(request, conn, cid, req.content)
     return _make_turn(request, conn, conv, history)
 
 
@@ -208,7 +279,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                 finished = True
                 yield event
                 if needs_title:
-                    asked = turn.history[-1]["content"]
+                    last = turn.history[-1]
+                    asked = last["content"] or ", ".join(a["name"] for a in last.get("attachments", []))
                     title = await turn.llm.generate_title(turn.default_model, asked, text) or asked[:40]
                     store.rename_conversation(conn, cid, title)
                     yield {"type": "title", "title": title}

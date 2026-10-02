@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,4 +14,8 @@ class Settings(BaseSettings):
     openai_max_retries: int = 2
     openai_max_output_tokens: int | None = None
     openai_reasoning_summaries: bool = True  # ask reasoning models for a summary of their thinking
+    # How a PDF reaches the model: "text" extracts its text here and sends that (works with any model); "file"
+    # sends the PDF itself as an input_file, which OpenAI reads with page images but local servers often reject.
+    openai_pdf_input: Literal["text", "file"] = "text"
     db_path: str = "chitchat.db"
+    attachments_dir: str = "attachments"

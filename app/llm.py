@@ -6,12 +6,18 @@
                        # reasoning_tokens}, when there are any
     {"type": "error", "message": str}
 """
+import asyncio
+import base64
+import json
 import re
 import typing
 from collections.abc import AsyncIterator
+from pathlib import Path
+from xml.sax.saxutils import quoteattr
 
 import openai
 from openai import AsyncOpenAI
+from openai.types.responses import ResponseInputContentParam
 from openai.types.shared import ReasoningEffort
 
 from app.config import Settings
@@ -28,6 +34,47 @@ _REASONING = re.compile(r"^(o\d|gpt-5|gpt-oss)")
 
 def supports_reasoning(model: str) -> bool:
     return bool(_REASONING.match(model))
+
+
+def _data_url(attachment: dict) -> str:
+    return f"data:{attachment['mime']};base64,{base64.b64encode(Path(attachment['path']).read_bytes()).decode()}"
+
+
+def _content(message: dict) -> str | list[ResponseInputContentParam]:
+    """A message's `content` for the API: plain text, or parts when it has attachments.
+
+    attachments: [{"kind": "image" | "file", "name", "mime", "path"} | {"kind": "text", "name", "text"}]
+    """
+    if not message.get("attachments"):
+        return message["content"]
+    parts: list[ResponseInputContentParam] = []
+    for a in message["attachments"]:
+        match a["kind"]:
+            case "image":
+                parts.append({"type": "input_image", "image_url": _data_url(a)})
+            case "file":
+                parts.append({"type": "input_file", "filename": a["name"], "file_data": _data_url(a)})
+            case _:
+                name = quoteattr(a["name"])  # quoted and escaped: a file name is untrusted
+                parts.append({"type": "input_text", "text": f"<file name={name}>\n{a['text']}\n</file>"})
+    if message["content"]:
+        parts.append({"type": "input_text", "text": message["content"]})
+    return parts
+
+
+def _inputs(messages: list[dict]) -> list[dict]:
+    return [{"role": m["role"], "content": _content(m)} for m in messages]
+
+
+def _error_message(error: openai.OpenAIError) -> str:
+    """The provider's own message, without the SDK's "Error code: 400 - {...}" wrapping."""
+    body = getattr(error, "body", None)  # for API errors, the provider's error object
+    message = (body.get("message") if isinstance(body, dict) else None) or getattr(error, "message", None) or str(error)
+    try:  # some OpenAI-compatible servers nest a whole JSON error inside the message
+        message = json.loads(message)["error"]["message"]
+    except (ValueError, KeyError, TypeError):
+        pass
+    return message
 
 
 def _usage(response) -> dict:
@@ -92,7 +139,7 @@ class OpenAILLM:
         try:
             stream = await self.client.responses.create(
                 model=model,
-                input=messages,
+                input=await asyncio.to_thread(_inputs, messages),  # reads attachment files
                 store=False,
                 stream=True,
                 max_output_tokens=self.settings.openai_max_output_tokens,
@@ -119,7 +166,7 @@ class OpenAILLM:
                     case "error":
                         yield {"type": "error", "message": ev.message}
         except openai.OpenAIError as e:
-            yield {"type": "error", "message": str(e)}
+            yield {"type": "error", "message": _error_message(e)}
 
     async def generate_title(self, model: str, user_text: str, reply_text: str) -> str | None:
         """Short conversation title, or None on any API failure (titles are best-effort)."""

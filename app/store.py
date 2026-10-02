@@ -2,7 +2,7 @@
 import json
 import sqlite3
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -120,3 +120,46 @@ def update_message_content(conn: sqlite3.Connection, message_id: int, content: s
 def delete_messages_after(conn: sqlite3.Connection, cid: str, message_id: int) -> None:
     conn.execute("DELETE FROM messages WHERE conversation_id = ? AND id > ?", (cid, message_id))
     conn.commit()
+
+
+# ---- attachments (files live on disk, see attachments.py; these rows say what they are) ----
+ATTACHMENT_FIELDS = ("id", "name", "mime", "kind", "size")  # what a message's meta keeps about each one
+
+
+def add_attachment(conn: sqlite3.Connection, aid: str, name: str, mime: str, kind: str, size: int) -> dict:
+    conn.execute(
+        "INSERT INTO attachments (id, name, mime, kind, size, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (aid, name, mime, kind, size, _now()),
+    )
+    conn.commit()
+    return get_attachment(conn, aid)
+
+
+def get_attachment(conn: sqlite3.Connection, aid: str) -> dict | None:
+    row = conn.execute("SELECT * FROM attachments WHERE id = ?", (aid,)).fetchone()
+    return dict(row) if row else None
+
+
+def pending_attachments(conn: sqlite3.Connection, ids: list[str]) -> list[dict]:
+    """The uploaded-but-unsent attachments among `ids`, in that order; ids that don't qualify are left out."""
+    rows = [get_attachment(conn, aid) for aid in dict.fromkeys(ids)]
+    return [r for r in rows if r and r["conversation_id"] is None]
+
+
+def link_attachments(conn: sqlite3.Connection, cid: str, ids: list[str]) -> None:
+    conn.executemany("UPDATE attachments SET conversation_id = ? WHERE id = ?", [(cid, aid) for aid in ids])
+    conn.commit()
+
+
+def attachment_ids(conn: sqlite3.Connection, cid: str) -> list[str]:
+    return [r["id"] for r in conn.execute("SELECT id FROM attachments WHERE conversation_id = ?", (cid,))]
+
+
+def purge_orphans(conn: sqlite3.Connection, older_than: timedelta) -> list[str]:
+    """Delete uploads that were never sent with a message; returns their ids so the files can go too."""
+    cutoff = (datetime.now(UTC) - older_than).isoformat()
+    ids = [r["id"] for r in conn.execute(
+        "SELECT id FROM attachments WHERE conversation_id IS NULL AND created_at < ?", (cutoff,))]
+    conn.executemany("DELETE FROM attachments WHERE id = ?", [(aid,) for aid in ids])
+    conn.commit()
+    return ids

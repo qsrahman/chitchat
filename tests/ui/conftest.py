@@ -90,8 +90,9 @@ class ScriptedLLM:
         else:
             await asyncio.sleep(0.05)
             # Echo the settings that reached the model, so tests can see them in the reply.
+            files = ",".join(a["name"] for a in messages[-1].get("attachments", []))
             used = {"model": model if model != self.default_model else None, "instructions": instructions,
-                    "effort": reasoning_effort, "temperature": temperature}
+                    "effort": reasoning_effort, "temperature": temperature, "files": files or None}
             echo = "".join(f" [{k}={v}]" for k, v in used.items() if v is not None)
             yield {"type": "delta", "text": f"Reply #{self.n} to **{text}**{echo}"}
         yield {"type": "done"}
@@ -106,7 +107,8 @@ class ScriptedLLM:
 @pytest.fixture
 def app_url(tmp_path):
     app = create_app(Settings(
-        _env_file=None, db_path=str(tmp_path / "ui.db"), openai_api_key="test", openai_model=ScriptedLLM.default_model
+        _env_file=None, db_path=str(tmp_path / "ui.db"), attachments_dir=str(tmp_path / "files"),
+        openai_api_key="test", openai_model=ScriptedLLM.default_model
     ))
     app.state.llm = ScriptedLLM()
     sock = socket.socket()

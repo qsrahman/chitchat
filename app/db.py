@@ -25,8 +25,23 @@ ALTER TABLE conversations ADD COLUMN settings TEXT NOT NULL DEFAULT '{}';
 CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
+# v3: uploaded files. conversation_id stays NULL until the file is sent with a message, which is what lets the
+# app tell abandoned uploads (to purge) from attached ones.
+ATTACHMENTS = """
+CREATE TABLE attachments (
+    id              TEXT PRIMARY KEY,
+    conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    mime            TEXT NOT NULL,
+    kind            TEXT NOT NULL,
+    size            INTEGER NOT NULL,
+    created_at      TEXT NOT NULL
+);
+CREATE INDEX attachments_by_conversation ON attachments(conversation_id);
+"""
+
 # Each entry upgrades the schema by one version; PRAGMA user_version records how many ran.
-MIGRATIONS = [SCHEMA, SETTINGS]
+MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS]
 
 
 def connect(path: str) -> sqlite3.Connection:

@@ -165,17 +165,44 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 /* composer: a raised pill. One line = one row; once the text grows the input takes the full width and the
    send button drops to a row below (is-multiline, set from app.js). */
 #form { position: relative; width: min(var(--col), 100% - 32px); margin-inline: auto; padding: 8px 0 max(10px, env(safe-area-inset-bottom)); }
-.composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 4px 8px; padding: 8px 8px 8px 20px; border: 1px solid var(--line); border-radius: 28px; background: var(--raised); box-shadow: 0 2px 8px light-dark(#0000000a, #0006), 0 4px 60px 6px light-dark(#00000008, #0004); }
+.composer { display: grid; grid-template: "chips chips chips" auto "lead input send" auto / auto minmax(0, 1fr) auto; align-items: end; gap: 0 4px; padding: 8px; border: 1px solid var(--line); border-radius: 28px; background: var(--raised); box-shadow: 0 2px 8px light-dark(#0000000a, #0006), 0 4px 60px 6px light-dark(#00000008, #0004); }
 .composer:focus-within { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
-.composer.is-multiline { grid-template-columns: minmax(0, 1fr); padding: 14px 8px 8px 20px; border-radius: 26px; }
-.composer.is-multiline #send { justify-self: end; }
-#input { min-width: 0; resize: none; border: 0; outline: 0; padding: 5px 0; font: inherit; font-size: 1.0625rem; line-height: 1.5; background: none; color: var(--ink); field-sizing: content; max-height: 40dvh; }
-#send { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); }
+.composer.is-multiline { row-gap: 2px; grid-template: "chips chips" auto "input input" auto "lead send" auto / auto 1fr; border-radius: 26px; }
+.composer.is-multiline #input { padding: 6px 12px 2px; }
+#chips { grid-area: chips; }
+#attach { grid-area: lead; width: 36px; height: 36px; border-radius: 50%; color: var(--muted); }
+#attach:hover { color: var(--ink); }
+#input { grid-area: input; min-width: 0; resize: none; border: 0; outline: 0; padding: 5px 4px; font: inherit; font-size: 1.0625rem; line-height: 1.5; background: none; color: var(--ink); field-sizing: content; max-height: 40dvh; }
+#send { grid-area: send; justify-self: end; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); }
 #send:disabled { background: var(--hover); color: var(--muted); }
 #send .i-stop { display: none; fill: currentColor; }
 #send.is-stop .i-stop { display: block; }
 #send.is-stop .i-send { display: none; }
 #jump { position: absolute; left: 50%; bottom: calc(100% + 4px); translate: -50% 0; }
+/* attachments: chips in the composer, tiles in sent messages */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 4px 6px; }
+.chip { position: relative; display: flex; align-items: center; gap: 8px; max-width: 100%; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.chip[aria-busy="true"] { opacity: .6; }
+.chip-image { width: 56px; height: 56px; padding: 0; }
+.chip-image img { width: 100%; height: 100%; border-radius: 13px; object-fit: cover; }
+.chip-file { padding: 8px 34px 8px 12px; min-width: 0; }
+.chip-file .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.chip-file .chip-size, .chip-error-text { font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.chip.is-error { border-color: var(--danger); }
+.chip.is-error .chip-error-text { color: var(--danger); white-space: normal; }
+.chip-remove { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--surface); }
+.chip-remove svg { width: 12px; height: 12px; stroke-width: 2.4; }
+.chip-file .chip-remove { top: 50%; right: 8px; translate: 0 -50%; background: none; color: var(--muted); }
+.chip-file .chip-remove:hover { color: var(--ink); }
+.attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.tile-image img { display: block; width: 120px; height: 120px; border-radius: 14px; object-fit: cover; border: 1px solid var(--line); }
+.tile-file { display: flex; align-items: center; gap: 8px; max-width: 16rem; padding: 8px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: inherit; text-decoration: none; }
+.tile-file:hover { background: var(--hover); }
+.tile-file .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.msg.user .body:empty { display: none; }
+#drop { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: light-dark(#ffffffd9, #0f1115d9); pointer-events: none; }
+#drop p { margin: 0; padding: 28px 40px; border: 2px dashed var(--accent); border-radius: 24px; font-size: 1.1rem; }
+
 .hint { margin: 8px 0 0; text-align: center; font-size: .78rem; color: var(--muted); }
 
 /* dialogs */

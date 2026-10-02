@@ -13,6 +13,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 ## Layout
 - `app/llm.py`: the only module that imports `openai`. It yields our normalized events (`delta`, `done`, `error`, ...).
 - `app/routes.py`: HTTP and SSE endpoints. `app/main.py` is the `create_app()` factory.
+- `app/attachments.py`: upload classification (from bytes), files on disk, PDF text, and `for_model()`, which turns a stored attachment into what `llm.py` sends. `llm.py` builds the API input parts.
 - `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions.
 - `app/static/`: vanilla JS UI as ES modules (`app.js`, `markdown.js`), no build step. Libraries are vendored in `static/vendor/`; don't add CDN links. Rendering rules (math, reasoning text, sanitizing) are in `docs/rendering.md`.
 - `tests/ui/`: Playwright tests against the real app with a `ScriptedLLM` (`tests/ui/conftest.py`).

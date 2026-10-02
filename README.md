@@ -9,7 +9,8 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Reading-focused UI: serif replies, highlighted code with copy, typeset math (KaTeX), light/dark theme, centered new-chat composer that reflows as you type, icon rail sidebar, mobile drawer, smart autoscroll, drafts that survive a reload
 - Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
 - Reasoning summaries in a collapsible block, and token usage under each reply
-- Planned: attachments, web search and tools, search and export
+- Attachments: images, PDFs and text files via the paperclip, drag and drop or paste
+- Planned: web search and tools, search and export
 
 ## Requirements
 Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key. For the browser tests, run `uv run playwright install chromium` once.
@@ -32,6 +33,8 @@ Environment variables or `.env`:
 | `OPENAI_MAX_RETRIES` | `2` | SDK retries on transient errors |
 | `OPENAI_MAX_OUTPUT_TOKENS` | none | Cap on tokens per reply; a reply that hits it is kept and flagged |
 | `OPENAI_REASONING_SUMMARIES` | `true` | Ask reasoning models for a summary of their thinking; set `false` if your OpenAI organization isn't verified for it |
+| `OPENAI_PDF_INPUT` | `text` | `text` extracts a PDF's text and sends that (any model); `file` sends the PDF itself (OpenAI) |
+| `ATTACHMENTS_DIR` | `attachments` | Where uploaded files are stored |
 | `DB_PATH` | `chitchat.db` | SQLite file |
 
 ## Test
@@ -47,6 +50,7 @@ app/llm.py      the only module that talks to OpenAI; emits normalized events
 app/routes.py   HTTP + SSE endpoints
 app/db.py       SQLite connection + migrations
 app/store.py    conversation/message CRUD
+app/attachments.py  upload validation, file storage, PDF text
 app/static/     vanilla JS UI, ES modules, vendored libs (no build step)
 tests/ui/       Playwright browser tests
 tests/          pytest suite

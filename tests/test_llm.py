@@ -1,5 +1,6 @@
 """OpenAILLM through the real SDK, against an httpx mock transport: the request we send and the SSE
 stream we parse are both the SDK's own, so only the wire format is faked."""
+import base64
 import json
 
 import httpx
@@ -207,3 +208,62 @@ async def test_summaries_can_be_switched_off():
     async for _ in llm.stream_reply("gpt-5-mini", [{"role": "user", "content": "hi"}], reasoning_effort="high"):
         pass
     assert sent[-1]["reasoning"] == {"effort": "high"}
+
+
+# ---- attachments ----
+
+def user_message(tmp_path, text="what is this?"):
+    image, pdf = tmp_path / "pic", tmp_path / "doc"
+    image.write_bytes(b"IMAGE-BYTES")
+    pdf.write_bytes(b"PDF-BYTES")
+    return {"role": "user", "content": text, "attachments": [
+        {"kind": "image", "name": "pic.png", "mime": "image/png", "path": str(image)},
+        {"kind": "file", "name": "doc.pdf", "mime": "application/pdf", "path": str(pdf)},
+        {"kind": "text", "name": "notes.txt", "text": "remember the milk"},
+    ]}
+
+
+async def test_attachments_become_input_parts_before_the_text(tmp_path):
+    sent = []
+    llm = make_llm(streaming(requests=sent))
+    plain = {"role": "assistant", "content": "an earlier reply"}
+    async for _ in llm.stream_reply("m", [user_message(tmp_path), plain]):
+        pass
+    first, second = sent[0]["input"]
+    assert second == {"role": "assistant", "content": "an earlier reply"}  # no attachments: plain text, as before
+    assert first["content"] == [
+        {"type": "input_image", "image_url": "data:image/png;base64," + base64.b64encode(b"IMAGE-BYTES").decode()},
+        {"type": "input_file", "filename": "doc.pdf",
+         "file_data": "data:application/pdf;base64," + base64.b64encode(b"PDF-BYTES").decode()},
+        {"type": "input_text", "text": '<file name="notes.txt">\nremember the milk\n</file>'},
+        {"type": "input_text", "text": "what is this?"},
+    ]
+
+
+async def test_a_message_of_only_attachments_has_no_empty_text_part(tmp_path):
+    sent = []
+    message = user_message(tmp_path, text="")
+    async for _ in make_llm(streaming(requests=sent)).stream_reply("m", [message]):
+        pass
+    parts = sent[0]["input"][0]["content"]
+    assert len(parts) == 3 and all(p["text"] for p in parts if p["type"] == "input_text")
+
+
+async def test_a_file_name_cannot_break_out_of_its_tag():
+    sent = []
+    message = {"role": "user", "content": "", "attachments": [
+        {"kind": "text", "name": 'a"><b>.txt', "text": "x"},
+    ]}
+    async for _ in make_llm(streaming(requests=sent)).stream_reply("m", [message]):
+        pass
+    assert sent[0]["input"][0]["content"][0]["text"] == "<file name='a\"&gt;&lt;b&gt;.txt'>\nx\n</file>"  # escaped
+
+
+async def test_provider_errors_are_shown_without_the_sdk_wrapping_or_nested_json():
+    nested = '{"error":{"code":400,"message":"Multimodal data provided, but model does not support multimodal."}}'
+    llm = make_llm(lambda request: httpx.Response(400, json={"error": {"message": nested, "type": "invalid"}}))
+    assert await collect(llm) == [
+        {"type": "error", "message": "Multimodal data provided, but model does not support multimodal."}
+    ]
+    plain = make_llm(lambda request: httpx.Response(400, json={"error": {"message": "file inputs are not supported"}}))
+    assert await collect(plain) == [{"type": "error", "message": "file inputs are not supported"}]

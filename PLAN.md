@@ -15,6 +15,7 @@ app/
   config.py    Settings (env / .env; OPENAI_* names)
   db.py        sqlite connection + schema (PRAGMA user_version)
   store.py     plain functions: conversations + messages CRUD
+  attachments.py  upload checks, files on disk, what the model gets per file
   llm.py       the ONLY module importing openai; emits normalized events
   routes.py    /api/* + SSE
   static/      index.html, app.js, markdown.js, style.css, vendor/ (marked, DOMPurify, highlight.js)
@@ -38,8 +39,8 @@ Seams that keep features additive:
 | 3b | done | UI/UX polish (`docs/ui-polish.md`) and Playwright browser tests |
 | 4 | done | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
 | 5 | done | Reasoning summaries (collapsible), token usage display |
-| 6 | next | Attachments: images (`input_image`), files/PDF (`input_file`) |
-| 7 | | Tools: built-in web search with citations, then a function-calling loop with a small registry (`tools.py`) |
+| 6 | done | Attachments: images (`input_image`), files/PDF (`input_file`) |
+| 7 | next | Tools: built-in web search with citations, then a function-calling loop with a small registry (`tools.py`) |
 | 8 | | Context management (truncate/summarize old turns), FTS5 search, export (Markdown/JSON) |
 | 9 | | Optional: auth, multi-user, rate limits, Dockerfile |
 

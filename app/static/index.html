@@ -54,16 +54,25 @@
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M5 11l5 5 5-5"/></svg>
     </button>
     <div class="composer">
+      <div id="chips" class="chips" aria-live="polite" hidden></div>
+      <button id="attach" type="button" class="icon-btn" aria-label="Attach files" title="Attach files">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 9l-5.5 5.5a3 3 0 0 1-4.2-4.2L11 4.6a2 2 0 0 1 2.8 2.8L8.2 13"/></svg>
+      </button>
       <textarea id="input" rows="1" placeholder="Ask anything" aria-label="Message" autofocus></textarea>
       <button id="send" type="submit" aria-label="Send message" disabled>
         <svg class="i-send" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg>
         <svg class="i-stop" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>
       </button>
     </div>
+    <input id="file-input" type="file" multiple hidden>
     <ul id="starters"></ul>
     <p class="hint">Enter to send, Shift+Enter for a new line. Esc stops a reply.</p>
   </form>
 </main>
+
+<div id="drop" hidden>
+  <p>Drop files to attach them</p>
+</div>
 
 <div id="model-menu" popover role="menu" aria-label="Choose a model">
   <div id="model-list"></div>
