@@ -205,12 +205,26 @@ dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 #form { position: relative; width: min(var(--col), 100% - 32px); margin-inline: auto; padding: 8px 0 max(10px, env(safe-area-inset-bottom)); }
 .composer { display: grid; grid-template: "chips chips chips" auto "lead input send" auto / auto minmax(0, 1fr) auto; align-items: end; gap: 0 4px; padding: 8px; border: 1px solid var(--line); border-radius: var(--size-6); background: var(--raised); box-shadow: var(--shadow-2); transition: border-color .15s var(--ease-out-3), box-shadow .2s var(--ease-out-3); }
 .composer:focus-within { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); box-shadow: var(--shadow-3); }
+/* stacked: when the text wraps (set from app.js), and always on narrow screens, where the controls would squeeze the input */
 .composer.is-multiline { row-gap: 2px; grid-template: "chips chips" auto "input input" auto "lead send" auto / auto 1fr; border-radius: var(--size-5); }
 .composer.is-multiline #input { padding: 6px 12px 2px; }
+@media (max-width: 760px) {
+  .composer { row-gap: 2px; grid-template: "chips chips" auto "input input" auto "lead send" auto / auto 1fr; border-radius: var(--size-5); }
+  .composer #input { padding: 6px 12px 2px; }
+}
 #chips { grid-area: chips; }
 .lead { grid-area: lead; display: flex; align-items: center; gap: 2px; }
 .lead .icon-btn { height: 36px; min-width: 36px; border-radius: 18px; color: var(--muted); }
 .lead .icon-btn:hover { color: var(--ink); }
+.lead .icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+.lead .icon-btn:disabled:hover { background: none; color: var(--muted); }
+.effort { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px 0 9px; border-radius: 18px; color: var(--muted); transition: background-color .15s var(--ease-out-3), color .15s var(--ease-out-3); }
+.effort[hidden] { display: none; }
+.effort:hover, .effort:focus-within { background: var(--hover); color: var(--ink); }
+.effort[data-active] { color: var(--accent); }
+.effort select { height: 100%; padding: 0 2px; border: 0; background: none; color: inherit; font: inherit; font-size: var(--text-sm); cursor: pointer; field-sizing: content; }
+.effort select:focus-visible { outline: 0; }
+.effort:has(select:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .toggle-label { display: none; font-size: var(--text-sm); padding-right: 4px; }
 #search-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; }
 #search-toggle[hidden] { display: none; }

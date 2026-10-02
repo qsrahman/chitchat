@@ -36,10 +36,12 @@ def test_the_toggle_is_off_by_default_and_turns_on_and_off(page, app_url):
     expect(toggle(page)).to_have_attribute("aria-pressed", "false")
 
 
-def test_it_is_hidden_when_search_is_not_configured(page, app_url):
+def test_it_is_shown_but_disabled_when_search_is_not_configured(page, app_url):
     page.route("**/api/tools", lambda route: route.fulfill(json=[]))
     open_app(page, app_url)
-    expect(toggle(page)).to_be_hidden()
+    expect(toggle(page)).to_be_visible()
+    expect(toggle(page)).to_be_disabled()
+    expect(toggle(page)).to_have_attribute("title", "Web search is unavailable: set BRAVE_API_KEY on the server")
 
 
 def test_a_choice_made_on_the_new_chat_screen_applies_to_the_first_message(page, app_url):

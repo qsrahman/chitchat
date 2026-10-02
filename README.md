@@ -10,6 +10,7 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
 - Reasoning summaries in a collapsible block
 - Attachments: images, PDFs and text files via the paperclip, drag and drop or paste
+- Composer controls: web search on/off (globe) and thinking effort (for reasoning models; "None" turns thinking off)
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
 - Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`)
 - Full-text search across all conversations (sidebar), and export of a chat as Markdown or JSON (chat settings)
@@ -38,7 +39,7 @@ Environment variables or `.env`:
 | `OPENAI_PDF_INPUT` | `text` | `text` extracts a PDF's text and sends that (any model); `file` sends the PDF itself (OpenAI) |
 | `ATTACHMENTS_DIR` | `attachments` | Where uploaded files are stored |
 | `COMPACT_THRESHOLD` | `150000` | Tokens after which OpenAI compacts the older turns of a conversation; `0` turns it off |
-| `BRAVE_API_KEY` | none | Enables web search (Brave Search API). The globe button appears in the composer when it is set |
+| `BRAVE_API_KEY` | none | Enables web search (Brave Search API). Without it the globe button in the composer is disabled |
 | `MAX_TOOL_CALLS` | `4` | Most tool calls (searches) in one reply |
 | `DB_PATH` | `chitchat.db` | SQLite file |
 

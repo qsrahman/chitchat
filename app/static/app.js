@@ -724,11 +724,12 @@ function setSettings(settings) {
   state.settings = settings;
   // The dot on the settings button means "something besides the model and the tools is customized": those have
   // their own controls in the header and the composer.
-  const own = ["model", "tools"];
+  const own = ["model", "tools", "reasoning_effort"];
   const customized = Object.keys(DEFAULT_SETTINGS).some((k) => !own.includes(k) && settings[k] !== DEFAULT_SETTINGS[k]);
   $("settings-btn").toggleAttribute("data-active", customized);
   syncModelButton();
   syncSearchToggle();
+  syncEffort();
 }
 
 // Save settings for the open conversation; on the new-chat screen they are held until the first message.
@@ -773,6 +774,7 @@ function syncModelButton() {
 async function refreshModels() {
   try { modelInfo = await api("/models"); } catch { /* keep what we have; the settings dialog reports real problems */ }
   syncModelButton();
+  syncEffort();
 }
 
 function modelRow(id, tags) {
@@ -889,16 +891,48 @@ $("instructions-btn").onclick = async () => {
 bindSave($("instructions-dialog"), () =>
   api("/custom-instructions", { method: "PUT", body: JSON.stringify({ text: $("set-instructions").value }) }));
 
+// ---- thinking effort ----
+// A select in the composer, shown for models that take a reasoning effort (the others take a temperature, which
+// stays in the chat settings). "Auto" stores null: the model's own default.
+const effortSelect = $("effort");
+
+function syncEffort() {
+  const efforts = modelInfo.efforts ?? [];
+  $("effort-wrap").hidden = !modelInfo.models.find((m) => m.id === currentModel())?.reasoning;
+  if (effortSelect.options.length !== efforts.length + 1) {
+    const group = document.createElement("optgroup");
+    group.label = "Thinking effort";
+    group.append(new Option("Auto", ""), ...efforts.map((e) => new Option(e[0].toUpperCase() + e.slice(1), e)));
+    effortSelect.replaceChildren(group);
+  }
+  effortSelect.value = state.settings.reasoning_effort ?? "";
+  effortSelect.title = `Thinking effort: ${effortSelect.selectedOptions[0].text}`;
+  $("effort-wrap").title = effortSelect.title;
+  $("effort-wrap").toggleAttribute("data-active", effortSelect.value !== "");
+}
+
+effortSelect.onchange = async () => {
+  try {
+    await saveSettings({ ...state.settings, reasoning_effort: effortSelect.value || null });
+  } catch {
+    syncEffort();
+    showNote("Couldn't change the thinking effort. Check your connection and try again.");
+  }
+};
+
 // ---- web search toggle ----
-// Shown only when the server has the tool configured (a Brave key). On or off is a per-conversation setting.
+// Always shown; it is disabled while the server has no search tool configured (a Brave key). On or off is a
+// per-conversation setting.
 const SEARCH = "web_search";
 const searchOn = () => state.settings.tools.includes(SEARCH);
 
 function syncSearchToggle() {
   const toggle = $("search-toggle");
-  toggle.hidden = !state.tools.some((t) => t.name === SEARCH);
-  toggle.setAttribute("aria-pressed", String(searchOn()));
-  toggle.title = `Web search: ${searchOn() ? "on" : "off"}`;
+  const available = state.tools.some((t) => t.name === SEARCH);
+  toggle.disabled = !available;
+  toggle.setAttribute("aria-pressed", String(available && searchOn()));
+  toggle.title = !available ? "Web search is unavailable: set BRAVE_API_KEY on the server"
+    : `Web search: ${searchOn() ? "on" : "off"}`;
 }
 
 let noteTimer;

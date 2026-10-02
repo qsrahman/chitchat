@@ -65,10 +65,14 @@
         <button id="attach" type="button" class="icon-btn" aria-label="Attach files" title="Attach files">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 9l-5.5 5.5a3 3 0 0 1-4.2-4.2L11 4.6a2 2 0 0 1 2.8 2.8L8.2 13"/></svg>
         </button>
-        <button id="search-toggle" type="button" class="icon-btn" aria-pressed="false" aria-label="Web search" title="Web search: off" hidden>
+        <button id="search-toggle" type="button" class="icon-btn" aria-pressed="false" aria-label="Web search" title="Web search: off" disabled>
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.2 2 2.2 12 0 14M10 3c-2.2 2-2.2 12 0 14"/></svg>
           <span class="toggle-label">Search</span>
         </button>
+        <label id="effort-wrap" class="effort" title="Thinking effort" hidden>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 14.5h5M8.5 17h3M10 3a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z"/></svg>
+          <select id="effort" aria-label="Thinking effort"></select>
+        </label>
       </div>
       <textarea id="input" rows="1" placeholder="Ask anything" aria-label="Message" autofocus></textarea>
       <button id="send" type="submit" aria-label="Send message" disabled>
