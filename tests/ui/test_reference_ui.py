@@ -1,7 +1,7 @@
 """UI details taken from looking at chatgpt.com and chat.qwen.ai (docs/ui-polish.md)."""
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app
+from tests.ui.test_chat_ui import open_app, send
 from tests.ui.test_model_picker_ui import pick
 
 
@@ -31,8 +31,17 @@ def test_the_thinking_select_moves_to_the_bottom_row_with_a_long_message(page, a
 def test_the_greeting_is_plain_sans_text(page, app_url):
     open_app(page, app_url)
     heading = page.get_by_role("heading", name="What are you working on?")
-    assert "Charter" not in heading.evaluate("e => getComputedStyle(e).fontFamily")
     assert heading.evaluate("e => getComputedStyle(e).fontWeight") == "400"
+
+
+def test_everything_uses_chatgpts_system_font_stack_including_replies(page, app_url):
+    open_app(page, app_url)
+    send(page, "hello")
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    for selector in ("body", "h1", "#input", ".msg.assistant .body", ".msg.user .body", "#send"):
+        family = page.locator(selector).first.evaluate("e => getComputedStyle(e).fontFamily")
+        assert family.startswith('ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica'), (selector, family)
+        assert "Charter" not in family and "Georgia" not in family
 
 
 def test_the_model_menu_has_a_heading(page, app_url):

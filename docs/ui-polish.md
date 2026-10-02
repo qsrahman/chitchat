@@ -3,7 +3,7 @@
 Done between phases 3 and 4.
 
 ## Design
-Reading-first. Replies are set in a serif face (Charter / Iowan Old Style / Georgia) with no bubbles, so long answers read like a document. Your messages and the interface use the system sans, and code uses the system monospace. One blue accent, light and dark themes through `light-dark()` (follows the system setting).
+Reading-first. Replies have no bubbles, so long answers read like a document (they were first set in a serif face; see "Font" below). The whole UI uses one system sans stack, and code uses the system monospace. One blue accent, light and dark themes through `light-dark()` (follows the system setting).
 
 ## What changed
 - **Layout:** sidebar with conversations grouped by recency (Today, Yesterday, Previous 7 days, Older), a slim top bar with the conversation title, a centered reading column, and a composer with a send/stop button. The sidebar is closed by default (toggle button in the top bar). On wide screens it pushes the content aside and stays open while you switch chats; under 760px it is an overlay drawer that closes when you pick a chat.
@@ -86,3 +86,6 @@ The four example prompts under the new-chat composer and the "Enter to send, Shi
 
 ## Send button hover
 Hovering (or keyboard-focusing) the enabled send/stop button fades in a moving gradient: the accent, purple, pink and orange, flowing continuously while the pointer stays (`--spark-1..4` in `style.css`, lighter in dark mode so the dark arrow stays readable). It is a `::before` layer under the icon, so the fade is a normal opacity transition; the flow is a looping `background-position` animation that is paused at rest, so nothing runs when the button isn't hovered. A disabled button doesn't react. With `prefers-reduced-motion` the gradient still appears but doesn't move. Tests: `tests/ui/test_send_hover_ui.py`.
+
+## Font
+chatgpt.com loads no web font (`document.fonts` is empty). Its computed stack is the OS interface font: `-apple-system-body, ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"`, which on this Mac renders San Francisco; body 16px, weight 400, `text-rendering: optimizeLegibility`, antialiased. That stack is now `--sans` and is used for everything, **replies included**: the serif reading face is gone (the earlier "ChatGPT's all-sans typography is not applied" decision is reversed). Replies are 16px / 1.75 line height. `-apple-system-body` (Safari's Dynamic Type) was left out: it makes sizes follow the OS text-size setting in Safari only, and ours are fixed. Code keeps the monospace stack. Because it is a system font, the look follows the platform: SF on Apple devices, Segoe UI on Windows, and the platform sans on Linux or Android.

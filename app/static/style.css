@@ -18,8 +18,9 @@
   --r-sm: var(--size-2); /* controls */
   --r-lg: var(--size-3); /* containers: menus, dialogs, code blocks, bubbles */
   --text-sm: .875rem; /* secondary text; --font-size-0 (.75rem) is for the smallest */
-  --serif: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* ChatGPT's own stack (read from chatgpt.com): no web font, the OS interface font: San Francisco on macOS and
+     iOS, Segoe UI on Windows */
+  --sans: ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --col: 46rem;
 }
@@ -28,7 +29,7 @@
 ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 :root { accent-color: var(--accent); }
 [hidden] { display: none !important; }
-body { margin: 0; height: 100dvh; display: grid; grid-template: minmax(0, 1fr) / 3.5rem minmax(0, 1fr); background: var(--surface); color: var(--ink); font: 15px/var(--font-lineheight-3) var(--sans); -webkit-font-smoothing: antialiased; }
+body { margin: 0; height: 100dvh; display: grid; grid-template: minmax(0, 1fr) / 3.5rem minmax(0, 1fr); background: var(--surface); color: var(--ink); font: 15px/var(--font-lineheight-3) var(--sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* one transition for everything that reacts to the pointer; reduced motion removes it below */
 :where(.btn, .icon-btn, .round-btn, .side-item, .conv, .menu-item, .model-btn, .actions button, .code-copy, #send, .tile-file) {
@@ -127,7 +128,7 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 .msg { margin: 0 0 var(--size-5); }
 .msg.user { display: flex; flex-direction: column; align-items: flex-end; }
 .msg.user .body { max-width: 85%; padding: 9px 14px; border-radius: var(--r-lg) var(--r-lg) var(--size-1) var(--r-lg); background: var(--bubble); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
-.msg.assistant .body { font: 1.0625rem/var(--font-lineheight-4) var(--serif); overflow-wrap: anywhere; }
+.msg.assistant .body { font: 1rem/1.75 var(--sans); overflow-wrap: anywhere; }
 .msg.assistant .body :is(p, li, blockquote) { text-wrap: pretty; }
 .msg.error .body { padding-left: 12px; border-left: 3px solid var(--danger); color: var(--danger); }
 .reasoning { margin: 0 0 12px; font: .9rem/1.55 var(--sans); color: var(--muted); }
