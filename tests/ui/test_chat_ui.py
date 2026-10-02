@@ -15,7 +15,7 @@ def open_app(page: Page, app_url: str):
 
 def open_sidebar(page: Page):
     page.get_by_role("button", name="Show conversations").click()
-    expect(page.locator("#sidebar")).to_be_visible()
+    expect(page.locator("#conversations")).to_be_visible()
 
 
 def conv_id(page: Page) -> str:
@@ -358,22 +358,6 @@ def test_delete_asks_first_then_removes(page, app_url):
 
 # ---- layout and theme ----
 
-def test_sidebar_is_closed_by_default_and_toggles(page, app_url):
-    open_app(page, app_url)
-    sidebar, toggle = page.locator("#sidebar"), page.get_by_role("button", name="Show conversations")
-    expect(sidebar).to_be_hidden()
-    expect(toggle).to_have_attribute("aria-expanded", "false")
-    page.keyboard.press("Tab")  # focus goes to the toggle / composer, never into the hidden sidebar
-    assert not page.evaluate("document.activeElement.closest('#sidebar')")
-    width_closed = page.locator("main").bounding_box()["width"]
-    toggle.click()
-    expect(sidebar).to_be_visible()
-    expect(page.get_by_role("button", name="Hide conversations")).to_have_attribute("aria-expanded", "true")
-    assert page.locator("main").bounding_box()["width"] < width_closed  # pushes content, no overlay
-    page.get_by_role("button", name="Hide conversations").click()
-    expect(sidebar).to_be_hidden()
-
-
 def test_sidebar_stays_open_when_switching_chats_on_desktop(page, app_url):
     open_app(page, app_url)
     send(page, "alpha")
@@ -384,7 +368,7 @@ def test_sidebar_stays_open_when_switching_chats_on_desktop(page, app_url):
     expect(page.locator("#conversations li")).to_have_count(2)
     page.get_by_role("link", name="alpha").click()
     expect(page.locator(".msg.user .body")).to_have_text("alpha")
-    expect(page.locator("#sidebar")).to_be_visible()
+    expect(page.locator("#conversations")).to_be_visible()
 
 
 def test_mobile_sidebar_is_a_drawer(page, app_url):

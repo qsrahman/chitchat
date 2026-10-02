@@ -22,3 +22,21 @@ Reading-first. Replies are set in a serif face (Charter / Iowan Old Style / Geor
 `tests/ui/` drives the real app in Chromium with Playwright (`pytest-playwright`). `tests/ui/conftest.py` serves the app with uvicorn on a free port and a `ScriptedLLM` whose reply depends on a keyword in the prompt (`slow`, `long`, `code`, `xss`, `fail`, `cutoff`). Any JS or console error fails the test.
 
 One-time setup: `uv run playwright install chromium`. Run only the UI tests with `uv run pytest tests/ui`.
+
+## Second pass: findings from chatgpt.com
+Looked at the logged-out chatgpt.com (desktop and mobile, light and dark, the menus, a composer being typed in, and one short conversation) and applied what fits.
+
+| Seen on chatgpt.com | Here |
+|---|---|
+| The home screen is a hero: heading, composer and suggestions as one centered group; the composer drops to the bottom only once a chat starts | Same. `main:not(.is-started)` centers the group; `is-started` restores the pinned composer |
+| Composer is a ~52px pill (28px radius) with a layered soft shadow, and the send button is dim until there is text | Raised pill (`--raised`), same shadow recipe, send disabled-style when empty |
+| The composer reflows as it grows: one row for one line; with more, the text takes the full width and the buttons drop to a row below | `is-multiline`, set in `syncComposer()`. It also reflows for wrapped text, and stays reflowed until the box is empty so it can't flip-flop |
+| Suggestions are quiet icon rows under the composer, without dividers | Same |
+| The closed sidebar is a narrow icon rail, not nothing | Closed = 3.5rem rail (toggle, new chat, custom instructions); open = full list. Still closed by default. Mobile keeps the overlay drawer |
+| Message actions are icon-only buttons with tooltips | Copy, Edit and Regenerate are icon buttons (`aria-label` + `title`); Copy shows a check and "Copied" briefly. Retry keeps its text label because it appears on an error |
+| The scroll-to-bottom control is a round icon button above the composer | Round button anchored to the top of the form, so it never overlaps a tall composer |
+| Unsent text survives a reload | Drafts kept in `localStorage` per conversation (and for the new-chat screen), cleared on send |
+
+Not applied: the model-selector popover in the header (a larger change; settings stay in the dialog), the `+` attach and tools menu (phases 6 and 7), dictation, login upsells, and ChatGPT's all-sans typography (the serif reading face stays on purpose).
+
+Tests: `tests/ui/test_layout_ui.py`.

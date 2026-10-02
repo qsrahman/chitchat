@@ -10,21 +10,27 @@
 <aside id="sidebar" aria-label="Conversations">
   <div class="side-head">
     <span class="brand">ChitChat</span>
-    <button id="new-chat" type="button" class="btn">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
-      New chat
+    <button type="button" class="icon-btn nav-toggle" aria-label="Show conversations" title="Show conversations" aria-expanded="false">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="3"/><path d="M8 4v12"/></svg>
     </button>
   </div>
+  <button id="new-chat" type="button" class="side-item" aria-label="New chat" title="New chat">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3"/></svg>
+    <span class="label">New chat</span>
+  </button>
   <nav id="conversations"></nav>
   <div class="side-foot">
-    <button id="instructions-btn" type="button" class="btn">Custom instructions</button>
+    <button id="instructions-btn" type="button" class="side-item" aria-label="Custom instructions" title="Custom instructions">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3"/><path d="M4 16c.8-3 3-4.5 6-4.5s5.2 1.5 6 4.5"/></svg>
+      <span class="label">Custom instructions</span>
+    </button>
   </div>
 </aside>
 <div id="scrim" hidden></div>
 
 <main>
   <header class="topbar">
-    <button id="toggle-nav" type="button" class="icon-btn" aria-label="Show conversations" aria-expanded="false">
+    <button id="toggle-nav" type="button" class="icon-btn nav-toggle" aria-label="Show conversations" title="Show conversations" aria-expanded="false">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
     </button>
     <h1 id="title">New chat</h1>
@@ -36,16 +42,13 @@
   <div id="messages" role="log" aria-label="Messages" tabindex="-1">
     <div id="empty">
       <h2>What are you working on?</h2>
-      <ul id="starters"></ul>
     </div>
     <div id="thread"></div>
   </div>
-  <button id="jump" type="button" class="btn" hidden>
-    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M5 11l5 5 5-5"/></svg>
-    Jump to latest
-  </button>
-
   <form id="form">
+    <button id="jump" type="button" class="round-btn" aria-label="Jump to latest" title="Jump to latest" hidden>
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M5 11l5 5 5-5"/></svg>
+    </button>
     <div class="composer">
       <textarea id="input" rows="1" placeholder="Ask anything" aria-label="Message" autofocus></textarea>
       <button id="send" type="submit" aria-label="Send message" disabled>
@@ -53,6 +56,7 @@
         <svg class="i-stop" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>
       </button>
     </div>
+    <ul id="starters"></ul>
     <p class="hint">Enter to send, Shift+Enter for a new line. Esc stops a reply.</p>
   </form>
 </main>

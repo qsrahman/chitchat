@@ -7,12 +7,25 @@ const thread = $("thread");
 const input = $("input");
 const sendBtn = $("send");
 const form = $("form");
+const composer = document.querySelector(".composer");
 
 // id: current conversation (null = new chat, created lazily on first send).
 // stick: keep the view pinned to the bottom unless the reader scrolled up.
 // settings: the current conversation's settings (kept client-side until a new chat's first send creates it).
 const DEFAULT_SETTINGS = { model: null, system_prompt: "", reasoning_effort: null, temperature: null };
 const state = { id: null, busy: false, abort: null, stick: true, convs: [], settings: { ...DEFAULT_SETTINGS } };
+
+// 20x20 stroke icons (see iconButton).
+const ICONS = {
+  copy: "M7 7h9v9H7zM13 7V4H4v9h3",
+  check: "M4 10l4 4 8-8",
+  refresh: "M16 10a6 6 0 1 1-1.8-4.3M16 4v3.5h-3.5",
+  pencil: "M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3",
+  trash: "M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10",
+  code: "M7 6l-4 4 4 4M13 6l4 4-4 4",
+  chat: "M4 5h12v8H9l-4 3v-3H4z",
+  scale: "M10 4v12M5 16h10M4 7h12M4 7l-2 5h4zM16 7l-2 5h4z",
+};
 
 async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -119,7 +132,7 @@ function actionButton(label, onclick) {
 const clearActions = () => thread.querySelectorAll(".actions").forEach((a) => a.replaceChildren());
 
 // Copy on every reply; Edit on the last user message; Regenerate on the last reply, or
-// Retry when the conversation ends on a user message or an error.
+// Retry when the conversation ends on a user message or an error. Icon buttons, named by aria-label.
 function updateActions() {
   clearActions();
   if (state.busy) return;
@@ -127,15 +140,25 @@ function updateActions() {
   const last = msgs.at(-1);
   const lastUser = msgs.findLast((m) => m.classList.contains("user"));
   for (const m of msgs.filter((m) => m.classList.contains("assistant"))) {
-    actionsOf(m).append(actionButton("Copy", async (e) => {
+    const copy = iconButton("Copy", ICONS.copy, async () => {
       await navigator.clipboard.writeText(m._text);
-      e.target.textContent = "Copied";
-      setTimeout(() => (e.target.textContent = "Copy"), 1200);
-    }));
+      confirmed(copy);
+    });
+    actionsOf(m).append(copy);
   }
-  if (lastUser) actionsOf(lastUser).append(actionButton("Edit", () => startEdit(lastUser)));
-  if (last?.classList.contains("assistant")) actionsOf(last).append(actionButton("Regenerate", regenerate));
+  if (lastUser) actionsOf(lastUser).append(iconButton("Edit", ICONS.pencil, () => startEdit(lastUser)));
+  if (last?.classList.contains("assistant")) actionsOf(last).append(iconButton("Regenerate", ICONS.refresh, regenerate));
   else if (last && lastUser) actionsOf(last).append(actionButton("Retry", () => retry(lastUser)));
+}
+
+// Briefly show a check mark and "Copied" on an icon button.
+function confirmed(btn) {
+  const path = btn.querySelector("path");
+  const [d, label] = [path.getAttribute("d"), btn.getAttribute("aria-label")];
+  path.setAttribute("d", ICONS.check);
+  btn.setAttribute("aria-label", "Copied");
+  btn.title = "Copied";
+  setTimeout(() => { path.setAttribute("d", d); btn.setAttribute("aria-label", label); btn.title = label; }, 1200);
 }
 
 function startEdit(m) {
@@ -287,7 +310,9 @@ function syncSend() {
 
 function submit(text) {
   input.value = "";
+  saveDraft();
   fit();
+  syncComposer();
   syncSend();
   addMessage("user", text);
   runTurn("chat", { content: text });
@@ -312,21 +337,49 @@ const fit = CSS.supports("field-sizing", "content") ? () => {} : () => {
   input.style.height = "auto";
   input.style.height = `${input.scrollHeight}px`;
 };
-input.addEventListener("input", () => { fit(); syncSend(); });
+input.addEventListener("input", () => { fit(); syncComposer(); syncSend(); saveDraft(); });
+
+// One line sits in a single row with the send button. Once the text takes more than a line the input gets
+// the full width and send drops below; it stays that way until the box is empty, so wrapping can't flip-flop.
+function syncComposer() {
+  const style = getComputedStyle(input);
+  const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  const lines = Math.round((input.scrollHeight - padding) / parseFloat(style.lineHeight));
+  const multiline = input.value !== "" &&
+    (composer.classList.contains("is-multiline") || input.value.includes("\n") || lines > 1);
+  composer.classList.toggle("is-multiline", multiline);
+}
+
+// Unsent text is kept per conversation (and for the new-chat screen), so a reload or a switch loses nothing.
+const draftKey = () => `chitchat:draft:${state.id ?? "new"}`;
+function saveDraft() {
+  try {
+    if (input.value) localStorage.setItem(draftKey(), input.value);
+    else localStorage.removeItem(draftKey());
+  } catch { /* storage blocked: drafts just aren't kept */ }
+}
+function loadDraft() {
+  try { input.value = localStorage.getItem(draftKey()) ?? ""; } catch { input.value = ""; }
+  fit();
+  syncComposer();
+  syncSend();
+}
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && state.busy && !document.querySelector("dialog[open]")) state.abort?.abort();
 });
 
 const STARTERS = [
-  "Explain how database indexes work, with a short example",
-  "Write a Python script that renames files by their modified date",
-  "Compare SQLite and Postgres for a side project",
-  "Draft a polite email asking to move a meeting to next week",
+  [ICONS.chat, "Explain how database indexes work, with a short example"],
+  [ICONS.code, "Write a Python script that renames files by their modified date"],
+  [ICONS.scale, "Compare SQLite and Postgres for a side project"],
+  [ICONS.pencil, "Draft a polite email asking to move a meeting to next week"],
 ];
-$("starters").append(...STARTERS.map((text) => {
+$("starters").append(...STARTERS.map(([icon, text]) => {
   const li = document.createElement("li");
-  li.append(actionButton(text, () => !state.busy && submit(text)));
+  const button = actionButton(text, () => !state.busy && submit(text));
+  button.prepend(Object.assign(document.createElement("span"), { innerHTML: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${icon}"/></svg>` }));
+  li.append(button);
   return li;
 }));
 
@@ -369,6 +422,7 @@ function iconButton(label, path, onclick) {
   b.type = "button";
   b.className = "icon-btn";
   b.setAttribute("aria-label", label);
+  b.title = label;
   b.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${path}"/></svg>`;
   b.onclick = onclick;
   return b;
@@ -385,8 +439,8 @@ function renderConv(c) {
   link.onclick = closeNavIfOverlay;
   li.append(
     link,
-    iconButton(`Rename "${c.title}"`, "M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3", () => renameConv(c)),
-    iconButton(`Delete "${c.title}"`, "M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10", () => deleteConv(c)),
+    iconButton(`Rename "${c.title}"`, ICONS.pencil, () => renameConv(c)),
+    iconButton(`Delete "${c.title}"`, ICONS.trash, () => deleteConv(c)),
   );
   return li;
 }
@@ -491,14 +545,19 @@ bindSave($("instructions-dialog"), () =>
 function setNavOpen(open) {
   document.body.classList.toggle("nav-open", open);
   $("scrim").hidden = !open;
-  const toggle = $("toggle-nav");
-  toggle.setAttribute("aria-expanded", String(open));
-  toggle.setAttribute("aria-label", open ? "Hide conversations" : "Show conversations");
+  const label = open ? "Hide conversations" : "Show conversations";
+  for (const toggle of document.querySelectorAll(".nav-toggle")) {
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-label", label);
+    toggle.title = label;
+  }
 }
 function closeNavIfOverlay() {
   if (matchMedia("(max-width: 760px)").matches) setNavOpen(false);
 }
-$("toggle-nav").onclick = () => setNavOpen(!document.body.classList.contains("nav-open"));
+document.querySelectorAll(".nav-toggle").forEach((b) => {
+  b.onclick = () => setNavOpen(!document.body.classList.contains("nav-open"));
+});
 $("scrim").onclick = () => setNavOpen(false);
 
 async function openConversation(id) {
@@ -522,6 +581,7 @@ async function openConversation(id) {
   }
   updateActions();
   scrollToBottom();
+  loadDraft();
   await refreshList();
   input.focus();
 }
