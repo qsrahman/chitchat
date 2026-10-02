@@ -8,7 +8,7 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Stop generation (partial reply kept), regenerate, retry, edit the last message, copy
 - Reading-focused UI: serif replies, highlighted code with copy, typeset math (KaTeX), light/dark theme, centered new-chat composer that reflows as you type, icon rail sidebar, mobile drawer, smart autoscroll, drafts that survive a reload
 - Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
-- Reasoning summaries in a collapsible block, and token usage under each reply
+- Reasoning summaries in a collapsible block
 - Attachments: images, PDFs and text files via the paperclip, drag and drop or paste
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
 - Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`)

@@ -20,23 +20,24 @@ def test_reasoning_streams_open_then_collapses_and_can_be_expanded(page, app_url
     expect(details.locator(".reasoning-body")).to_contain_text("Checking the sums.")
 
 
-def test_token_usage_is_shown_under_the_reply(page, app_url):
+def test_token_usage_is_not_shown_under_the_reply(page, app_url):
     open_app(page, app_url)
     send(page, "ponder this")
-    expect(page.locator(".msg.assistant > .note")).to_have_text("1,234 in, 567 out (300 reasoning)")
+    expect(page.locator(".msg.assistant")).to_contain_text("The answer is 42.")
+    expect(page.locator(".msg.assistant > .note")).to_be_hidden()
 
 
-def test_reasoning_and_usage_survive_a_reload(page, app_url):
+def test_reasoning_survives_a_reload(page, app_url):
     open_app(page, app_url)
     send(page, "ponder this")
-    expect(page.locator(".msg.assistant > .note")).to_be_visible()
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()  # the reply is done and saved
     page.reload()
     details = page.locator(".msg.assistant details.reasoning")
     expect(details).not_to_have_attribute("open", "")
     expect(details.locator("summary")).to_have_text("Reasoning")
     details.locator("summary").click()
     expect(details.locator(".reasoning-body")).to_contain_text("Weighing options.")
-    expect(page.locator(".msg.assistant > .note")).to_have_text("1,234 in, 567 out (300 reasoning)")
+    expect(page.locator(".msg.assistant > .note")).to_be_hidden()
 
 
 def test_a_plain_reply_has_no_reasoning_block_or_usage_line(page, app_url):

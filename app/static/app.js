@@ -46,7 +46,7 @@ messagesEl.addEventListener("scroll", () => {
 $("jump").onclick = () => { state.stick = true; scrollToBottom(); };
 
 // ---- messages ----
-// Each .msg = [details.reasoning] + .body (rendered text) + .note (stopped / cut off / usage) + .actions.
+// Each .msg = [details.reasoning] + .body (rendered text) + .note (stopped / cut off / compacted) + .actions.
 // el._text and el._reasoning are the raw texts.
 function addMessage(role, text = "", meta = {}) {
   const el = document.createElement("div");
@@ -95,17 +95,12 @@ const bodyOf = (el) => el.querySelector(".body");
 const noteOf = (el) => el.querySelector(".note");
 const actionsOf = (el) => el.querySelector(".actions");
 
-const tokens = new Intl.NumberFormat();
-const usageText = (u) => `${tokens.format(u.input_tokens)} in, ${tokens.format(u.output_tokens)} out` +
-  (u.reasoning_tokens ? ` (${tokens.format(u.reasoning_tokens)} reasoning)` : "");
-
 function setNote(el, meta) {
   const note = noteOf(el);
   note.textContent = [
     meta.stopped && "Stopped.",
     meta.incomplete && "Reply cut off: output limit reached.",
     meta.compaction && "Earlier messages were compacted to save context.",
-    meta.usage && usageText(meta.usage),
   ].filter(Boolean).join(" ");
   note.hidden = !note.textContent;
 }

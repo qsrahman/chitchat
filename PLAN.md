@@ -39,7 +39,7 @@ Seams that keep features additive:
 | 3 | done | Stop generation (partial message saved), regenerate, edit last user message, copy, retry |
 | 3b | done | UI/UX polish (`docs/ui-polish.md`) and Playwright browser tests |
 | 4 | done | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
-| 5 | done | Reasoning summaries (collapsible), token usage display |
+| 5 | done | Reasoning summaries (collapsible), token usage recorded (not displayed) |
 | 6 | done | Attachments: images (`input_image`), files/PDF (`input_file`) |
 | 7 | done | Tools: built-in web search with citations, then a function-calling loop with a small registry (`tools.py`) |
 | 8 | done | Context management (OpenAI server-side compaction), FTS5 search, export (Markdown/JSON) |
