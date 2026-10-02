@@ -52,3 +52,14 @@ The header shows the model the conversation uses ("gemma4:cloud ⌄") and opens 
 - The settings button's dot now means "something other than the model is customized", since the model has its own button. The settings dialog and the picker share one model list and stay in sync.
 
 Tests: `tests/ui/test_model_picker_ui.py`.
+
+## Design tokens and a polish pass (Open Props)
+[Open Props](https://open-props.style) is vendored in `static/vendor/open-props/` (MIT; only the files used: `sizes`, `shadows`, `easings`, `fonts`, `zindex`, about 11 KB). It is CSS custom properties only: no classes, no build, no JavaScript. The colors stay ours (`light-dark()` palette in `style.css`); Open Props supplies the scales:
+- **Radii:** two steps built from `--size-*`: `--r-sm` (controls, 8px) and `--r-lg` (containers: menus, dialogs, code blocks, bubbles, 16px); pills use `--size-5/6`. Previously there were nine different values (5 to 28px).
+- **Elevation:** `--shadow-2` (composer, 3 when focused), `--shadow-3` (jump button), `--shadow-4` (menu), `--shadow-5` (dialogs). The tokens switch to stronger shadows in dark mode themselves, which the hand-written ones didn't, so dark-mode popovers and dialogs now lift off the page.
+- **Type:** `--font-size-*`, `--font-weight-*`, `--font-lineheight-*` for headings, the hero and the answer text, plus two local steps (`--text-sm` .875rem for secondary text, `--font-size-0` .75rem for the smallest) replacing five near-identical sizes (.78 to .9rem). Headings use `text-wrap: balance`, answer text `pretty`.
+- **Motion:** one shared transition (`--ease-out-3`) for hover and press states, a small scale on `:active`, entrances for the model menu and dialogs and a fade for new messages via `@starting-style` (closing is instant). All of it is off under `prefers-reduced-motion`.
+- **Layers:** `--layer-*` for the drawer, scrim and drop overlay.
+- **Also:** `--bubble` (a step above the page, for sent messages, inline code and attachment tiles: they were hard to tell apart from the page in dark mode), consistent focus rings on fields, a thin scrollbar, `accent-color`, `::selection`.
+
+Spacing and the remaining pixel paddings were left as they are: they are layout, not a scale problem, and converting them is churn. No markup or JavaScript changed, and no test needed changing.
