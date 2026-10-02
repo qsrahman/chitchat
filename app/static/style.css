@@ -10,6 +10,10 @@
   --accent: light-dark(#3652e3, #93a5ff);
   --on-accent: light-dark(#ffffff, #0f1115);
   --danger: light-dark(#b42318, #ff9087);
+  --spark-1: light-dark(#3652e3, #93a5ff); /* the send button's hover gradient: the accent, then three more hues */
+  --spark-2: light-dark(#8a3fd1, #c4a1ff);
+  --spark-3: light-dark(#e0407f, #ff9bc2);
+  --spark-4: light-dark(#e8801f, #ffc07a);
   --bubble: light-dark(#eceef3, #242934); /* sent messages and inline code: a step above the page */
   --r-sm: var(--size-2); /* controls */
   --r-lg: var(--size-3); /* containers: menus, dialogs, code blocks, bubbles */
@@ -196,7 +200,7 @@ dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 @starting-style { .msg { opacity: 0; } }
 @keyframes pulse { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .dots i, .tool-call[data-status="running"] summary { animation: none; opacity: .6; } .actions { transition: none; } }
-@media (prefers-reduced-motion: reduce) { *, ::before, ::after { transition: none !important; } :where(.btn, .icon-btn, .round-btn, #send):active { scale: 1; } }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { transition: none !important; animation: none !important; } :where(.btn, .icon-btn, .round-btn, #send):active { scale: 1; } }
 
 /* composer: a raised pill. One line = one row; once the text grows the input takes the full width and the
    send button drops to a row below (is-multiline, set from app.js). */
@@ -235,6 +239,18 @@ dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 #send .i-stop { display: none; fill: currentColor; }
 #send.is-stop .i-stop { display: block; }
 #send.is-stop .i-send { display: none; }
+/* Hover: a gradient of shifting colors fades in over the button and keeps flowing while the pointer is on it.
+   It is a layer under the icon so the fade can be a transition (gradients themselves can't be). */
+#send { position: relative; overflow: hidden; isolation: isolate; }
+#send > svg { position: relative; }
+#send::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0;
+  background: linear-gradient(120deg, var(--spark-1), var(--spark-2), var(--spark-3), var(--spark-4), var(--spark-1)) 0 0 / 300% 100%;
+  transition: opacity .2s var(--ease-out-3);
+  animation: spark 3s linear infinite paused;
+}
+#send:hover:not(:disabled)::before, #send:focus-visible:not(:disabled)::before { opacity: 1; animation-play-state: running; }
+@keyframes spark { to { background-position: 300% 0; } }
 #jump { position: absolute; left: 50%; bottom: calc(100% + 4px); translate: -50% 0; }
 /* attachments: chips in the composer, tiles in sent messages */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 4px 6px; }

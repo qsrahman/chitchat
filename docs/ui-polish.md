@@ -83,3 +83,6 @@ Tests: `tests/ui/test_reference_ui.py`.
 
 ## Removed: suggestions and the keyboard hint
 The four example prompts under the new-chat composer and the "Enter to send, Shift+Enter for a new line. Esc stops a reply." line are gone (earlier sections above that mention suggestions describe the past). The shortcuts themselves still work: Enter sends, Shift+Enter adds a line, Esc stops a reply. The home screen is now the greeting and the composer.
+
+## Send button hover
+Hovering (or keyboard-focusing) the enabled send/stop button fades in a moving gradient: the accent, purple, pink and orange, flowing continuously while the pointer stays (`--spark-1..4` in `style.css`, lighter in dark mode so the dark arrow stays readable). It is a `::before` layer under the icon, so the fade is a normal opacity transition; the flow is a looping `background-position` animation that is paused at rest, so nothing runs when the button isn't hovered. A disabled button doesn't react. With `prefers-reduced-motion` the gradient still appears but doesn't move. Tests: `tests/ui/test_send_hover_ui.py`.
