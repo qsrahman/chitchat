@@ -38,6 +38,7 @@ Environment variables or `.env`:
 | `OPENAI_REASONING_SUMMARIES` | `true` | Ask reasoning models for a summary of their thinking; set `false` if your OpenAI organization isn't verified for it |
 | `OPENAI_PDF_INPUT` | `text` | `text` extracts a PDF's text and sends that (any model); `file` sends the PDF itself (OpenAI) |
 | `ATTACHMENTS_DIR` | `attachments` | Where uploaded files are stored |
+| `DEFAULT_SYSTEM_PROMPT` | built-in (date, display format) | Prompt sent before custom instructions; empty sends none; `{date}` is today. See `docs/default-prompt.md` |
 | `COMPACT_THRESHOLD` | `150000` | Tokens after which OpenAI compacts the older turns of a conversation; `0` turns it off |
 | `BRAVE_API_KEY` | none | Enables web search (Brave Search API). Without it the globe button in the composer is disabled |
 | `MAX_TOOL_CALLS` | `4` | Most tool calls (searches) in one reply |

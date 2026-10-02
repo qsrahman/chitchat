@@ -11,8 +11,10 @@ def search_box(page):
 def test_search_shows_matching_chats_with_the_match_highlighted(page, app_url):
     open_app(page, app_url)
     send(page, "tell me about quokkas")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()  # saved, not cut off
     page.get_by_role("button", name="New chat").click()
     send(page, "tell me about cats")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
     open_sidebar(page)
     search_box(page).fill("quokk")
     result = page.locator(".result")
@@ -25,8 +27,10 @@ def test_search_shows_matching_chats_with_the_match_highlighted(page, app_url):
 def test_clicking_a_result_opens_that_chat_and_clearing_restores_the_list(page, app_url):
     open_app(page, app_url)
     send(page, "tell me about quokkas")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()  # saved, not cut off
     page.get_by_role("button", name="New chat").click()
     send(page, "tell me about cats")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
     open_sidebar(page)
     search_box(page).fill("quokkas")
     page.locator(".result").click()

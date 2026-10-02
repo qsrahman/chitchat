@@ -155,7 +155,7 @@ class ScriptedLLM:
 def app_url(tmp_path):
     app = create_app(Settings(
         _env_file=None, db_path=str(tmp_path / "ui.db"), attachments_dir=str(tmp_path / "files"),
-        openai_api_key="test", openai_model=ScriptedLLM.default_model
+        openai_api_key="test", openai_model=ScriptedLLM.default_model, default_system_prompt=""
     ))
     app.state.llm = ScriptedLLM()
 

@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
@@ -241,12 +242,14 @@ def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]
 
 
 def _model_options(request: Request, conn: sqlite3.Connection, conv: dict, model: str) -> dict:
-    """Keyword arguments for llm.stream_reply from custom instructions + the conversation's settings."""
+    """Keyword arguments for llm.stream_reply: instructions are the default prompt, custom instructions, the
+    conversation's system prompt and the enabled tools' guidance, in that order (the stable part first)."""
     s = conv["settings"]
     # A saved setting for a tool that is not configured (right now) is ignored, not an error.
     enabled = {n: request.app.state.tools[n] for n in s["tools"] if n in request.app.state.tools}
     guidance = [t.guidance for t in enabled.values()]
-    parts = [store.get_app_setting(conn, "custom_instructions"), s["system_prompt"], *guidance]
+    base = request.app.state.settings.default_system_prompt.replace("{date}", date.today().isoformat())
+    parts = [base, store.get_app_setting(conn, "custom_instructions"), s["system_prompt"], *guidance]
     options = {"instructions": "\n\n".join(filter(None, parts)) or None}
     if enabled:
         options["tools"] = enabled
