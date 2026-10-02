@@ -99,6 +99,9 @@ main.is-started #empty { display: none; }
 .msg.assistant .body table { border-collapse: collapse; display: block; overflow-x: auto; font: .92rem/1.5 var(--sans); }
 .msg.assistant .body :is(th, td) { padding: 6px 12px; border: 1px solid var(--line); text-align: left; }
 .msg.assistant .body hr { border: 0; border-top: 1px solid var(--line); margin: 1.6em 0; }
+.math-block { margin: 1em 0; overflow-x: auto; }
+.math-block .katex-display { margin: 0; }
+.body .katex { font-size: 1.05em; }
 .body :not(pre) > code { font: .88em var(--mono); padding: .15em .35em; border-radius: 5px; background: var(--bg); border: 1px solid var(--line); }
 
 .code { margin: 1em 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); font-family: var(--sans); }

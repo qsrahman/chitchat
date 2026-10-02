@@ -4,7 +4,7 @@
 - `llm.py` turns `response.reasoning_summary_text.delta` into `{"type": "reasoning_delta", "text"}`. Consecutive summary parts (different `summary_index`) are separated by a blank line.
 - Reasoning models (`supports_reasoning`) are asked for `reasoning.summary = "auto"`. OpenAI refuses summaries for organizations that aren't verified, so `OPENAI_REASONING_SUMMARIES=false` turns the request off. Non-reasoning models never get the `reasoning` parameter. (`gpt-oss` on Ollama streams summaries whether or not you ask.)
 - UI: a `<details class="reasoning">` above the answer. It opens as "Thinking…" while the summary streams, and collapses to "Reasoning" when the answer starts. It stands in for the three-dot indicator while there is no answer text yet. A failed reply drops the block.
-- The summary is rendered as sanitized markdown (OpenAI summaries use bold headings). A raw chain-of-thought from an open model can show stray emphasis from `*` characters.
+- The summary is rendered as sanitized markdown (OpenAI summaries use bold headings) by its own `marked` instance (`renderReasoning`). That instance refuses single-delimiter emphasis (`*x*`, `_x_`): models like `gpt-oss` stream their raw thinking as the "summary", where `17*23 ... 17*20` is arithmetic. `**bold**`, lists, code and math still render; a real `*italic*` shows literally.
 
 ## Usage
 - `done` carries `usage: {input_tokens, output_tokens, reasoning_tokens}` from the response (`reasoning_tokens` is 0 when the endpoint doesn't report it, as Ollama doesn't). Endpoints that report no usage send none.

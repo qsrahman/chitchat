@@ -14,12 +14,12 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - `app/llm.py`: the only module that imports `openai`. It yields our normalized events (`delta`, `done`, `error`, ...).
 - `app/routes.py`: HTTP and SSE endpoints. `app/main.py` is the `create_app()` factory.
 - `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions.
-- `app/static/`: vanilla JS UI as ES modules (`app.js`, `markdown.js`), no build step. Libraries are vendored in `static/vendor/`; don't add CDN links.
+- `app/static/`: vanilla JS UI as ES modules (`app.js`, `markdown.js`), no build step. Libraries are vendored in `static/vendor/`; don't add CDN links. Rendering rules (math, reasoning text, sanitizing) are in `docs/rendering.md`.
 - `tests/ui/`: Playwright tests against the real app with a `ScriptedLLM` (`tests/ui/conftest.py`).
 
 ## Conventions
 - Work one phase at a time, as in `PLAN.md`. A phase is code + tests + `docs/phase-N.md` + one commit titled `phase N: <summary>`. Update the `PLAN.md` status table and the README feature list in the same commit.
-- Keep it flat. No ORM, no repository classes, no new abstraction until a phase needs it. Before writing a helper, check what already exists and use it, even if a hand-rolled version would be a line shorter: stdlib and JS builtins, FastAPI (e.g. `fastapi.sse`), pydantic, the openai SDK (types such as `ReasoningEffort`, and `httpx.MockTransport` for testing it), Playwright (`wait_for_function`, not polling loops), highlight.js / marked / DOMPurify. Keep a hand-written piece only when nothing covers it, and say why in a comment.
+- Keep it flat. No ORM, no repository classes, no new abstraction until a phase needs it. Before writing a helper, check what already exists and use it, even if a hand-rolled version would be a line shorter: stdlib and JS builtins, FastAPI (e.g. `fastapi.sse`), pydantic, the openai SDK (types such as `ReasoningEffort`, and `httpx.MockTransport` for testing it), Playwright (`wait_for_function`, not polling loops), highlight.js / marked / DOMPurify / KaTeX. Keep a hand-written piece only when nothing covers it, and say why in a comment.
 - Per-conversation settings live in `conversations.settings` (JSON, defaults in `store.DEFAULT_SETTINGS`); app-wide ones in `app_settings`. Add a setting by extending `ConversationSettings` (routes.py) and `DEFAULT_SETTINGS`, then pass it through `_model_options` and `llm.stream_reply`.
 - Every OpenAI call is stateless: `store=False`, with history sent as `input`. Don't use `previous_response_id` or the Conversations API.
 - Don't leak raw OpenAI events past `llm.py`. For a new feature, add a normalized event type there and handle it in `routes.py` and `app.js`.

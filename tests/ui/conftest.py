@@ -11,6 +11,13 @@ from app.config import Settings
 from app.main import create_app
 
 CODE_REPLY = "Here is a loop:\n\n```python\nfor i in range(3):\n    print(i)\n```\n\nThat's it, with `inline` code.\n"
+MATH_REPLY = (
+    "Inline \\(17\\cdot20 = 340\\) and display $$E=mc^2$$ inline.\n\n"
+    "\\[\nx^2 + y^2 = z^2\n\\]\n\n"
+    "It costs $5 and $10, code `\\(x\\)` stays literal, and so does:\n\n"
+    "```\n\\(y\\)\n```\n\n"
+    "Unsafe: \\(\\href{javascript:window.__xss=1}{click me}\\)."
+)
 XSS_REPLY = (
     'Hi <img src=x onerror="window.__xss=1"> ![pixel](https://example.invalid/leak.png) '
     "<script>window.__xss=1</script> "
@@ -48,10 +55,20 @@ class ScriptedLLM:
             for i in range(80):
                 await asyncio.sleep(0.04)
                 yield {"type": "delta", "text": f"Paragraph {i} of a long answer.\n\n"}
+        elif "mathstream" in text:  # a formula split across deltas, with a pause inside it
+            yield {"type": "delta", "text": "Here: \\(a^2"}
+            await asyncio.sleep(0.8)
+            yield {"type": "delta", "text": " + b^2\\) is the sum."}
+        elif "math" in text:
+            yield {"type": "delta", "text": MATH_REPLY}
         elif "ponder" in text:  # reasoning summary first, then the answer and its token usage
-            yield {"type": "reasoning_delta", "text": "**Weighing options.**"}
-            await asyncio.sleep(0.4)
-            yield {"type": "reasoning_delta", "text": "\n\nChecking the sums."}
+            if "stars" in text:  # raw-thinking style: arithmetic with asterisks, and a formula
+                yield {"type": "reasoning_delta", "text": "**Plan**\n\nSo 17*23 = 391 and 17*20 + 17*3 = 391, "}
+                yield {"type": "reasoning_delta", "text": "i.e. \\(17\\cdot23\\) with _snake_case_."}
+            else:
+                yield {"type": "reasoning_delta", "text": "**Weighing options.**"}
+                await asyncio.sleep(0.4)
+                yield {"type": "reasoning_delta", "text": "\n\nChecking the sums."}
             if "broken" in text:
                 yield {"type": "error", "message": "model fell over"}
                 return

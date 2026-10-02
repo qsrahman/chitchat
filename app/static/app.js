@@ -1,4 +1,4 @@
-import { renderMarkdown } from "./markdown.js";
+import { renderMarkdown, renderReasoning } from "./markdown.js";
 
 const $ = (id) => document.getElementById(id);
 const main = document.querySelector("main");
@@ -99,7 +99,7 @@ function render(el) {
   cancelAnimationFrame(el._frame);
   el._frame = null;
   const body = bodyOf(el);
-  if (el._reasoning) reasoningOf(el).querySelector(".reasoning-body").innerHTML = renderMarkdown(el._reasoning);
+  if (el._reasoning) reasoningOf(el).querySelector(".reasoning-body").innerHTML = renderReasoning(el._reasoning);
   if (el.classList.contains("assistant")) {
     if (el._text) body.innerHTML = renderMarkdown(el._text);
     else if (el._reasoning) body.replaceChildren(); // the reasoning block is the progress indicator
