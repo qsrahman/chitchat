@@ -37,13 +37,11 @@ def saved_messages(page: Page) -> list[dict]:
 
 # ---- composing and sending ----
 
-def test_starter_prompt_sends_and_titles_the_chat(page, app_url):
+def test_a_new_chat_offers_no_suggestions_and_no_keyboard_hint(page, app_url):
     open_app(page, app_url)
-    page.get_by_role("button", name="Compare SQLite and Postgres for a side project").click()
-    expect(page.locator(".msg.assistant")).to_contain_text("Reply #1 to Compare SQLite")
-    expect(page.locator("#conversations a[aria-current=page]")).to_contain_text("Compare SQLite")
-    expect(page.locator("#title")).to_contain_text("Compare SQLite")
-    expect(page.locator("#empty")).to_be_hidden()
+    expect(page.get_by_text("Enter to send")).to_have_count(0)
+    expect(page.get_by_role("button", name="Compare SQLite")).to_have_count(0)
+    expect(page.locator("#starters, .hint")).to_have_count(0)
 
 
 def test_send_button_follows_input_and_enter_semantics(page, app_url):

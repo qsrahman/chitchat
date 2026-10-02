@@ -27,7 +27,7 @@
 body { margin: 0; height: 100dvh; display: grid; grid-template: minmax(0, 1fr) / 3.5rem minmax(0, 1fr); background: var(--surface); color: var(--ink); font: 15px/var(--font-lineheight-3) var(--sans); -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* one transition for everything that reacts to the pointer; reduced motion removes it below */
-:where(.btn, .icon-btn, .round-btn, .side-item, .conv, .menu-item, .model-btn, .actions button, .code-copy, #send, #starters button, .tile-file) {
+:where(.btn, .icon-btn, .round-btn, .side-item, .conv, .menu-item, .model-btn, .actions button, .code-copy, #send, .tile-file) {
   transition: background-color .15s var(--ease-out-3), color .15s var(--ease-out-3), border-color .15s var(--ease-out-3), scale .1s var(--ease-out-3);
 }
 :where(.btn, .icon-btn, .round-btn, #send):active:not(:disabled) { scale: .94; }
@@ -108,7 +108,7 @@ main:not(.is-started) #title { visibility: hidden; }
 #thread, #empty { width: min(var(--col), 100% - 32px); margin-inline: auto; }
 #thread { padding: 28px 0 24px; }
 #empty h2 { margin: 0; font: var(--font-weight-4) var(--font-size-4)/var(--font-lineheight-2) var(--sans); letter-spacing: -.01em; text-align: center; text-wrap: balance; }
-main.is-started #empty, main.is-started #starters { display: none; }
+main.is-started #empty { display: none; }
 
 /* A new chat is a hero: heading, composer and suggestions as one group in the middle of the page. The
    composer drops to the bottom once the conversation starts. */
@@ -118,9 +118,6 @@ main:not(.is-started) #messages { flex: none; width: 100%; overflow: visible; }
 main:not(.is-started) #thread { display: none; }
 main:not(.is-started) #empty { padding-bottom: 24px; }
 
-#starters { list-style: none; margin: 12px 0 0; padding: 0; }
-#starters button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; border-radius: var(--r-lg); text-align: left; color: var(--muted); }
-#starters button:hover { background: var(--hover); color: var(--ink); }
 
 /* messages */
 .msg { margin: 0 0 var(--size-5); }
@@ -263,7 +260,6 @@ dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 #drop { position: fixed; inset: 0; z-index: var(--layer-5); display: grid; place-items: center; background: light-dark(#ffffffd9, #0f1115d9); pointer-events: none; }
 #drop p { margin: 0; padding: 28px 40px; border: 2px dashed var(--accent); border-radius: var(--size-5); font-size: 1.1rem; }
 
-.hint { margin: 8px 0 0; text-align: center; font-size: var(--font-size-0); color: var(--muted); }
 
 /* dialogs */
 dialog { width: min(24rem, 100% - 32px); padding: 20px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--raised); color: var(--ink); box-shadow: var(--shadow-5); }
@@ -297,7 +293,6 @@ dialog input[type=number] { margin-top: 4px; }
   #sidebar .nav-toggle { display: none; }
   #scrim { position: fixed; inset: 0; z-index: var(--layer-2); background: light-dark(#0005, #0008); }
   .conv .icon-btn { opacity: 1; }
-  .hint { display: none; }
   main:not(.is-started) { padding-bottom: 4vh; }
 }
 /* touch screens: 44px targets, as ChatGPT's own controls are */

@@ -80,3 +80,6 @@ Logged out, in the built-in browser (the logged-in features, like the composer's
 | Qwen frames the whole app as an inset rounded card; ChatGPT shows 3 suggestions, a dimmed disabled Send, a hover pill on the model button | Not done: the frame is decoration, and the rest is already how ours behaves |
 
 Tests: `tests/ui/test_reference_ui.py`.
+
+## Removed: suggestions and the keyboard hint
+The four example prompts under the new-chat composer and the "Enter to send, Shift+Enter for a new line. Esc stops a reply." line are gone (earlier sections above that mention suggestions describe the past). The shortcuts themselves still work: Enter sends, Shift+Enter adds a line, Esc stops a reply. The home screen is now the greeting and the composer.

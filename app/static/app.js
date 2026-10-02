@@ -22,9 +22,6 @@ const ICONS = {
   refresh: "M16 10a6 6 0 1 1-1.8-4.3M16 4v3.5h-3.5",
   pencil: "M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3",
   trash: "M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10",
-  code: "M7 6l-4 4 4 4M13 6l4 4-4 4",
-  chat: "M4 5h12v8H9l-4 3v-3H4z",
-  scale: "M10 4v12M5 16h10M4 7h12M4 7l-2 5h4zM16 7l-2 5h4z",
   file: "M6 3h6l4 4v10H6zM12 3v4h4",
   close: "M5 5l10 10M15 5L5 15",
 };
@@ -605,20 +602,6 @@ document.addEventListener("drop", (e) => {
   $("drop").hidden = true;
   addFiles([...e.dataTransfer.files]);
 });
-
-const STARTERS = [
-  [ICONS.chat, "Explain how database indexes work, with a short example"],
-  [ICONS.code, "Write a Python script that renames files by their modified date"],
-  [ICONS.scale, "Compare SQLite and Postgres for a side project"],
-  [ICONS.pencil, "Draft a polite email asking to move a meeting to next week"],
-];
-$("starters").append(...STARTERS.map(([icon, text]) => {
-  const li = document.createElement("li");
-  const button = actionButton(text, () => !state.busy && submit(text));
-  button.prepend(Object.assign(document.createElement("span"), { innerHTML: `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${icon}"/></svg>` }));
-  li.append(button);
-  return li;
-}));
 
 // ---- sidebar ----
 const DAY = 864e5;

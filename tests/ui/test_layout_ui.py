@@ -59,22 +59,12 @@ def test_new_chat_centers_the_composer_and_it_drops_to_the_bottom_once_chatting(
     centre = box(composer)["y"] + box(composer)["height"] / 2
     assert 0.3 * height < centre < 0.65 * height, "composer should sit in the middle of the page"
     assert box(page.get_by_role("heading", name="What are you working on?"))["y"] < box(composer)["y"]
-    assert box(page.locator("#starters"))["y"] > box(composer)["y"], "suggestions sit under the composer"
 
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
-    expect(page.locator("#starters")).to_be_hidden()
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_hidden()
     bottom = box(composer)["y"] + box(composer)["height"]
     assert height - bottom < 70, "composer should be pinned to the bottom"
-
-
-def test_suggestions_are_icon_rows_under_the_composer(page, app_url):
-    open_app(page, app_url)
-    rows = page.locator("#starters button")
-    expect(rows).to_have_count(4)
-    for i in range(4):
-        expect(rows.nth(i).locator("svg")).to_have_count(1)
 
 
 # ---- composer ----
