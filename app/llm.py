@@ -2,6 +2,8 @@
 
     {"type": "delta", "text": str}
     {"type": "reasoning_delta", "text": str}          # streamed reasoning summary
+    {"type": "tool_call", "id", "name", "arguments", "status": "running" | "done" | "error",
+        "display": {...} | "error": str}              # a tool the model called, see tools.py
     {"type": "done"}   # plus "incomplete": reason (hit a limit) and "usage": {input_tokens, output_tokens,
                        # reasoning_tokens}, when there are any
     {"type": "error", "message": str}
@@ -9,6 +11,7 @@
 import asyncio
 import base64
 import json
+import logging
 import re
 import typing
 from collections.abc import AsyncIterator
@@ -21,8 +24,10 @@ from openai.types.responses import ResponseInputContentParam
 from openai.types.shared import ReasoningEffort
 
 from app.config import Settings
+from app.tools import Tool, ToolError
 
 Event = dict
+logger = logging.getLogger(__name__)
 
 # The SDK's own list of effort levels (its type is Optional[Literal[...]]). Which of them a model accepts varies.
 REASONING_EFFORTS: list[str] = list(typing.get_args(typing.get_args(ReasoningEffort)[0]))
@@ -89,17 +94,66 @@ def _error_message(error: openai.OpenAIError) -> str:
     return message
 
 
-def _usage(response) -> dict:
-    """{"usage": {...}} from a finished response, or {} when the endpoint reports none."""
+def _usage(response) -> dict | None:
+    """Token counts from a finished response, or None when the endpoint reports none."""
     u = response.usage
     if not u:
-        return {}
+        return None
     details = u.output_tokens_details
-    return {"usage": {
+    return {
         "input_tokens": u.input_tokens,
         "output_tokens": u.output_tokens,
         "reasoning_tokens": (details.reasoning_tokens if details else 0) or 0,
-    }}
+    }
+
+
+def _add_usage(total: dict | None, more: dict | None) -> dict | None:
+    """Token counts summed over the rounds of one reply."""
+    if not more:
+        return total
+    return {k: (total or {}).get(k, 0) + v for k, v in more.items()}
+
+
+def _loads(arguments: str | None) -> dict:
+    """The arguments of a function call for display; {} if the model sent something unusable."""
+    try:
+        parsed = json.loads(arguments or "{}")
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _tool_spec(tool: Tool) -> dict:
+    return {"type": "function", "name": tool.name, "description": tool.description,
+            "parameters": tool.parameters, "strict": True}
+
+
+async def _run_tool(call, tools: dict[str, Tool], allowed: bool) -> tuple[str, dict]:
+    """Run one function call. Returns (the text for the model, fields for the UI's tool_call event).
+
+    A tool that fails must not fail the reply: the model is told, and may try something else.
+    """
+    tool = tools.get(call.name)
+    try:
+        arguments = json.loads(call.arguments or "{}")
+        if not isinstance(arguments, dict):
+            raise ValueError
+    except ValueError:
+        return "Error: the arguments were not a valid JSON object.", {"status": "error", "error": "Bad arguments."}
+    fields = {"arguments": arguments}
+    if tool is None:
+        return f"Error: there is no tool called {call.name}.", {**fields, "status": "error", "error": "Unknown tool."}
+    if not allowed:
+        return ("Error: the tool call limit for this reply was reached. Answer with what you have.",
+                {**fields, "status": "error", "error": "Tool call limit reached."})
+    try:
+        result = await tool.run(arguments)
+    except ToolError as e:
+        return f"Error: {e}", {**fields, "status": "error", "error": str(e)}
+    except Exception:  # tools are extension points: whatever one raises, the reply carries on
+        logger.exception("tool %s failed", call.name)
+        return "Error: the tool failed.", {**fields, "status": "error", "error": "The tool failed unexpectedly."}
+    return result.output, {**fields, "status": "done", "display": result.display}
 
 
 class OpenAILLM:
@@ -138,7 +192,11 @@ class OpenAILLM:
         instructions: str | None = None,
         reasoning_effort: str | None = None,
         temperature: float | None = None,
+        tools: dict[str, Tool] | None = None,
+        max_tool_calls: int = 4,
     ) -> AsyncIterator[Event]:
+        """Stream a reply. With `tools`, loops: each round the model may call tools, whose results go back to it,
+        until it answers. At most `max_tool_calls` calls run per reply; the loop is also bounded in rounds."""
         # Only send what was set: a parameter the model doesn't know is an API error.
         extra = {}
         if instructions:
@@ -154,35 +212,64 @@ class OpenAILLM:
             extra["reasoning"] = reasoning
         if temperature is not None:
             extra["temperature"] = temperature
+        if tools:
+            extra["tools"] = [_tool_spec(t) for t in tools.values()]
+            if supports_reasoning(model):  # calls are stateless, so reasoning items travel back to the model
+                extra["include"] = ["reasoning.encrypted_content"]
         try:
-            stream = await self.client.responses.create(
-                model=model,
-                input=await asyncio.to_thread(_inputs, messages),  # reads attachment files
-                store=False,
-                stream=True,
-                max_output_tokens=self.settings.openai_max_output_tokens,
-                **extra,
-            )
-            part = None  # summary part index, so consecutive parts don't run together
-            async for ev in stream:
-                match ev.type:
-                    case "response.output_text.delta":
-                        yield {"type": "delta", "text": ev.delta}
-                    case "response.reasoning_summary_text.delta":
-                        gap = "\n\n" if part is not None and part != ev.summary_index else ""
-                        part = ev.summary_index
-                        yield {"type": "reasoning_delta", "text": gap + ev.delta}
-                    case "response.completed":
-                        yield {"type": "done", **_usage(ev.response)}
-                    case "response.failed":
-                        err = ev.response.error
-                        yield {"type": "error", "message": err.message if err else "response failed"}
-                    case "response.incomplete":
-                        details = ev.response.incomplete_details
-                        reason = details.reason if details else "unknown"
-                        yield {"type": "done", "incomplete": reason, **_usage(ev.response)}
-                    case "error":
-                        yield {"type": "error", "message": ev.message}
+            items = await asyncio.to_thread(_inputs, messages)  # reads attachment files
+            usage, calls_run, break_before_text = None, 0, False
+            for _ in range(max_tool_calls + 3 if tools else 1):
+                stream = await self.client.responses.create(
+                    model=model, input=items, store=False, stream=True,
+                    max_output_tokens=self.settings.openai_max_output_tokens, **extra,
+                )
+                part = None  # summary part index, so consecutive parts don't run together
+                output, calls, wrote = [], [], False
+                async for ev in stream:
+                    match ev.type:
+                        case "response.output_text.delta":
+                            if break_before_text:  # text from an earlier round, then a tool call: new paragraph
+                                yield {"type": "delta", "text": "\n\n"}
+                                break_before_text = False
+                            wrote = True
+                            yield {"type": "delta", "text": ev.delta}
+                        case "response.reasoning_summary_text.delta":
+                            gap = "\n\n" if part is not None and part != ev.summary_index else ""
+                            part = ev.summary_index
+                            yield {"type": "reasoning_delta", "text": gap + ev.delta}
+                        case "response.output_item.done":
+                            output.append(ev.item.model_dump(exclude_none=True))
+                            if ev.item.type == "function_call":
+                                calls.append(ev.item)
+                        case "response.completed":
+                            usage = _add_usage(usage, _usage(ev.response))
+                        case "response.failed":
+                            err = ev.response.error
+                            yield {"type": "error", "message": err.message if err else "response failed"}
+                            return
+                        case "response.incomplete":
+                            details = ev.response.incomplete_details
+                            reason = details.reason if details else "unknown"
+                            usage = _add_usage(usage, _usage(ev.response))
+                            yield {"type": "done", "incomplete": reason, **({"usage": usage} if usage else {})}
+                            return
+                        case "error":
+                            yield {"type": "error", "message": ev.message}
+                            return
+                if not calls:
+                    yield {"type": "done", **({"usage": usage} if usage else {})}
+                    return
+                items += output
+                break_before_text = wrote
+                for call in calls:
+                    calls_run += 1
+                    yield {"type": "tool_call", "id": call.call_id, "name": call.name, "status": "running",
+                           "arguments": _loads(call.arguments)}
+                    text, fields = await _run_tool(call, tools, allowed=calls_run <= max_tool_calls)
+                    yield {"type": "tool_call", "id": call.call_id, "name": call.name, **fields}
+                    items.append({"type": "function_call_output", "call_id": call.call_id, "output": text})
+            yield {"type": "error", "message": "The model kept calling tools without answering."}
         except openai.OpenAIError as e:
             yield {"type": "error", "message": _error_message(e)}
 

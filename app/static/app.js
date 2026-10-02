@@ -12,8 +12,8 @@ const composer = document.querySelector(".composer");
 // id: current conversation (null = new chat, created lazily on first send).
 // stick: keep the view pinned to the bottom unless the reader scrolled up.
 // settings: the current conversation's settings (kept client-side until a new chat's first send creates it).
-const DEFAULT_SETTINGS = { model: null, system_prompt: "", reasoning_effort: null, temperature: null };
-const state = { id: null, busy: false, abort: null, stick: true, convs: [], settings: { ...DEFAULT_SETTINGS } };
+const DEFAULT_SETTINGS = { model: null, system_prompt: "", reasoning_effort: null, temperature: null, tools: [] };
+const state = { id: null, busy: false, abort: null, stick: true, convs: [], settings: { ...DEFAULT_SETTINGS }, tools: [] };
 
 // 20x20 stroke icons (see iconButton).
 const ICONS = {
@@ -54,6 +54,7 @@ function addMessage(role, text = "", meta = {}) {
   for (const cls of ["body", "note", "actions"]) el.append(Object.assign(document.createElement("div"), { className: cls }));
   thread.append(el);
   main.classList.add("is-started");
+  for (const call of meta.tools ?? []) renderToolCall(el, call);
   if (meta.attachments?.length) {
     el._attachments = meta.attachments;
     el.prepend(attachmentTiles(meta.attachments));
@@ -134,6 +135,62 @@ function reasoningOf(el) {
   return details;
 }
 
+// ---- tool calls ----
+// A tool the model called shows as a line above the answer: "Searching the web for ..." while it runs, then
+// "Searched the web for ..." that opens to the results. How each tool reads is in TOOL_UI; others get a plain line.
+const hostOf = (url) => new URL(url).hostname.replace(/^www\./, "");
+const isWebUrl = (url) => { try { return ["http:", "https:"].includes(new URL(url).protocol); } catch { return false; } };
+
+const TOOL_UI = {
+  web_search: {
+    running: (args) => `Searching the web for “${args.query ?? ""}”…`,
+    done: (args, shown) => {
+      const n = shown.results.length;
+      return `Searched the web for “${shown.query}” · ${n ? `${n} result${n === 1 ? "" : "s"}` : "no results"}`;
+    },
+    failed: (error) => `Web search failed: ${error}`,
+    stopped: "Web search stopped",
+    detail: (shown) => {
+      const list = document.createElement("ol");
+      for (const r of shown.results.filter((r) => isWebUrl(r.url))) { // URLs from the web are untrusted: web links only
+        const item = document.createElement("li");
+        const link = Object.assign(document.createElement("a"), { href: r.url, target: "_blank", rel: "noopener noreferrer", textContent: r.title });
+        item.append(link, Object.assign(document.createElement("span"), { className: "domain", textContent: hostOf(r.url) }));
+        if (r.description) item.append(Object.assign(document.createElement("p"), { textContent: r.description }));
+        list.append(item);
+      }
+      return list;
+    },
+  },
+};
+
+function renderToolCall(el, call) {
+  let box = el.querySelector(".tool-calls");
+  if (!box) {
+    box = Object.assign(document.createElement("div"), { className: "tool-calls" });
+    bodyOf(el).before(box);
+  }
+  let row = [...box.children].find((d) => d.dataset.id === call.id);
+  if (!row) {
+    row = document.createElement("details");
+    row.className = "tool-call";
+    row.dataset.id = call.id;
+    row.dataset.name = call.name;
+    row.innerHTML = '<summary></summary><div class="tool-body"></div>';
+    box.append(row);
+  }
+  const ui = TOOL_UI[call.name];
+  row.dataset.status = call.status;
+  row.setAttribute("aria-busy", String(call.status === "running"));
+  row.querySelector("summary").textContent = {
+    running: () => ui?.running(call.arguments ?? {}) ?? `Using ${call.name}…`,
+    done: () => ui?.done(call.arguments ?? {}, call.display) ?? `Used ${call.name}`,
+    error: () => ui?.failed(call.error) ?? `${call.name} failed: ${call.error}`,
+    stopped: () => ui?.stopped ?? `${call.name} stopped`,
+  }[call.status]();
+  row.querySelector(".tool-body").replaceChildren(...(call.status === "done" && ui ? [ui.detail(call.display)] : []));
+}
+
 function finishReasoning(el) {
   const details = el.querySelector(".reasoning");
   if (!details) return;
@@ -148,7 +205,7 @@ function render(el) {
   if (el._reasoning) reasoningOf(el).querySelector(".reasoning-body").innerHTML = renderReasoning(el._reasoning);
   if (el.classList.contains("assistant")) {
     if (el._text) body.innerHTML = renderMarkdown(el._text);
-    else if (el._reasoning) body.replaceChildren(); // the reasoning block is the progress indicator
+    else if (el._reasoning || el.querySelector(".tool-call")) body.replaceChildren(); // those are the progress indicator
     else body.innerHTML = '<span class="dots" role="status" aria-label="Thinking"><i></i><i></i><i></i></span>';
   } else body.textContent = el._text;
   if (state.stick) scrollToBottom();
@@ -307,6 +364,9 @@ async function runTurn(path, payload = {}) {
           details.querySelector("summary").textContent = "Thinking…";
         }
         setReasoning(el, (el._reasoning ?? "") + ev.text);
+      } else if (ev.type === "tool_call") {
+        renderToolCall(el, ev);
+        render(el);
       } else if (ev.type === "done") { finished = true; setNote(el, ev); }
       else if (ev.type === "error") throw new Error(ev.message);
     }
@@ -316,13 +376,17 @@ async function runTurn(path, payload = {}) {
     else {
       el.className = "msg error";
       el.querySelector(".reasoning")?.remove();
+      el.querySelector(".tool-calls")?.remove();
       el._reasoning = null;
       setText(el, `Couldn't get a reply. ${err.message}`);
     }
   } finally {
+    for (const row of el.querySelectorAll('.tool-call[data-status="running"]')) { // a stopped search stays "running" otherwise
+      renderToolCall(el, { id: row.dataset.id, name: row.dataset.name, status: "stopped" });
+    }
     finishReasoning(el);
     render(el);
-    if (el.classList.contains("assistant") && !el._text && !el._reasoning) el.remove();
+    if (el.classList.contains("assistant") && !el._text && !el._reasoning && !el.querySelector(".tool-call")) el.remove();
     if (state.abort === ctrl) { // a newer turn may already own the UI (e.g. after switching chats)
       state.busy = false;
       state.abort = null;
@@ -621,10 +685,20 @@ async function deleteConv(c) {
 // ---- settings ----
 function setSettings(settings) {
   state.settings = settings;
-  // The dot on the settings button means "something besides the model is customized"; the model has its own button.
-  const customized = Object.keys(DEFAULT_SETTINGS).some((k) => k !== "model" && settings[k] !== DEFAULT_SETTINGS[k]);
+  // The dot on the settings button means "something besides the model and the tools is customized": those have
+  // their own controls in the header and the composer.
+  const own = ["model", "tools"];
+  const customized = Object.keys(DEFAULT_SETTINGS).some((k) => !own.includes(k) && settings[k] !== DEFAULT_SETTINGS[k]);
   $("settings-btn").toggleAttribute("data-active", customized);
   syncModelButton();
+  syncSearchToggle();
+}
+
+// Save settings for the open conversation; on the new-chat screen they are held until the first message.
+// PATCH replaces the whole object, so callers pass the full next settings.
+async function saveSettings(next) {
+  if (state.id) setSettings((await api(`/conversations/${state.id}`, { method: "PATCH", body: JSON.stringify({ settings: next }) })).settings);
+  else setSettings(next);
 }
 
 // Dialogs that save to the server stay open until the save succeeds.
@@ -691,8 +765,7 @@ async function chooseModel(id) {
   error.hidden = true;
   const next = { ...state.settings, model: id === modelInfo.default ? null : id };
   try {
-    if (state.id) setSettings((await api(`/conversations/${state.id}`, { method: "PATCH", body: JSON.stringify({ settings: next }) })).settings);
-    else setSettings(next);
+    await saveSettings(next);
     modelMenu.hidePopover(); // the browser returns focus to the button
   } catch {
     error.textContent = "Couldn't switch model. Check your connection and try again.";
@@ -758,14 +831,13 @@ async function openSettings() {
 $("settings-btn").onclick = openSettings;
 
 bindSave($("settings-dialog"), async () => {
-  const next = {
+  await saveSettings({
+    ...state.settings, // keeps what the dialog doesn't show, such as the tools
     model: $("set-model").value || null,
     system_prompt: $("set-system").value.trim(),
     reasoning_effort: $("set-effort").value || null,
     temperature: $("set-temp").value === "" ? null : Number($("set-temp").value),
-  };
-  if (state.id) setSettings((await api(`/conversations/${state.id}`, { method: "PATCH", body: JSON.stringify({ settings: next }) })).settings);
-  else setSettings(next);
+  });
 });
 
 $("instructions-btn").onclick = async () => {
@@ -776,6 +848,36 @@ $("instructions-btn").onclick = async () => {
 };
 bindSave($("instructions-dialog"), () =>
   api("/custom-instructions", { method: "PUT", body: JSON.stringify({ text: $("set-instructions").value }) }));
+
+// ---- web search toggle ----
+// Shown only when the server has the tool configured (a Brave key). On or off is a per-conversation setting.
+const SEARCH = "web_search";
+const searchOn = () => state.settings.tools.includes(SEARCH);
+
+function syncSearchToggle() {
+  const toggle = $("search-toggle");
+  toggle.hidden = !state.tools.some((t) => t.name === SEARCH);
+  toggle.setAttribute("aria-pressed", String(searchOn()));
+  toggle.title = `Web search: ${searchOn() ? "on" : "off"}`;
+}
+
+let noteTimer;
+function showNote(text) {
+  const note = $("composer-note");
+  note.textContent = text;
+  note.hidden = false;
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => { note.hidden = true; }, 5000);
+}
+
+$("search-toggle").onclick = async () => {
+  const tools = searchOn() ? state.settings.tools.filter((t) => t !== SEARCH) : [...state.settings.tools, SEARCH];
+  try {
+    await saveSettings({ ...state.settings, tools });
+  } catch {
+    showNote("Couldn't change web search. Check your connection and try again.");
+  }
+};
 
 // ---- navigation ----
 // The sidebar starts closed. On narrow screens it is an overlay, so choosing something closes it.
@@ -833,4 +935,5 @@ window.addEventListener("hashchange", () => {
 syncSend();
 refreshModels();
 api("/attachments/limits").then((limits) => { maxFiles = limits.max_files; }).catch(() => {});
+api("/tools").then((tools) => { state.tools = tools; syncSearchToggle(); }).catch(() => {});
 openConversation(location.hash.slice(1) || null);

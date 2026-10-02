@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 
 from app.config import Settings
 from app.llm import REASONING_EFFORTS, OpenAILLM, supports_reasoning
+from app.tools import Tool, ToolError, ToolResult
 
 
 def sse(*events: dict) -> bytes:
@@ -305,3 +306,219 @@ async def test_provider_errors_are_shown_without_the_sdk_wrapping_or_nested_json
     ]
     plain = make_llm(lambda request: httpx.Response(400, json={"error": {"message": "file inputs are not supported"}}))
     assert await collect(plain) == [{"type": "error", "message": "file inputs are not supported"}]
+
+
+# ---- the tool loop ----
+
+
+def call_item(name="web_search", arguments='{"query": "python", "freshness": null}', call_id="call_1"):
+    item = {"type": "function_call", "id": f"fc_{call_id}", "call_id": call_id, "name": name,
+            "arguments": arguments, "status": "completed"}
+    return {"type": "response.output_item.done", "item": item, "output_index": 0, "sequence_number": 2}
+
+
+def usage(i, o, r=0):
+    return {"input_tokens": i, "output_tokens": o, "total_tokens": i + o,
+            "output_tokens_details": {"reasoning_tokens": r}}
+
+
+def rounds(*bodies, requests):
+    """A handler that answers request n with the n-th event list; the request bodies are recorded."""
+    answers = iter(bodies)
+
+    def handler(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, content=sse(*next(answers)), headers={"content-type": "text/event-stream"})
+
+    return handler
+
+
+def tool(run=None, name="web_search"):
+    calls = []
+
+    async def default(args):
+        calls.append(args)
+        shown = {"query": args.get("query"), "results": [{"title": "T", "url": "https://x.dev"}]}
+        return ToolResult("RESULT TEXT", shown)
+
+    async def counting(args):
+        calls.append(args)
+        return await run(args)
+
+    return Tool(name=name, label="Web search", description="Search.", parameters={"type": "object"},
+                run=counting if run else default), calls
+
+
+async def events_of(llm, **kwargs):
+    return [e async for e in llm.stream_reply("m", [{"role": "user", "content": "hi"}], **kwargs)]
+
+
+async def test_one_tool_round_runs_the_tool_feeds_the_result_back_and_streams_the_answer():
+    requests = []
+    web, calls = tool()
+    llm = make_llm(rounds(
+        [call_item(), completed(usage(100, 10))],
+        [delta("It is "), delta("3.14."), completed(usage(150, 20, 5))],
+        requests=requests,
+    ))
+    events = await events_of(llm, tools={"web_search": web})
+    assert events == [
+        {"type": "tool_call", "id": "call_1", "name": "web_search", "status": "running",
+         "arguments": {"query": "python", "freshness": None}},
+        {"type": "tool_call", "id": "call_1", "name": "web_search", "status": "done",
+         "arguments": {"query": "python", "freshness": None},
+         "display": {"query": "python", "results": [{"title": "T", "url": "https://x.dev"}]}},
+        {"type": "delta", "text": "It is "}, {"type": "delta", "text": "3.14."},
+        {"type": "done", "usage": {"input_tokens": 250, "output_tokens": 30, "reasoning_tokens": 5}},  # both rounds
+    ]
+    assert calls == [{"query": "python", "freshness": None}]
+    first, second = requests
+    assert first["tools"] == [{"type": "function", "name": "web_search", "description": "Search.",
+                               "parameters": {"type": "object"}, "strict": True}]
+    assert second["input"][0] == {"role": "user", "content": "hi"}
+    assert second["input"][1]["type"] == "function_call" and second["input"][1]["call_id"] == "call_1"
+    assert second["input"][2] == {"type": "function_call_output", "call_id": "call_1", "output": "RESULT TEXT"}
+    assert second["tools"] == first["tools"] and second["store"] is False
+
+
+async def test_text_before_a_tool_call_is_separated_from_the_answer():
+    requests = []
+    web, _ = tool()
+    llm = make_llm(rounds(
+        [delta("Let me check."), call_item(), completed()], [delta("Done."), completed()], requests=requests))
+    texts = [e["text"] for e in await events_of(llm, tools={"web_search": web}) if e["type"] == "delta"]
+    assert "".join(texts) == "Let me check.\n\nDone."
+
+
+async def test_reasoning_models_get_encrypted_reasoning_back_with_the_call():
+    requests = []
+    web, _ = tool()
+    reasoning = {"type": "response.output_item.done", "output_index": 0, "sequence_number": 1,
+                 "item": {"type": "reasoning", "id": "rs_1", "summary": [], "encrypted_content": "ENC"}}
+    llm = make_llm(rounds([reasoning, call_item(), completed()], [delta("ok"), completed()], requests=requests))
+    async for _ in llm.stream_reply("gpt-5.5", [{"role": "user", "content": "hi"}], tools={"web_search": web}):
+        pass
+    assert requests[0]["include"] == ["reasoning.encrypted_content"]
+    assert [i.get("type") for i in requests[1]["input"][1:]] == ["reasoning", "function_call", "function_call_output"]
+    assert requests[1]["input"][1]["encrypted_content"] == "ENC"
+
+
+async def test_other_models_do_not_ask_for_encrypted_reasoning():
+    requests = []
+    web, _ = tool()
+    llm = make_llm(rounds([delta("ok"), completed()], requests=requests))
+    await events_of(llm, tools={"web_search": web})
+    assert "include" not in requests[0]
+
+
+async def test_without_tools_there_is_one_request_and_no_tools_parameter():
+    requests = []
+    await events_of(make_llm(rounds([delta("hi"), completed()], requests=requests)))
+    assert len(requests) == 1 and "tools" not in requests[0]
+
+
+async def test_a_tool_error_is_reported_to_the_model_and_the_user_and_the_reply_carries_on():
+    requests = []
+
+    async def fails(args):
+        raise ToolError("Search rate limit reached.")
+
+    web, _ = tool(fails)
+    llm = make_llm(rounds(
+        [call_item(), completed()], [delta("Sorry, I couldn't search."), completed()], requests=requests))
+    events = await events_of(llm, tools={"web_search": web})
+    error = next(e for e in events if e["type"] == "tool_call" and e["status"] == "error")
+    assert error["error"] == "Search rate limit reached."
+    assert requests[1]["input"][-1]["output"] == "Error: Search rate limit reached."
+    assert events[-1]["type"] == "done"
+
+
+async def test_a_tool_that_crashes_does_not_crash_the_reply(caplog):
+    async def boom(args):
+        raise RuntimeError("secret internals")
+
+    web, _ = tool(boom)
+    requests = []
+    llm = make_llm(rounds([call_item(), completed()], [delta("ok"), completed()], requests=requests))
+    events = await events_of(llm, tools={"web_search": web})
+    error = next(e for e in events if e.get("status") == "error")
+    assert error["error"] == "The tool failed unexpectedly." and "secret" not in json.dumps(events)
+    assert requests[1]["input"][-1]["output"] == "Error: the tool failed."
+    assert "web_search failed" in caplog.text and events[-1]["type"] == "done"
+
+
+@pytest.mark.parametrize("arguments", ["not json", "[1, 2]", '"text"'])
+async def test_bad_arguments_never_reach_the_tool(arguments):
+    web, calls = tool()
+    requests = []
+    llm = make_llm(rounds(
+        [call_item(arguments=arguments), completed()], [delta("ok"), completed()], requests=requests))
+    events = await events_of(llm, tools={"web_search": web})
+    assert calls == [] and next(e for e in events if e.get("status") == "error")["error"] == "Bad arguments."
+    assert "valid JSON object" in requests[1]["input"][-1]["output"]
+
+
+async def test_an_unknown_tool_is_an_error_not_a_crash():
+    web, calls = tool()
+    requests = []
+    llm = make_llm(rounds(
+        [call_item(name="launch_missiles"), completed()], [delta("ok"), completed()], requests=requests))
+    events = await events_of(llm, tools={"web_search": web})
+    assert calls == [] and any(e.get("error") == "Unknown tool." for e in events)
+    assert "no tool called launch_missiles" in requests[1]["input"][-1]["output"]
+
+
+async def test_calls_beyond_the_limit_are_not_run():
+    web, calls = tool()
+    requests = []
+    llm = make_llm(rounds(
+        [call_item(call_id="a"), call_item(call_id="b"), call_item(call_id="c"), completed()],
+        [delta("ok"), completed()], requests=requests))
+    events = await events_of(llm, tools={"web_search": web}, max_tool_calls=2)
+    assert len(calls) == 2  # the third was refused
+    outcomes = [(e["id"], e["status"]) for e in events if e["type"] == "tool_call" and e["status"] != "running"]
+    assert outcomes == [("a", "done"), ("b", "done"), ("c", "error")]
+    assert "limit" in requests[1]["input"][-1]["output"]
+
+
+async def test_a_model_that_never_stops_calling_tools_is_cut_off():
+    web, calls = tool()
+    requests = []
+    llm = make_llm(rounds(*[[call_item(call_id=f"c{i}"), completed()] for i in range(10)], requests=requests))
+    events = await events_of(llm, tools={"web_search": web}, max_tool_calls=1)
+    assert events[-1] == {"type": "error", "message": "The model kept calling tools without answering."}
+    assert len(requests) == 4 and len(calls) == 1  # max_tool_calls + 3 rounds, and only one search was really run
+
+
+async def test_an_error_event_in_a_later_round_ends_the_reply():
+    web, _ = tool()
+    llm = make_llm(rounds([call_item(), completed()],
+                          [{"type": "error", "message": "boom", "code": None, "param": None, "sequence_number": 1}],
+                          requests=[]))
+    events = await events_of(llm, tools={"web_search": web})
+    assert events[-1] == {"type": "error", "message": "boom"}
+
+
+async def test_an_incomplete_later_round_still_reports_the_total_usage():
+    web, _ = tool()
+    incomplete = {"type": "response.incomplete", "sequence_number": 1, "response": {
+        "incomplete_details": {"reason": "max_output_tokens"}, "usage": usage(50, 8)}}
+    llm = make_llm(rounds([call_item(), completed(usage(100, 10))], [delta("part"), incomplete], requests=[]))
+    done = (await events_of(llm, tools={"web_search": web}))[-1]
+    assert done == {"type": "done", "incomplete": "max_output_tokens",
+                    "usage": {"input_tokens": 150, "output_tokens": 18, "reasoning_tokens": 0}}
+
+
+async def test_several_calls_in_one_round_all_get_their_outputs_in_order():
+    web, calls = tool()
+    requests = []
+    llm = make_llm(rounds(
+        [call_item(call_id="a", arguments='{"query": "one", "freshness": null}'),
+         call_item(call_id="b", arguments='{"query": "two", "freshness": null}'), completed()],
+        [delta("ok"), completed()], requests=requests))
+    await events_of(llm, tools={"web_search": web})
+    assert [c["query"] for c in calls] == ["one", "two"]
+    tail = requests[1]["input"][1:]
+    kinds = [i["type"] for i in tail]
+    assert kinds.count("function_call") == 2 and kinds.count("function_call_output") == 2
+    assert {i["call_id"] for i in tail if i["type"] == "function_call_output"} == {"a", "b"}

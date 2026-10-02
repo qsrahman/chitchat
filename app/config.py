@@ -17,5 +17,7 @@ class Settings(BaseSettings):
     # How a PDF reaches the model: "text" extracts its text here and sends that (works with any model); "file"
     # sends the PDF itself as an input_file, which OpenAI reads with page images but local servers often reject.
     openai_pdf_input: Literal["text", "file"] = "text"
+    brave_api_key: str = ""  # enables the web_search tool (Brave Search API)
+    max_tool_calls: int = 4  # per reply: each web search is billed by Brave
     db_path: str = "chitchat.db"
     attachments_dir: str = "attachments"

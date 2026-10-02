@@ -111,6 +111,12 @@ async def list_models(request: Request):
     }
 
 
+@router.get("/tools")
+def list_tools(request: Request):
+    """The tools that can be switched on for a conversation (those that are configured)."""
+    return [{"name": t.name, "label": t.label} for t in request.app.state.tools.values()]
+
+
 @router.get("/attachments/limits")
 def attachment_limits():
     return {"max_files": attachments.MAX_FILES}
@@ -186,11 +192,17 @@ def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]
     return history
 
 
-def _model_options(conn: sqlite3.Connection, conv: dict, model: str) -> dict:
+def _model_options(request: Request, conn: sqlite3.Connection, conv: dict, model: str) -> dict:
     """Keyword arguments for llm.stream_reply from custom instructions + the conversation's settings."""
     s = conv["settings"]
-    instructions = "\n\n".join(filter(None, [store.get_app_setting(conn, "custom_instructions"), s["system_prompt"]]))
-    options = {"instructions": instructions or None}
+    # A saved setting for a tool that is not configured (right now) is ignored, not an error.
+    enabled = {n: request.app.state.tools[n] for n in s["tools"] if n in request.app.state.tools}
+    guidance = [t.guidance for t in enabled.values()]
+    parts = [store.get_app_setting(conn, "custom_instructions"), s["system_prompt"], *guidance]
+    options = {"instructions": "\n\n".join(filter(None, parts)) or None}
+    if enabled:
+        options["tools"] = enabled
+        options["max_tool_calls"] = request.app.state.settings.max_tool_calls
     if supports_reasoning(model):
         options["reasoning_effort"] = s["reasoning_effort"]
     else:
@@ -215,7 +227,9 @@ class Turn:
 def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], model: str | None = None):
     default_model = request.app.state.settings.openai_model
     model = model or conv["settings"]["model"] or default_model
-    return Turn(conn, request.app.state.llm, default_model, conv, history, model, _model_options(conn, conv, model))
+    return Turn(
+        conn, request.app.state.llm, default_model, conv, history, model, _model_options(request, conn, conv, model)
+    )
 
 
 def _redo_last_user_turn(
@@ -253,6 +267,18 @@ def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
     return _make_turn(request, conn, conv, history)
 
 
+def _tool_meta(calls: dict[str, dict], interrupted: str | None = None) -> list[dict]:
+    """What a message keeps about the tools it called, for the UI to show again later."""
+    keep = ("id", "name", "arguments", "status", "display", "error")
+    metas = []
+    for call in calls.values():
+        meta = {k: call[k] for k in keep if k in call}
+        if interrupted and call["status"] == "running":
+            meta["status"] = interrupted
+        metas.append(meta)
+    return metas
+
+
 async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     """Stream the reply to turn.history and save it.
 
@@ -263,18 +289,22 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     """
     cid, conn = turn.conv["id"], turn.conn
     needs_title = turn.conv["title"] == store.DEFAULT_TITLE
-    reply, reasoning, finished = [], [], False
+    reply, reasoning, tool_calls, finished = [], [], {}, False
     try:
         async for event in turn.llm.stream_reply(turn.model, turn.history, **turn.options):
             if event["type"] == "delta":
                 reply.append(event["text"])
             elif event["type"] == "reasoning_delta":
                 reasoning.append(event["text"])
+            elif event["type"] == "tool_call":
+                tool_calls[event["id"]] = event  # the last event for an id is its outcome
             elif event["type"] == "done":
                 text = "".join(reply)
                 meta = {k: event[k] for k in ("incomplete", "usage") if k in event}
                 if reasoning:
                     meta["reasoning"] = "".join(reasoning)
+                if tool_calls:
+                    meta["tools"] = _tool_meta(tool_calls)
                 store.add_message(conn, cid, "assistant", text, meta)
                 finished = True
                 yield event
@@ -291,6 +321,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     finally:
         if not finished and reply:
             meta = {"stopped": True, **({"reasoning": "".join(reasoning)} if reasoning else {})}
+            if tool_calls:
+                meta["tools"] = _tool_meta(tool_calls, interrupted="stopped")
             store.add_message(conn, cid, "assistant", "".join(reply), meta)
 
 

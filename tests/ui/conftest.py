@@ -9,6 +9,7 @@ import uvicorn
 
 from app.config import Settings
 from app.main import create_app
+from app.tools import Tool
 
 CODE_REPLY = "Here is a loop:\n\n```python\nfor i in range(3):\n    print(i)\n```\n\nThat's it, with `inline` code.\n"
 MATH_REPLY = (
@@ -29,6 +30,11 @@ PRIMES_REPLY = (
     "The Clay Institute will pay \\$1 million to whoever proves it. "
     "Tickets cost $5 and $10; budgets are $20,000 and $30,000."
 )
+SEARCH_RESULTS = [
+    {"title": "Python Releases", "url": "https://www.python.org/downloads/", "description": "The latest release."},
+    {"title": "What's new", "url": "https://docs.python.org/3/whatsnew/", "description": ""},
+    {"title": "Not a web page", "url": "javascript:window.__xss=1", "description": "must not become a link"},
+]
 XSS_REPLY = (
     'Hi <img src=x onerror="window.__xss=1"> ![pixel](https://example.invalid/leak.png) '
     "<script>window.__xss=1</script> "
@@ -46,7 +52,9 @@ class ScriptedLLM:
         self.failed = set()
         self.dropped = set()
 
-    async def stream_reply(self, model, messages, instructions=None, reasoning_effort=None, temperature=None):
+    async def stream_reply(
+        self, model, messages, instructions=None, reasoning_effort=None, temperature=None, tools=None, max_tool_calls=4
+    ):
         text = messages[-1]["content"]
         self.n += 1
         if "fail" in text and text not in self.failed:
@@ -70,6 +78,24 @@ class ScriptedLLM:
             yield {"type": "delta", "text": "Here: \\(a^2"}
             await asyncio.sleep(0.8)
             yield {"type": "delta", "text": " + b^2\\) is the sum."}
+        elif "findweb" in text:  # a web search, then the answer; "broken" makes the search fail, "hang" never returns
+            query = {"arguments": {"query": "python version", "freshness": None}}
+            call = {"type": "tool_call", "id": "call_1", "name": "web_search"}
+            if "hang" in text:
+                yield {"type": "delta", "text": "Let me look. "}
+            yield {**call, "status": "running", **query}
+            if "hang" in text:
+                await asyncio.sleep(60)
+            await asyncio.sleep(0.4)
+            if "broken" in text:
+                yield {**call, "status": "error", **query, "error": "Search rate limit reached."}
+                yield {"type": "delta", "text": "Sorry, I couldn't search."}
+            else:
+                shown = {"query": "python version", "results": SEARCH_RESULTS}
+                yield {**call, "status": "done", **query, "display": shown}
+                yield {"type": "delta", "text": "It is **3.14**, per [python.org](https://www.python.org/)."}
+            yield {"type": "done"}
+            return
         elif "dollarstream" in text:  # a $...$ formula split across deltas
             yield {"type": "delta", "text": "Here: $a^2"}
             await asyncio.sleep(0.8)
@@ -109,7 +135,8 @@ class ScriptedLLM:
             # Echo the settings that reached the model, so tests can see them in the reply.
             files = ",".join(a["name"] for a in messages[-1].get("attachments", []))
             used = {"model": model if model != self.default_model else None, "instructions": instructions,
-                    "effort": reasoning_effort, "temperature": temperature, "files": files or None}
+                    "effort": reasoning_effort, "temperature": temperature, "files": files or None,
+                    "tools": ",".join(tools) if tools else None}
             echo = "".join(f" [{k}={v}]" for k, v in used.items() if v is not None)
             yield {"type": "delta", "text": f"Reply #{self.n} to **{text}**{echo}"}
         yield {"type": "done"}
@@ -128,6 +155,11 @@ def app_url(tmp_path):
         openai_api_key="test", openai_model=ScriptedLLM.default_model
     ))
     app.state.llm = ScriptedLLM()
+
+    async def no_network(args):
+        raise AssertionError("the scripted LLM never runs tools")
+
+    app.state.tools = {"web_search": Tool("web_search", "Web search", "Search.", {"type": "object"}, no_network)}
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
     server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))

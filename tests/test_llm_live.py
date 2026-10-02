@@ -1,7 +1,9 @@
+import dataclasses
 import os
 
 import pytest
 
+from app import tools
 from app.config import Settings
 from app.llm import OpenAILLM
 
@@ -30,3 +32,39 @@ async def test_live_list_models_returns_unique_chat_models():
     models = await OpenAILLM(s).list_models()
     assert models and len(models) == len(set(models))
     assert not any(w in m for m in models for w in ("embed", "whisper", "tts", "moderation"))
+
+
+@pytest.mark.live
+async def test_live_tool_loop_with_a_stand_in_search_tool():
+    """The real API's function-call events and the stateless round trip, without needing a Brave key."""
+    s = Settings()
+    ran = []
+
+    async def stand_in(args):
+        ran.append(args)
+        return tools.ToolResult(
+            "1. Zorblax 9 is the current release of the Zorblax language\n   https://zorblax.example/releases",
+            {"query": args["query"],
+             "results": [{"title": "Zorblax releases", "url": "https://zorblax.example/releases"}]},
+        )
+
+    real = tools.build(Settings(_env_file=None, brave_api_key="unused"))["web_search"]
+    tool = dataclasses.replace(real, run=stand_in)
+    question = "What is the current release of the Zorblax programming language? Search first."
+    messages = [{"role": "user", "content": question}]
+    events = [e async for e in OpenAILLM(s).stream_reply(
+        s.openai_model, messages, instructions=tool.guidance, tools={"web_search": tool})]
+    assert ran, "the model never called the tool"
+    assert [e["status"] for e in events if e["type"] == "tool_call"][:2] == ["running", "done"]
+    assert "Zorblax 9" in "".join(e["text"] for e in events if e["type"] == "delta")
+    assert events[-1]["type"] == "done" and events[-1]["usage"]["input_tokens"] > 0
+
+
+@pytest.mark.live
+async def test_live_brave_search():
+    s = Settings()
+    if not s.brave_api_key:
+        pytest.skip("needs BRAVE_API_KEY")
+    result = await tools.build(s)["web_search"].run({"query": "python programming language", "freshness": None})
+    assert result.display["results"] and all(r["url"].startswith("http") for r in result.display["results"])
+    assert result.output.startswith("Web search results")

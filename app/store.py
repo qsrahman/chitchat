@@ -5,8 +5,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from app import tools
 from app.llm import ReasoningEffort
 
 DEFAULT_TITLE = "New chat"
@@ -23,6 +24,14 @@ class ConversationSettings(BaseModel):
     system_prompt: Instructions = ""
     reasoning_effort: ReasoningEffort = None
     temperature: Annotated[float, Field(ge=0, le=2)] | None = None
+    tools: list[str] = Field(default_factory=list)  # tool names switched on for this conversation (tools.NAMES)
+
+    @field_validator("tools")
+    @classmethod
+    def _known_tools(cls, names: list[str]) -> list[str]:
+        if unknown := set(names) - set(tools.NAMES):
+            raise ValueError(f"unknown tool: {', '.join(sorted(unknown))}")
+        return list(dict.fromkeys(names))
 
 
 DEFAULT_SETTINGS = ConversationSettings().model_dump()

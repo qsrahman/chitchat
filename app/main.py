@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app import attachments, db, store
+from app import attachments, db, store, tools
 from app.config import Settings
 from app.llm import OpenAILLM
 from app.routes import router
@@ -19,6 +19,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         abandoned = store.purge_orphans(conn, timedelta(hours=24))
     attachments.delete_files(app.state.settings.attachments_dir, abandoned)
     app.state.llm = OpenAILLM(app.state.settings)
+    app.state.tools = tools.build(app.state.settings)
     app.include_router(router)
 
     @app.get("/healthz")

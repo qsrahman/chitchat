@@ -10,7 +10,8 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
 - Reasoning summaries in a collapsible block, and token usage under each reply
 - Attachments: images, PDFs and text files via the paperclip, drag and drop or paste
-- Planned: web search and tools, search and export
+- Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
+- Planned: context management, search and export
 
 ## Requirements
 Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key. For the browser tests, run `uv run playwright install chromium` once.
@@ -35,6 +36,8 @@ Environment variables or `.env`:
 | `OPENAI_REASONING_SUMMARIES` | `true` | Ask reasoning models for a summary of their thinking; set `false` if your OpenAI organization isn't verified for it |
 | `OPENAI_PDF_INPUT` | `text` | `text` extracts a PDF's text and sends that (any model); `file` sends the PDF itself (OpenAI) |
 | `ATTACHMENTS_DIR` | `attachments` | Where uploaded files are stored |
+| `BRAVE_API_KEY` | none | Enables web search (Brave Search API). The globe button appears in the composer when it is set |
+| `MAX_TOOL_CALLS` | `4` | Most tool calls (searches) in one reply |
 | `DB_PATH` | `chitchat.db` | SQLite file |
 
 ## Test
@@ -51,6 +54,7 @@ app/routes.py   HTTP + SSE endpoints
 app/db.py       SQLite connection + migrations
 app/store.py    conversation/message CRUD
 app/attachments.py  upload validation, file storage, PDF text
+app/tools.py    tools the model can call (web search)
 app/static/     vanilla JS UI, ES modules, vendored libs (no build step)
 tests/ui/       Playwright browser tests
 tests/          pytest suite
