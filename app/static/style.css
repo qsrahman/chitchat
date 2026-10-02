@@ -87,13 +87,14 @@ main:not(.is-started) #title { visibility: hidden; }
 /* model menu: a popover under the header button (placed from app.js: CSS anchor positioning is not widely available) */
 #model-menu { position: fixed; inset: auto; margin: 0; width: min(22rem, 100vw - 16px); padding: 6px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--raised); color: var(--ink); box-shadow: var(--shadow-4); }
 #model-list { max-height: min(20rem, 50dvh); overflow-y: auto; }
-.menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: var(--r-sm); text-align: left; }
+.menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: var(--r-sm); text-align: left; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--hover); }
 .menu-item:focus-visible { outline-offset: -2px; }
 .menu-item .check { visibility: hidden; color: var(--accent); }
 .menu-item[aria-checked="true"] .check { visibility: visible; }
 .menu-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-tag { flex: none; font-size: var(--font-size-0); color: var(--muted); }
+.menu-head { margin: 4px 10px 6px; font-size: var(--font-size-0); font-weight: var(--font-weight-6); color: var(--muted); }
 .menu-note { margin: 4px 10px 6px; font-size: var(--font-size-0); color: var(--muted); }
 #more-settings { margin-top: 2px; border-top: 1px solid var(--line); border-radius: 0 0 var(--r-sm) var(--r-sm); padding-top: 10px; }
 #model-menu .field-error { margin: 4px 10px; }
@@ -106,7 +107,7 @@ main:not(.is-started) #title { visibility: hidden; }
 #messages { overflow-y: auto; scroll-behavior: auto; overscroll-behavior: contain; }
 #thread, #empty { width: min(var(--col), 100% - 32px); margin-inline: auto; }
 #thread { padding: 28px 0 24px; }
-#empty h2 { margin: 0; font: var(--font-weight-5) var(--font-size-5)/var(--font-lineheight-2) var(--serif); letter-spacing: -.01em; text-align: center; text-wrap: balance; }
+#empty h2 { margin: 0; font: var(--font-weight-4) var(--font-size-4)/var(--font-lineheight-2) var(--sans); letter-spacing: -.01em; text-align: center; text-wrap: balance; }
 main.is-started #empty, main.is-started #starters { display: none; }
 
 /* A new chat is a hero: heading, composer and suggestions as one group in the middle of the page. The
@@ -203,13 +204,13 @@ dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 /* composer: a raised pill. One line = one row; once the text grows the input takes the full width and the
    send button drops to a row below (is-multiline, set from app.js). */
 #form { position: relative; width: min(var(--col), 100% - 32px); margin-inline: auto; padding: 8px 0 max(10px, env(safe-area-inset-bottom)); }
-.composer { display: grid; grid-template: "chips chips chips" auto "lead input send" auto / auto minmax(0, 1fr) auto; align-items: end; gap: 0 4px; padding: 8px; border: 1px solid var(--line); border-radius: var(--size-6); background: var(--raised); box-shadow: var(--shadow-2); transition: border-color .15s var(--ease-out-3), box-shadow .2s var(--ease-out-3); }
+.composer { display: grid; grid-template: "chips chips chips chips" auto "lead input mode send" auto / auto minmax(0, 1fr) auto auto; align-items: end; gap: 0 4px; padding: 8px; border: 1px solid var(--line); border-radius: var(--size-6); background: var(--raised); box-shadow: var(--shadow-2); transition: border-color .15s var(--ease-out-3), box-shadow .2s var(--ease-out-3); }
 .composer:focus-within { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); box-shadow: var(--shadow-3); }
 /* stacked: when the text wraps (set from app.js), and always on narrow screens, where the controls would squeeze the input */
-.composer.is-multiline { row-gap: 2px; grid-template: "chips chips" auto "input input" auto "lead send" auto / auto 1fr; border-radius: var(--size-5); }
+.composer.is-multiline { row-gap: 2px; grid-template: "chips chips chips" auto "input input input" auto "lead mode send" auto / 1fr auto auto; border-radius: var(--size-5); }
 .composer.is-multiline #input { padding: 6px 12px 2px; }
 @media (max-width: 760px) {
-  .composer { row-gap: 2px; grid-template: "chips chips" auto "input input" auto "lead send" auto / auto 1fr; border-radius: var(--size-5); }
+  .composer { row-gap: 2px; grid-template: "chips chips chips" auto "input input input" auto "lead mode send" auto / 1fr auto auto; border-radius: var(--size-5); }
   .composer #input { padding: 6px 12px 2px; }
 }
 #chips { grid-area: chips; }
@@ -218,7 +219,7 @@ dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 .lead .icon-btn:hover { color: var(--ink); }
 .lead .icon-btn:disabled { opacity: .4; cursor: not-allowed; }
 .lead .icon-btn:disabled:hover { background: none; color: var(--muted); }
-.effort { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px 0 9px; border-radius: 18px; color: var(--muted); transition: background-color .15s var(--ease-out-3), color .15s var(--ease-out-3); }
+.effort { grid-area: mode; display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px 0 9px; border-radius: 18px; color: var(--muted); transition: background-color .15s var(--ease-out-3), color .15s var(--ease-out-3); }
 .effort[hidden] { display: none; }
 .effort:hover, .effort:focus-within { background: var(--hover); color: var(--ink); }
 .effort[data-active] { color: var(--accent); }
@@ -298,5 +299,13 @@ dialog input[type=number] { margin-top: 4px; }
   .conv .icon-btn { opacity: 1; }
   .hint { display: none; }
   main:not(.is-started) { padding-bottom: 4vh; }
+}
+/* touch screens: 44px targets, as ChatGPT's own controls are */
+@media (pointer: coarse) {
+  .icon-btn, .round-btn, #send, .lead .icon-btn, .effort { min-width: 44px; min-height: 44px; }
+  .lead .icon-btn, .effort { height: 44px; }
+  #send, .round-btn { width: 44px; height: 44px; }
+  .effort { padding: 0 6px 0 12px; }
+  .conv a { padding-block: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { #sidebar { transition: none; } }
