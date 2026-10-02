@@ -161,6 +161,23 @@ def test_custom_instructions_apply_to_every_chat_and_persist(page, app_url):
     expect(page.locator(".msg.assistant .body")).to_contain_text("[instructions=Call me Que Be brief]")
 
 
+def test_the_dialog_does_not_depend_on_the_order_the_models_arrive_in(page, app_url):
+    open_app(page, app_url)
+    # The same models, but with the default last and reasoning while the first one is not: the dialog has to
+    # find the default by id rather than by position, both to drop it from the list and to read its flag.
+    page.route("**/api/models", lambda route: route.fulfill(json={
+        "default": "scripted-default", "efforts": ["low", "high"],
+        "models": [{"id": "alpha-model", "reasoning": False},
+                   {"id": "gpt-5-mini", "reasoning": True},
+                   {"id": "scripted-default", "reasoning": True}],
+    }))
+    dialog = open_settings(page)
+    model = dialog.get_by_label("Model")
+    expect(model.locator("option")).to_have_text(["Default (scripted-default)", "alpha-model", "gpt-5-mini"])
+    expect(dialog.get_by_label("Reasoning effort")).to_be_visible()  # the default's own flag, not the first listed
+    expect(dialog.get_by_label("Temperature")).to_be_hidden()
+
+
 def test_the_dialog_opens_at_once_even_when_the_model_list_is_slow(page, app_url):
     open_app(page, app_url)
     expect(page.get_by_role("button", name="scripted-default")).to_be_visible()  # the startup list has loaded

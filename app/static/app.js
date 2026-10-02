@@ -409,10 +409,8 @@ function submit(text) {
   const files = pending.filter((p) => p.status === "done").map((p) => p.file);
   input.value = "";
   saveDraft();
-  fit();
+  scheduleComposer();
   clearPending();
-  syncComposer();
-  syncSend();
   addMessage("user", text, { attachments: files });
   runTurn("chat", { content: text, attachments: files.map((f) => f.id) });
 }
@@ -438,7 +436,19 @@ const fit = CSS.supports("field-sizing", "content") ? () => {} : () => {
   input.style.height = "auto";
   input.style.height = `${input.scrollHeight}px`;
 };
-input.addEventListener("input", () => { fit(); syncComposer(); syncSend(); saveDraft(); });
+// fit() and syncComposer() both read the field's layout, so they run once per frame rather than once per
+// keystroke. saveDraft() stays synchronous: a debounced write would lose the draft if the page is reloaded
+// straight after typing.
+let composerFrame;
+function scheduleComposer() {
+  composerFrame ??= requestAnimationFrame(() => {
+    composerFrame = null;
+    fit();
+    syncComposer();
+    syncSend();
+  });
+}
+input.addEventListener("input", () => { scheduleComposer(); saveDraft(); });
 
 // One line sits in a single row with the send button. Once the text takes more than a line the input gets
 // the full width and send drops below; it stays that way until the box is empty, so wrapping can't flip-flop.
@@ -461,9 +471,7 @@ function saveDraft() {
 }
 function loadDraft() {
   try { input.value = localStorage.getItem(draftKey()) ?? ""; } catch { input.value = ""; }
-  fit();
-  syncComposer();
-  syncSend();
+  scheduleComposer();
 }
 
 document.addEventListener("keydown", (e) => {
@@ -472,7 +480,7 @@ document.addEventListener("keydown", (e) => {
 
 // ---- attachments ----
 // Files upload as soon as they are chosen and show as chips in the composer; sending refers to them by id.
-// pending: [{ name, size, status: "uploading" | "done" | "error", file (the server's record), error, preview, ctrl }]
+// pending: [{ name, size, status: "uploading" | "done" | "error", file (the server's record), error, preview, ctrl, chip }]
 const pending = [];
 let maxFiles = 5; // replaced by the server's limit
 
@@ -481,31 +489,52 @@ const bytes = (n) => {
   return new Intl.NumberFormat(undefined, { style: "unit", unit, unitDisplay: "narrow", maximumFractionDigits: 1 }).format(size);
 };
 
+// A chip's shape is fixed by its name and preview, so it is built once and then patched in place: rebuilding
+// them all on every status change would drop keyboard focus and re-create the preview images. They are only
+// ever appended and removed, so the DOM order already matches `pending`.
+function buildChip(p) {
+  const chip = Object.assign(document.createElement("div"), { className: "chip" });
+  if (p.preview) {
+    chip.classList.add("chip-image");
+    chip.append(Object.assign(document.createElement("img"), { src: p.preview, alt: p.name }));
+  } else {
+    chip.classList.add("chip-file");
+    chip.innerHTML = icon(ICONS.file);
+    chip._note = Object.assign(document.createElement("span"), { className: "chip-size" });
+    chip.append(
+      Object.assign(document.createElement("span"), { className: "chip-name", textContent: p.name }),
+      chip._note,
+    );
+  }
+  const remove = iconButton(`Remove ${p.name}`, ICONS.close, () => removePending(p));
+  remove.className = "chip-remove";
+  chip.append(remove);
+  return chip;
+}
+
+function patchChip(p) {
+  const failed = p.status === "error";
+  p.chip.setAttribute("aria-busy", String(p.status === "uploading"));
+  p.chip.classList.toggle("is-error", failed);
+  if (p.chip._note) {
+    p.chip._note.className = failed ? "chip-error-text" : "chip-size";
+    p.chip._note.textContent = failed ? p.error : bytes(p.size);
+  }
+}
+
 function renderChips() {
   const chips = $("chips");
   chips.hidden = !pending.length;
-  chips.replaceChildren(...pending.map((p) => {
-    const chip = document.createElement("div");
-    chip.className = "chip";
-    chip.setAttribute("aria-busy", String(p.status === "uploading"));
-    if (p.preview) {
-      chip.classList.add("chip-image");
-      chip.append(Object.assign(document.createElement("img"), { src: p.preview, alt: p.name }));
-    } else {
-      chip.classList.add("chip-file");
-      chip.innerHTML = icon(ICONS.file);
-      chip.append(Object.assign(document.createElement("span"), { className: "chip-name", textContent: p.name }));
-      const note = p.status === "error" ? p.error : bytes(p.size);
-      chip.append(Object.assign(document.createElement("span"), {
-        className: p.status === "error" ? "chip-error-text" : "chip-size", textContent: note,
-      }));
+  for (const p of pending) {
+    if (!p.chip) {
+      p.chip = buildChip(p);
+      chips.append(p.chip);
     }
-    chip.classList.toggle("is-error", p.status === "error");
-    const remove = iconButton(`Remove ${p.name}`, ICONS.close, () => removePending(p));
-    remove.className = "chip-remove";
-    chip.append(remove);
-    return chip;
-  }));
+    patchChip(p);
+  }
+  for (const chip of [...chips.children]) {
+    if (!pending.some((p) => p.chip === chip)) chip.remove();
+  }
   syncSend();
 }
 
@@ -854,8 +883,13 @@ $("set-model").addEventListener("change", syncSettingsFields);
 // refreshed in the background and the choices rebuilt, keeping what has been picked meanwhile.
 function fillModelChoices(model, effort) {
   const { default: fallback, efforts = [], models } = modelInfo;
-  reasoningModels = new Map([["", models[0]?.reasoning], ...models.map((m) => [m.id, m.reasoning])]);
-  const options = models.slice(1).map((m) => new Option(m.id, m.id));
+  // "" is what the Default option carries, so it needs the default model's own reasoning flag. Both lines
+  // below ask for the default by id rather than trusting the order /api/models happens to use.
+  reasoningModels = new Map([
+    ["", models.find((m) => m.id === fallback)?.reasoning],
+    ...models.map((m) => [m.id, m.reasoning]),
+  ]);
+  const options = models.filter((m) => m.id !== fallback).map((m) => new Option(m.id, m.id));
   if (model && !reasoningModels.has(model)) options.push(new Option(model, model)); // no longer listed
   $("set-model").replaceChildren(new Option(`Default (${fallback ?? "…"})`, ""), ...options);
   $("set-effort").replaceChildren(new Option("Default", ""), ...efforts.map((e) => new Option(e, e)));
@@ -871,8 +905,10 @@ function openSettings() {
   $("set-system").value = s.system_prompt;
   $("set-temp").value = s.temperature ?? "";
   $("export-row").hidden = !state.id;
-  $("export-md").href = `/api/conversations/${state.id}/export?format=md`;
-  $("export-json").href = `/api/conversations/${state.id}/export?format=json`;
+  if (state.id) { // no hrefs before there is a conversation, so nothing can ask for /conversations/null
+    $("export-md").href = `/api/conversations/${state.id}/export?format=md`;
+    $("export-json").href = `/api/conversations/${state.id}/export?format=json`;
+  }
   dialog.querySelector(".field-error").hidden = true;
   dialog.showModal();
   refreshModels().then(() => {

@@ -68,6 +68,35 @@ def test_text_and_attachments_together(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("[files=notes.txt]")
 
 
+def test_a_chip_button_keeps_focus_while_another_chip_uploads(page, app_url):
+    open_app(page, app_url)
+    attach(page, NOTES)
+    wait_uploaded(page)
+    page.get_by_role("button", name="Remove notes.txt").focus()
+
+    attach(page, PIC)  # a second chip appears, then finishes uploading, which re-renders the chips
+    wait_uploaded(page)
+    expect(chips(page)).to_have_count(2)
+    # Chips are patched in place, so the focused button is still the very same element. Rebuilding them
+    # would have replaced it and sent focus back to <body>.
+    expect(page.get_by_role("button", name="Remove notes.txt")).to_be_focused()
+
+
+def test_a_chip_survives_a_status_change_of_another_one(page, app_url, expected_console_errors):
+    open_app(page, app_url)
+    attach(page, NOTES)
+    wait_uploaded(page)
+    chips(page).first.evaluate("el => { el.dataset.kept = 'yes' }")
+
+    expected_console_errors.append("415")  # the browser logs the rejected upload
+    attach(page, ("tool.zip", b"PK\x03\x04" + b"\x00" * 300, "application/zip"))
+    wait_uploaded(page)
+    expect(chips(page)).to_have_count(2)
+    # The rejected chip went from busy to failed; the other one was not rebuilt underneath the reader.
+    expect(chips(page).nth(1)).to_have_class(re.compile("is-error"))
+    expect(chips(page).first).to_have_attribute("data-kept", "yes")
+
+
 def test_removing_a_chip_keeps_it_out_of_the_message(page, app_url):
     open_app(page, app_url)
     attach(page, PIC, NOTES)

@@ -111,6 +111,19 @@ def test_long_text_without_a_newline_also_reflows_and_stays_reflowed_while_editi
     expect(composer).not_to_have_class("composer is-multiline")
 
 
+def test_rapid_typing_still_reflows_the_composer_and_saves_the_draft(page, app_url):
+    open_app(page, app_url)
+    field = page.get_by_label("Message", exact=True)
+    field.click()
+    page.keyboard.type("word " * 80, delay=0)  # many input events inside a few frames
+
+    # The composer's layout work is coalesced into one pass per frame, so the last update must not be dropped.
+    expect(page.locator(".composer")).to_have_class("composer is-multiline")
+    expect(page.locator("#send")).to_be_enabled()
+    page.reload()
+    expect(field).to_have_value("word " * 80)  # and the draft is written as you type, never debounced away
+
+
 def test_jump_button_is_a_round_icon_above_the_composer(page, app_url):
     page.set_viewport_size({"width": 1100, "height": 500})
     open_app(page, app_url)

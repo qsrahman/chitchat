@@ -57,6 +57,7 @@ def test_export_links_in_settings_download_the_chat(page, app_url):
     page.get_by_role("button", name="Chat settings").click()
     expect(page.locator("#settings-dialog")).to_be_visible()
     expect(page.locator("#export-row")).to_be_hidden()  # nothing to export in a new chat
+    assert page.locator("#export-md").get_attribute("href") is None  # so no link can ask for a conversation named null
     page.keyboard.press("Escape")
     send(page, "hello export")
     page.get_by_role("button", name="Chat settings").click()
