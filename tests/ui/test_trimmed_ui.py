@@ -27,6 +27,7 @@ def test_the_note_survives_a_reload_and_sits_with_the_other_notes(page, app_url)
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     conversation = page.evaluate("fetch('/api/conversations/' + location.hash.slice(1)).then((r) => r.json())")
     conversation["messages"][-1]["meta"] = {"trimmed": 3, "compaction": {"after_reply": True}}
     page.route("**/api/conversations/*", lambda route: route.fulfill(json=conversation)

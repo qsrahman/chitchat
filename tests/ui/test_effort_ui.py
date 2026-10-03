@@ -44,6 +44,7 @@ def test_changing_it_in_a_chat_persists_and_none_turns_thinking_off(page, app_ur
     pick(page, "gpt-5-mini")
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     effort(page).select_option("none")
     expect(page.locator("#effort-wrap")).to_have_attribute("data-active", "")
     send(page, "again")

@@ -67,6 +67,7 @@ def test_with_the_toggle_off_the_model_gets_no_tools(page, app_url):
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(page.locator(".msg.assistant .body")).not_to_contain_text("[tools=")
 
 
@@ -75,6 +76,7 @@ def test_the_setting_persists_per_conversation(page, app_url):
     search_on(page)
     send(page, "with search")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     page.reload()
     expect(toggle(page)).to_have_attribute("aria-pressed", "true")
 
@@ -83,6 +85,7 @@ def test_the_setting_persists_per_conversation(page, app_url):
     expect(toggle(page)).to_have_attribute("aria-pressed", "false")  # a new chat starts off
     send(page, "without search")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #2")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
 
     page.get_by_role("link", name="with search").click()
     expect(page.locator(".msg.user .body")).to_have_text("with search")
@@ -93,6 +96,7 @@ def test_turning_it_on_mid_conversation_applies_from_the_next_message(page, app_
     open_app(page, app_url)
     send(page, "first")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     search_on(page)
     send(page, "second")
     expect(page.locator(".msg.assistant").nth(1)).to_contain_text("[tools=web_search]")
@@ -104,6 +108,7 @@ def test_saving_the_settings_dialog_keeps_the_search_setting(page, app_url):
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     search_on(page)
     page.get_by_role("button", name="Chat settings").click()
     page.get_by_label("System prompt").fill("Be brief")
@@ -126,6 +131,7 @@ def test_a_failed_save_says_so_and_keeps_the_old_state(page, app_url, expected_c
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expected_console_errors.append("net::ERR_FAILED")
 
     def abort_patch(route):
@@ -142,6 +148,7 @@ def test_a_failed_save_says_so_and_keeps_the_old_state(page, app_url, expected_c
 
 def test_the_toggle_works_from_the_keyboard(page, app_url):
     open_app(page, app_url)
+    expect(toggle(page)).to_be_enabled()  # it is disabled until the page has asked which tools exist
     toggle(page).focus()
     page.keyboard.press("Space")
     expect(toggle(page)).to_have_attribute("aria-pressed", "true")

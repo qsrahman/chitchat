@@ -34,7 +34,7 @@ def in_view(page, locator):
 def test_a_chat_is_found_by_its_title_with_the_match_highlighted(page, app_url):
     open_app(page, app_url)
     send(page, "tell me about quokkas")  # the scripted model titles a chat with its first words
-    expect(page.locator(".msg.assistant")).to_be_visible()
+    expect(page.locator("#title")).to_have_text("tell me about quokkas")  # titled: saved, and searchable
     open_sidebar(page)
     search_box(page).fill("tell")
     result = page.locator(".result")
@@ -46,7 +46,7 @@ def test_a_chat_is_found_by_its_title_with_the_match_highlighted(page, app_url):
 def test_a_message_result_shows_the_title_and_the_snippet_with_marks_in_both(page, app_url):
     open_app(page, app_url)
     send(page, "my wombat question")
-    expect(page.locator(".msg.assistant")).to_be_visible()
+    finished(page)  # the reply is saved (the placeholder shows at once, before the message reaches the server)
     open_sidebar(page)
     search_box(page).fill("wombat")
     expect(page.locator(".result strong mark")).to_have_text("wombat")
@@ -56,7 +56,7 @@ def test_a_message_result_shows_the_title_and_the_snippet_with_marks_in_both(pag
 def test_a_title_only_match_has_no_snippet(page, app_url):
     open_app(page, app_url)
     send(page, "kangaroo facts")
-    expect(page.locator(".msg.assistant")).to_be_visible()
+    expect(page.locator("#title")).to_have_text("kangaroo facts")  # titled: saved, and searchable
     open_sidebar(page)
     page.locator(".conv").first.hover()
     page.get_by_role("button", name='Rename "kangaroo facts"').click()

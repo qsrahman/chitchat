@@ -96,6 +96,7 @@ def test_a_failed_save_puts_the_checkbox_back_and_says_so(page, app_url, expecte
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expected_console_errors.append("500")
     page.route("**/api/conversations/*",
                lambda r: r.fulfill(status=500) if r.request.method == "PATCH" else r.fallback())

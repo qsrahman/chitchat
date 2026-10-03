@@ -242,9 +242,29 @@ def expected_console_errors():
     return []
 
 
+def wait_until_ready(page):
+    """The page's HTML is visible before its module scripts have run (they are deferred), and under load the gap is
+    long enough for a fill or an Enter to land on a page that cannot react yet. app.js marks the body when done."""
+    page.locator("body[data-ready]").wait_for(state="attached")
+
+
 @pytest.fixture
 def page(page, expected_console_errors):
-    """pytest-playwright's page, plus: any JS error or unexpected console error fails the test."""
+    """pytest-playwright's page, plus: navigations wait for the app to be ready, and any JS error or unexpected
+    console error fails the test."""
+    goto, reload = page.goto, page.reload
+
+    def goto_ready(*args, **kwargs):
+        response = goto(*args, **kwargs)
+        wait_until_ready(page)
+        return response
+
+    def reload_ready(*args, **kwargs):
+        response = reload(*args, **kwargs)
+        wait_until_ready(page)
+        return response
+
+    page.goto, page.reload = goto_ready, reload_ready
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("console", lambda m: m.type == "error" and errors.append(m.text))

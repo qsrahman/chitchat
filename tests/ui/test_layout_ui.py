@@ -29,6 +29,7 @@ def test_closed_sidebar_is_an_icon_rail_that_keeps_the_main_actions_in_reach(pag
 
     send(page, "from the rail")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     page.get_by_role("button", name="New chat").click()  # no need to open the sidebar first
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
 
@@ -62,6 +63,7 @@ def test_new_chat_centers_the_composer_and_it_drops_to_the_bottom_once_chatting(
 
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_hidden()
     bottom = box(composer)["y"] + box(composer)["height"]
     assert height - bottom < 70, "composer should be pinned to the bottom"
@@ -137,6 +139,7 @@ def test_message_actions_are_icon_buttons_with_tooltips_and_copy_confirms(page, 
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     for name in ("Copy", "Edit", "Regenerate"):
         button = page.locator(".actions").get_by_role("button", name=name, exact=True).first
         expect(button).to_have_attribute("title", name)
@@ -164,6 +167,7 @@ def test_drafts_are_kept_per_conversation_and_cleared_on_send(page, app_url):
     field = page.get_by_label("Message", exact=True)
     send(page, "first chat")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     field.fill("draft for the first chat")
 
     open_sidebar(page)
@@ -174,9 +178,11 @@ def test_drafts_are_kept_per_conversation_and_cleared_on_send(page, app_url):
     page.get_by_role("link", name="first chat").click()
     expect(page.locator(".msg.user .body")).to_have_text("first chat")
     expect(field).to_have_value("draft for the first chat")
+    expect(field).to_be_focused()  # opening a chat focuses the box last; until then Enter goes to the link clicked
 
     page.keyboard.press("Enter")
     expect(page.locator(".msg.assistant").nth(1)).to_contain_text("Reply #2")
+    expect(page.locator(".msg.assistant").nth(1).locator(".actions button").first).to_be_visible()  # saved
     page.reload()
     expect(field).to_have_value("")  # sending cleared it
 

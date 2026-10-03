@@ -62,6 +62,7 @@ def test_settings_persist_per_conversation(page, app_url):
     open_app(page, app_url)
     send(page, "first chat")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     dialog = open_settings(page)
     dialog.get_by_label("System prompt").fill("Only for the first chat")
     save(dialog)
@@ -87,6 +88,7 @@ def test_settings_apply_from_the_next_message_in_an_existing_chat(page, app_url)
     open_app(page, app_url)
     send(page, "one")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     dialog = open_settings(page)
     dialog.get_by_label("System prompt").fill("Now with a prompt")
     save(dialog)
@@ -118,6 +120,7 @@ def test_save_failure_is_shown_and_can_be_retried(page, app_url, expected_consol
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expected_console_errors.append("net::ERR_FAILED")
 
     def abort_patch(route):

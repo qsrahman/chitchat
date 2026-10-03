@@ -60,6 +60,7 @@ def test_choosing_a_model_switches_it_for_the_next_message_and_persists(page, ap
     open_app(page, app_url)
     send(page, "first")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(page.locator(".msg.assistant .body")).not_to_contain_text("[model=")
 
     pick(page, "alpha-model")
@@ -78,6 +79,7 @@ def test_choosing_the_default_again_stores_no_override(page, app_url):
     open_app(page, app_url)
     send(page, "first")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     pick(page, "alpha-model")
     assert saved_model(page) == "alpha-model"
     pick(page, DEFAULT)
@@ -101,12 +103,14 @@ def test_each_conversation_keeps_its_own_model(page, app_url):
     pick(page, "alpha-model")
     send(page, "chat a")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
 
     open_sidebar(page)
     page.get_by_role("button", name="New chat").click()
     expect(picker(page)).to_have_text(DEFAULT)  # a new chat starts on the default
     send(page, "chat b")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #2")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
 
     page.get_by_role("link", name="chat a").click()
     expect(page.locator(".msg.user .body")).to_have_text("chat a")
@@ -181,6 +185,7 @@ def test_a_failed_switch_says_so_and_keeps_the_old_model(page, app_url, expected
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expected_console_errors.append("net::ERR_FAILED")
 
     def abort_patch(route):

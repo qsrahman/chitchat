@@ -10,6 +10,7 @@ def send(page: Page, text: str):
 
 def open_app(page: Page, app_url: str):
     page.goto(app_url)
+    page.locator("body[data-ready]").wait_for(state="attached")  # the scripts have run (see conftest.wait_until_ready)
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
 
 
@@ -150,8 +151,10 @@ def test_edit_last_message_only_and_resend(page, app_url):
     open_app(page, app_url)
     send(page, "first")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     send(page, "second")
     expect(page.locator(".msg.assistant").nth(1)).to_contain_text("Reply #2")
+    expect(page.locator(".msg.assistant").nth(1).locator(".actions button").first).to_be_visible()  # saved
     expect(page.get_by_role("button", name="Edit")).to_have_count(1)
     page.get_by_role("button", name="Edit").click()
     page.get_by_label("Edit your message").fill("second, reworded")
@@ -238,6 +241,7 @@ def test_retry_after_an_edit_that_never_landed_replaces_the_old_turn(page, app_u
     open_app(page, app_url)
     send(page, "first")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expected_console_errors.append("net::ERR_FAILED")
     page.route("**/api/conversations/*/edit", lambda route: route.abort())
     page.get_by_role("button", name="Edit").click()
@@ -311,6 +315,7 @@ def test_new_chat_returns_to_empty_state_and_keeps_old_chat(page, app_url):
     open_app(page, app_url)
     send(page, "first topic")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
     page.get_by_role("button", name="New chat").click()
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
@@ -325,6 +330,7 @@ def test_rename_via_dialog_with_enter(page, app_url):
     open_app(page, app_url)
     send(page, "old name")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
     page.get_by_role("button", name='Rename "old name"').click()
     dialog = page.get_by_role("dialog", name="Rename conversation")
@@ -342,6 +348,7 @@ def test_rename_can_be_cancelled_with_escape(page, app_url):
     open_app(page, app_url)
     send(page, "stay put")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
     page.get_by_role("button", name='Rename "stay put"').click()
     page.get_by_label("Conversation title").fill("nope")
@@ -360,6 +367,7 @@ def test_delete_asks_first_then_removes(page, app_url):
     open_app(page, app_url)
     send(page, "doomed chat")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
     page.get_by_role("button", name='Delete "doomed chat"').click()
     dialog = page.get_by_role("dialog", name="Delete this conversation?")
@@ -378,6 +386,7 @@ def test_sidebar_stays_open_when_switching_chats_on_desktop(page, app_url):
     open_app(page, app_url)
     send(page, "alpha")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
     page.get_by_role("button", name="New chat").click()
     send(page, "beta")

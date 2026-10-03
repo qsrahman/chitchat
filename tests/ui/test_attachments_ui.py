@@ -224,6 +224,7 @@ def test_attachments_survive_a_reload_and_open_or_download(page, app_url):
     wait_uploaded(page)
     send(page, "look")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     page.reload()
     image = page.locator(".msg.user .tile-image")
     expect(image.locator("img")).to_have_js_property("naturalWidth", 1)  # the file is really served
@@ -288,13 +289,16 @@ def test_regenerate_and_edit_keep_the_attachments(page, app_url):
     wait_uploaded(page)
     send(page, "first words")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     page.get_by_role("button", name="Regenerate").click()
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #2")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(page.locator(".msg.assistant")).to_contain_text("[files=notes.txt]")
     page.get_by_role("button", name="Edit").click()
     page.get_by_label("Edit your message").fill("reworded")
     page.get_by_role("button", name="Save").click()
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #3")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(page.locator(".msg.assistant")).to_contain_text("[files=notes.txt]")
     expect(page.locator(".msg.user .tile-file")).to_have_count(1)
 
@@ -303,6 +307,7 @@ def test_switching_conversations_clears_the_composer_chips(page, app_url):
     open_app(page, app_url)
     send(page, "first chat")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     attach(page, NOTES)
     wait_uploaded(page)
     expect(chips(page)).to_have_count(1)
@@ -318,6 +323,7 @@ def test_deleting_the_conversation_deletes_its_files(page, app_url):
     wait_uploaded(page)
     send(page, "keep this")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     href = page.locator(".msg.user .tile-image").get_attribute("href")
     assert page.request.get(f"{app_url}{href}").status == 200
     open_sidebar(page)

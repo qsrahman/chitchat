@@ -30,6 +30,7 @@ def open_page(browser, app_url, scheme, viewport=None, **context_args):
                                   bypass_csp=True, **context_args)
     page = context.new_page()
     page.goto(app_url)
+    page.locator("body[data-ready]").wait_for(state="attached")
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
     page.add_script_tag(content=AXE)
     return context, page

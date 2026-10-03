@@ -44,6 +44,7 @@ def test_a_plain_reply_has_no_reasoning_block_or_usage_line(page, app_url):
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(page.locator("details.reasoning")).to_have_count(0)
     expect(page.locator(".msg.assistant > .note")).to_be_hidden()
 

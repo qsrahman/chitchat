@@ -38,6 +38,7 @@ def test_everything_uses_chatgpts_system_font_stack_including_replies(page, app_
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     for selector in ("body", "h1", "#input", ".msg.assistant .body", ".msg.user .body", "#send"):
         family = page.locator(selector).first.evaluate("e => getComputedStyle(e).fontFamily")
         assert family.startswith('ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica'), (selector, family)

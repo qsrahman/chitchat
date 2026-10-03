@@ -53,3 +53,4 @@ refreshModels();
 loadAttachmentLimits();
 loadTools();
 openConversation(location.hash.slice(1) || null);
+document.body.dataset.ready = ""; // every handler is attached: the UI tests wait for this before they type or click
