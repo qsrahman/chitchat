@@ -81,6 +81,7 @@ body.nav-open { grid-template-columns: 17rem minmax(0, 1fr); }
 .conv:hover .icon-btn, .conv:focus-within .icon-btn { opacity: 1; }
 .conv .icon-btn:hover { color: var(--ink); }
 .side-foot { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+.show-more { margin: 8px 10px; justify-content: center; width: calc(100% - 20px); color: var(--muted); font-size: var(--text-sm); }
 .no-convs { margin: 12px 10px; color: var(--muted); font-size: var(--text-sm); }
 
 /* main column */

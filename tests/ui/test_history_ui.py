@@ -80,3 +80,48 @@ def test_the_note_says_when_the_context_was_compacted(page, app_url):
     expect(page.locator(".msg.assistant .note")).to_have_text("Earlier messages were compacted to save context.")
     page.reload()
     expect(page.locator(".msg.assistant .note")).to_have_text("Earlier messages were compacted to save context.")
+
+
+def seed_chats(page, app_url, n):
+    for i in range(n):
+        cid = page.request.post(f"{app_url}/api/conversations").json()["id"]
+        page.request.patch(f"{app_url}/api/conversations/{cid}", data={"title": f"chat {i:03d}"})
+
+
+def test_a_long_list_loads_a_page_and_show_more_loads_the_rest(page, app_url):
+    seed_chats(page, app_url, 120)
+    open_app(page, app_url)
+    open_sidebar(page)
+    links = page.locator(".conv a:not(.result)")
+    expect(links).to_have_count(50)
+    expect(links.first).to_have_text("chat 119")  # newest first
+    page.get_by_role("button", name="Show more").click()
+    expect(links).to_have_count(100)
+    page.get_by_role("button", name="Show more").click()
+    expect(links).to_have_count(120)
+    expect(page.get_by_role("button", name="Show more")).to_have_count(0)  # nothing older
+
+
+def test_a_short_list_has_no_show_more(page, app_url):
+    seed_chats(page, app_url, 3)
+    open_app(page, app_url)
+    open_sidebar(page)
+    expect(page.locator(".conv a:not(.result)")).to_have_count(3)
+    expect(page.get_by_role("button", name="Show more")).to_have_count(0)
+
+
+def test_a_chat_beyond_the_first_page_opens_with_its_title_and_stays_loaded_on_refresh(page, app_url):
+    seed_chats(page, app_url, 60)
+    open_app(page, app_url)
+    open_sidebar(page)
+    page.get_by_role("button", name="Show more").click()
+    page.get_by_role("link", name="chat 000").click()
+    expect(page.locator("#title")).to_have_text("chat 000")
+    page.get_by_role("button", name='Rename "chat 001"').click()
+    page.locator("#rename-input").fill("renamed one")
+    page.get_by_role("button", name="Save").click()
+    expect(page.get_by_role("link", name="renamed one")).to_be_visible()
+    expect(page.locator(".conv a:not(.result)")).to_have_count(60)  # a refresh keeps what was loaded
+    expect(page.locator("#title")).to_have_text("chat 000")
+    page.get_by_role("button", name="New chat").first.click()
+    expect(page.locator("#title")).to_have_text("New chat")

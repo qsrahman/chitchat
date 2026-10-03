@@ -10,13 +10,28 @@ function groupOf(iso) {
   return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days <= 7 ? "Previous 7 days" : "Older";
 }
 
+// The list loads a page at a time ("Show more" asks for the next). A refresh reloads as many as are showing.
+const PAGE = 50;
+let more = false; // the last request came back full, so there may be older chats
+
 export async function refreshList() {
-  state.convs = await api("/conversations");
+  const limit = Math.min(500, Math.max(PAGE, state.convs.length));
+  state.convs = await api(`/conversations?limit=${limit}`);
+  more = state.convs.length === limit;
   renderList();
-  setTitle(state.convs.find((c) => c.id === state.id)?.title);
+  const current = state.convs.find((c) => c.id === state.id);
+  if (current) setTitle(current.title);
 }
 
-function setTitle(title) {
+async function showMore() {
+  const next = await api(`/conversations?limit=${PAGE}&offset=${state.convs.length}`);
+  state.convs.push(...next);
+  more = next.length === PAGE;
+  renderList();
+}
+
+// The open chat may be further down than the list has loaded, so the page sets its title when it opens it.
+export function setTitle(title) {
   $("title").textContent = title || "New chat";
   document.title = title ? `${title} · ChitChat` : "ChitChat";
 }
@@ -93,6 +108,11 @@ function renderList() {
     ul.append(...convs.map(renderConv));
     return [h, ul];
   }));
+  if (more) {
+    const button = Object.assign(document.createElement("button"), { type: "button", className: "btn show-more", textContent: "Show more" });
+    button.onclick = showMore;
+    nav.append(button);
+  }
 }
 
 

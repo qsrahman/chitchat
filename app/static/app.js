@@ -4,7 +4,7 @@ import { $, DEFAULT_SETTINGS, api, bus, input, main, state, thread } from "./cor
 import { addMessage, jumpTo, render, scrollToBottom } from "./messages.js";
 import { clearPending, loadAttachmentLimits, loadDraft, syncSend } from "./composer.js";
 import { updateActions } from "./chat.js";
-import { closeNavIfOverlay, refreshList } from "./sidebar.js";
+import { closeNavIfOverlay, refreshList, setTitle } from "./sidebar.js";
 import { refreshModels, setSettings } from "./settings.js";
 import { loadTools } from "./controls.js";
 import "./model-menu.js";
@@ -21,10 +21,12 @@ async function openConversation(id) {
   closeNavIfOverlay();
   if (location.hash.slice(1) !== (id ?? "")) history.replaceState(null, "", id ? `#${id}` : location.pathname);
   setSettings({ ...DEFAULT_SETTINGS });
+  setTitle(null);
   if (id) {
     try {
       const conv = await api(`/conversations/${id}`);
       setSettings(conv.settings);
+      setTitle(conv.title);
       conv.messages.forEach((m) => { addMessage(m.role, m.content, m.meta).dataset.id = m.id; });
       thread.querySelectorAll(".msg").forEach(render);
     } catch {

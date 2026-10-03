@@ -94,3 +94,18 @@ async def test_incomplete_reply_is_saved_and_flagged(client, llm):
     await client.post(f"/api/conversations/{cid}/chat", json={"content": "hi"})
     last = (await client.get(f"/api/conversations/{cid}")).json()["messages"][-1]
     assert (last["content"], last["meta"]) == ("long", {"incomplete": "max_output_tokens"})
+
+
+async def test_the_conversation_list_is_paged_newest_first(client):
+    ids = [(await client.post("/api/conversations")).json()["id"] for _ in range(5)]
+    first = (await client.get("/api/conversations", params={"limit": 2})).json()
+    rest = (await client.get("/api/conversations", params={"limit": 2, "offset": 2})).json()
+    last = (await client.get("/api/conversations", params={"limit": 2, "offset": 4})).json()
+    assert [c["id"] for c in first + rest + last] == ids[::-1]
+    assert len((await client.get("/api/conversations")).json()) == 5  # the default page is larger than that
+
+
+async def test_the_page_size_is_bounded(client):
+    assert (await client.get("/api/conversations", params={"limit": 0})).status_code == 422
+    assert (await client.get("/api/conversations", params={"limit": 501})).status_code == 422
+    assert (await client.get("/api/conversations", params={"offset": -1})).status_code == 422

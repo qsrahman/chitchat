@@ -74,8 +74,9 @@ def _require(conn: sqlite3.Connection, cid: str) -> dict:
 
 
 @router.get("/conversations")
-def list_conversations(conn: Conn):
-    return store.list_conversations(conn)
+def list_conversations(conn: Conn, limit: Annotated[int, Query(ge=1, le=500)] = 50,
+                       offset: Annotated[int, Query(ge=0)] = 0):
+    return store.list_conversations(conn, limit, offset)
 
 
 @router.post("/conversations", status_code=201)

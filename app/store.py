@@ -61,8 +61,10 @@ def get_conversation(conn: sqlite3.Connection, cid: str) -> dict | None:
     return _conversation(row) if row else None
 
 
-def list_conversations(conn: sqlite3.Connection) -> list[dict]:
-    rows = conn.execute("SELECT * FROM conversations ORDER BY updated_at DESC, rowid DESC")
+def list_conversations(conn: sqlite3.Connection, limit: int = -1, offset: int = 0) -> list[dict]:
+    """Newest first. `limit=-1` is SQLite's "no limit"."""
+    rows = conn.execute("SELECT * FROM conversations ORDER BY updated_at DESC, rowid DESC LIMIT ? OFFSET ?",
+                        (limit, offset))
     return [_conversation(r) for r in rows]
 
 
