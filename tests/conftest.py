@@ -58,3 +58,15 @@ async def client(app):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
+
+
+@pytest.fixture
+async def second(tmp_path):
+    """A second, empty app: where an export is imported to."""
+    app = create_app(Settings(_env_file=None, db_path=str(tmp_path / "second.db"),
+                              attachments_dir=str(tmp_path / "second-files"), openai_api_key="t", openai_model="m",
+                              default_system_prompt=""))
+    app.state.llm = FakeLLM()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://second") as c:
+        c.app = app  # so a test can look at that app's files and fake model
+        yield c

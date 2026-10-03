@@ -3,16 +3,13 @@ import io
 import json
 import zipfile
 
-import httpx
 import pytest
 
 from app import db, store
 from app.backup import MAX_CHATS
-from app.config import Settings
-from app.main import create_app
-from tests.conftest import FakeLLM
 from tests.helpers import PNG, new_conv, parse_sse, upload
 
+NO_EXTRAS = {"attachments": 0, "custom_instructions": False}  # what an import result says besides the counts
 ITEM = {"id": "cmp_1", "type": "compaction", "encrypted_content": "opaque"}
 
 
@@ -29,17 +26,6 @@ async def make_chat(client, llm, title, *texts, reply="Noted.", settings=None):
     for text in texts:
         await say(client, cid, text)
     return cid
-
-
-@pytest.fixture
-async def second(tmp_path):
-    """A second, empty app: where an export is imported to."""
-    app = create_app(Settings(_env_file=None, db_path=str(tmp_path / "second.db"),
-                              attachments_dir=str(tmp_path / "second-files"), openai_api_key="t", openai_model="m",
-                              default_system_prompt=""))
-    app.state.llm = FakeLLM()
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://second") as c:
-        yield c
 
 
 async def export_json(client):
@@ -114,7 +100,7 @@ async def test_what_is_exported_can_be_imported_into_a_fresh_database_unchanged(
     await make_chat(client, llm, "Quokkas", "tell me about quokkas")
     exported = (await export_json(client)).json()
     r = await import_file(second, (await export_json(client)).content)
-    assert r.status_code == 201 and r.json() == {"imported": 2, "skipped": 0, "messages": 6}
+    assert r.status_code == 201 and r.json() == {"imported": 2, "skipped": 0, "messages": 6} | NO_EXTRAS
     again = (await export_json(second)).json()
     for before, after in zip(exported["conversations"], again["conversations"], strict=True):
         assert after["id"] == before["id"] and after["title"] == before["title"]
@@ -129,7 +115,7 @@ async def test_importing_the_same_file_again_adds_nothing(client, llm, second):
     data = (await export_json(client)).content
     assert (await import_file(second, data)).json()["imported"] == 1
     r = await import_file(second, data)
-    assert r.json() == {"imported": 0, "skipped": 1, "messages": 0}
+    assert r.json() == {"imported": 0, "skipped": 1, "messages": 0} | NO_EXTRAS
     assert len((await second.get("/api/conversations")).json()) == 1
 
 
@@ -405,7 +391,7 @@ async def test_importing_an_export_with_versions_gives_the_same_tree_and_path(cl
     cid = await branched_chat(client, llm)
     document = (await export_json(client)).json()
     r = await import_file(second, document)
-    assert r.json() == {"imported": 1, "skipped": 0, "messages": 6}
+    assert r.json() == {"imported": 1, "skipped": 0, "messages": 6} | NO_EXTRAS
     there = (await second.get(f"/api/conversations/{cid}")).json()["messages"]
     assert [m["content"] for m in there] == ["q1", "Noted.", "q2 b", "a2 b"]
     assert len(there[2]["siblings"]) == 2  # the other version came along

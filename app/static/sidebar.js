@@ -168,12 +168,12 @@ async function commitDelete() {
   $("toast").hidden = true;
   try {
     await api(`/conversations/${conv.id}`, { method: "DELETE" });
-  } finally {
-    await refreshList();
-  }
+  } catch { /* already gone (another tab, or the page was closing): that is what was wanted */ }
+  await refreshList();
 }
 
 $("toast").querySelector("button").onclick = () => {
+  if (!pending) return;
   const { conv, wasOpen, timer } = pending;
   clearTimeout(timer);
   pending = null;
@@ -185,7 +185,11 @@ $("toast").querySelector("button").onclick = () => {
 
 // keepalive lets the request finish while the page closes
 window.addEventListener("pagehide", () => {
-  if (pending) fetch(`/api/conversations/${pending.conv.id}`, { method: "DELETE", keepalive: true });
+  if (!pending) return;
+  fetch(`/api/conversations/${pending.conv.id}`, { method: "DELETE", keepalive: true });
+  clearTimeout(pending.timer);
+  pending = null; // sent: nothing is waiting any more (the page may come back from the back-forward cache)
+  $("toast").hidden = true;
 });
 
 // ---- navigation ----
@@ -232,7 +236,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ---- backup ----
-// Export is two links (the server builds the files). Import sends a chosen JSON file and says what came of it.
+// Export is links (the server builds the files). Import sends a chosen JSON or zip file and says what came of it.
 const chats = (n) => `${n} chat${n === 1 ? "" : "s"}`;
 
 function setBackupStatus(text, failed = false) {
@@ -252,15 +256,18 @@ $("import-file").onchange = async (e) => {
   e.target.value = ""; // so choosing the same file again still counts
   if (!file) return;
   setBackupStatus(`Importing ${file.name}…`);
+  await commitDelete(); // a chat deleted a moment ago is gone for good now, so an import of it is not hidden or deleted again
   const body = new FormData();
   body.append("file", file);
   try {
     const res = await fetch("/api/import", { method: "POST", body });
     const result = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(typeof result.detail === "string" ? result.detail : `The import failed (${res.status}).`);
+    const files = result.attachments ? ` with ${result.attachments} file${result.attachments === 1 ? "" : "s"}` : "";
+    const instructions = result.custom_instructions ? "; custom instructions added" : "";
     setBackupStatus(result.imported
-      ? `Imported ${chats(result.imported)}${result.skipped ? `; ${result.skipped} already here` : ""}.`
-      : `Nothing new: ${chats(result.skipped)} already here.`);
+      ? `Imported ${chats(result.imported)}${files}${result.skipped ? `; ${result.skipped} already here` : ""}${instructions}.`
+      : `Nothing new: ${chats(result.skipped)} already here${instructions}.`);
     await refreshList();
   } catch (err) {
     setBackupStatus(err instanceof TypeError ? "Couldn't reach the server." : err.message, true);

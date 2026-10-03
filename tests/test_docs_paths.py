@@ -8,9 +8,10 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = [ROOT / n for n in ("README.md", "CLAUDE.md", "PLAN.md")] + sorted((ROOT / "docs").glob("*.md"))
 TOKEN = re.compile(r"`([^`\s]+)`")
 EXTENSIONS = (".py", ".js", ".mjs", ".css", ".html", ".md", ".toml", ".json", ".sh")
-# Placeholders, a library's name, and paths inside npm packages (docs/vendor.md lists those) are not files here.
+# Placeholders, a library's name, paths inside npm packages (docs/vendor.md lists those) and the name of a file inside
+# the backup zip are not files here.
 NOT_FILES = {"phase-N.md", "docs/phase-N.md", "date-title-idprefix.md", "highlight.js", "marked.min.js",
-             "dist/katex.min.css", "dist/katex.min.js", "dist/purify.min.js", "lib/marked.umd.js"}
+             "dist/katex.min.css", "dist/katex.min.js", "dist/purify.min.js", "lib/marked.umd.js", "chats.json"}
 LOCATIONS = ("", "app/", "app/tools/", "app/static/", "app/static/vendor/", "app/static/vendor/katex/", "docs/",
              "tests/", "tests/ui/", "tests/ui/assets/", "scripts/", ".githooks/")
 

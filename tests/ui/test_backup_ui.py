@@ -31,6 +31,8 @@ def test_the_sidebar_has_a_backup_button_that_opens_the_dialog(page, app_url):
     open_app(page, app_url)
     dialog = open_backup(page)
     expect(dialog.get_by_role("link", name="Export all chats")).to_have_attribute("href", "/api/export?format=json")
+    expect(dialog.get_by_role("link", name="Export with attachments")).to_have_attribute(
+        "href", "/api/export?format=full")
     expect(dialog.get_by_role("link", name="Export as Markdown")).to_have_attribute("href", "/api/export?format=md")
     expect(dialog.get_by_label("Import chats from a file")).to_be_visible()
     expect(dialog.locator("#backup-status")).to_be_hidden()
@@ -153,3 +155,56 @@ def test_a_hostile_file_cannot_run_script_or_break_the_chat(page, app_url):
     assert all("<" not in text or "script" not in text for text in summaries)
     assert page.evaluate("window.__xss") is None
     assert page.locator(".msg.assistant a[href^='javascript']").count() == 0
+
+
+def test_a_backup_with_attachments_brings_the_pictures_back(page, app_url):
+    from tests.ui.test_attachments_ui import PIC, attach, wait_uploaded
+    from tests.ui.test_chat_ui import finish_delete
+    open_app(page, app_url)
+    attach(page, PIC)
+    wait_uploaded(page)
+    send(page, "keep this picture")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    dialog = open_backup(page)
+    with page.expect_download() as download:
+        dialog.get_by_role("link", name="Export with attachments").click()
+    assert download.value.suggested_filename.endswith("-with-files.zip")
+    zipped = download.value.path()
+    dialog.get_by_role("button", name="Close").click()
+    page.get_by_role("button", name='Delete "keep this picture"').click()  # gone, files and all
+    page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+    expect(page.get_by_text("Your conversations will show up here.")).to_be_visible()
+    finish_delete(page)
+    page.get_by_role("button", name="Back up and import chats").click()
+    dialog = page.get_by_role("dialog", name="Back up and import chats")
+    dialog.get_by_label("Import chats from a file").set_input_files(
+        {"name": "backup.zip", "mimeType": "application/zip", "buffer": open(zipped, "rb").read()})
+    expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat with 1 file.")
+    dialog.get_by_role("button", name="Close").click()
+    page.get_by_role("link", name="keep this picture").click()
+    image = page.locator(".msg.user .tile-image img")
+    expect(image).to_be_visible()
+    page.wait_for_function("(el) => el.complete && el.naturalWidth > 0", arg=image.element_handle())  # it loads
+
+
+def test_importing_a_chat_you_just_deleted_brings_it_back_and_it_stays(page, app_url):
+    """The delete waits ten seconds for Undo; an import in that time must not be hidden by it or deleted by it."""
+    page.clock.install()
+    open_app(page, app_url)
+    send(page, "tell me about quokkas")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    cid = page.url.split("#")[1]
+    backup = page.request.get(f"{app_url}/api/export").body()
+    open_sidebar(page)
+    page.get_by_role("button", name='Delete "tell me about quokkas"').click()
+    page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+    expect(page.locator("#toast")).to_be_visible()
+    page.get_by_role("button", name="Back up and import chats").click()
+    dialog = page.get_by_role("dialog", name="Back up and import chats")
+    dialog.get_by_label("Import chats from a file").set_input_files(as_upload(backup))
+    expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat.")
+    dialog.get_by_role("button", name="Close").click()
+    expect(page.get_by_role("link", name="tell me about quokkas")).to_be_visible()  # not hidden
+    page.clock.fast_forward(11_000)
+    expect(page.get_by_role("link", name="tell me about quokkas")).to_be_visible()
+    assert page.request.get(f"{app_url}/api/conversations/{cid}").status == 200  # and not deleted again

@@ -189,9 +189,10 @@ def set_leaf(conn: sqlite3.Connection, cid: str, message_id: int) -> None:
 def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
     """Insert prepared conversations (id, title, settings, created_at, updated_at, leaf, and messages with role,
     content, meta, created_at and parent), all in one transaction: if anything fails, none are added. `parent` and
-    `leaf` are positions in the list of messages (parent: an earlier one, or None). One whose id is already here,
-    or repeated in `chats`, is skipped. Returns {"imported", "skipped", "messages"}."""
-    imported = skipped = messages = 0
+    `leaf` are positions in the list of messages (parent: an earlier one, or None); `attachments` (optional) are
+    rows for files already on disk: id, name, mime, kind, size, created_at. One whose id is already here, or repeated
+    in `chats`, is skipped. Returns {"imported", "skipped", "messages", "attachments"}."""
+    imported = skipped = messages = files = 0
     try:
         for c in chats:
             if conn.execute("SELECT 1 FROM conversations WHERE id = ?", (c["id"],)).fetchone():
@@ -212,13 +213,20 @@ def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
                 ids.append(cur.lastrowid)  # pyright: ignore[reportArgumentType]
             if ids:
                 conn.execute("UPDATE conversations SET leaf_id = ? WHERE id = ?", (ids[c["leaf"]], c["id"]))
+            conn.executemany(
+                "INSERT INTO attachments (id, conversation_id, name, mime, kind, size, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [(a["id"], c["id"], a["name"], a["mime"], a["kind"], a["size"], a["created_at"])
+                 for a in c.get("attachments", [])],
+            )
+            files += len(c.get("attachments", []))
             imported += 1
             messages += len(c["messages"])
         conn.commit()
     except Exception:
         conn.rollback()
         raise
-    return {"imported": imported, "skipped": skipped, "messages": messages}
+    return {"imported": imported, "skipped": skipped, "messages": messages, "attachments": files}
 
 
 def search_conversations(

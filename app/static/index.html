@@ -178,15 +178,16 @@
 <dialog id="backup-dialog" closedby="any" aria-labelledby="backup-heading">
   <form method="dialog">
     <h2 id="backup-heading">Back up and import chats</h2>
-    <p>Save every conversation to a file, to keep a copy or to move to another computer. Attachments are not included.</p>
+    <p>Save every conversation, with every version of your messages, to keep a copy or to move to another computer.</p>
     <ul class="backup-links">
-      <li><a href="/api/export?format=json" download>Export all chats</a> <span>one JSON file you can import again</span></li>
+      <li><a href="/api/export?format=full" download>Export with attachments</a> <span>a zip with the chats and their files, to import again</span></li>
+      <li><a href="/api/export?format=json" download>Export all chats</a> <span>one JSON file to import again, without attachments</span></li>
       <li><a href="/api/export?format=md" download>Export as Markdown</a> <span>a zip with a file per chat, to read</span></li>
     </ul>
     <label>Import chats from a file
-      <input id="import-file" type="file" accept=".json,application/json">
+      <input id="import-file" type="file" accept=".json,.zip,application/json,application/zip">
     </label>
-    <p class="field-note">Chats that are already here are left as they are: nothing is overwritten.</p>
+    <p class="field-note">Chats that are already here are left as they are: nothing is overwritten. Your custom instructions are taken only if you have none.</p>
     <p id="backup-status" role="status" hidden></p>
     <div class="dialog-actions">
       <button type="button" class="btn" data-cancel>Close</button>

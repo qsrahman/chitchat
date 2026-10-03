@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import sqlite3
@@ -7,10 +8,10 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, BinaryIO, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.sse import EventSourceResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
@@ -138,9 +139,20 @@ def export_conversation(cid: str, conn: Conn, format: Literal["md", "json"] = "m
     )
 
 
+def _chunks(file: BinaryIO) -> Iterator[bytes]:
+    with file:
+        while chunk := file.read(1_000_000):
+            yield chunk
+
+
 @router.get("/export")
-def export_everything(conn: Conn, format: Literal["json", "md"] = "json"):
-    """Every conversation: one JSON file that /api/import takes back, or a zip of Markdown files."""
+def export_everything(request: Request, conn: Conn, format: Literal["json", "md", "full"] = "json"):
+    """Every conversation: one JSON file that /api/import takes back, a zip of Markdown files, or ("full") a zip
+    with the JSON and the attachment files, which /api/import takes back too."""
+    if format == "full":
+        archive = backup.export_archive(conn, request.app.state.settings.attachments_dir)
+        return StreamingResponse(_chunks(archive), media_type="application/zip", headers={
+            "Content-Disposition": f'attachment; filename="chitchat-{datetime.now(UTC):%Y-%m-%d}-with-files.zip"'})
     if format == "json":
         body, media_type, extension = backup.export_json(conn), "application/json", "json"
     else:
@@ -149,13 +161,25 @@ def export_everything(conn: Conn, format: Literal["json", "md"] = "json"):
         "Content-Disposition": f'attachment; filename="chitchat-{datetime.now(UTC):%Y-%m-%d}.{extension}"'})
 
 
+def _too_large(limit: int) -> HTTPException:
+    return HTTPException(413, f"That file is too large to import (over {limit // 1_000_000} MB).")
+
+
 @router.post("/import", status_code=201)
-async def import_conversations(file: UploadFile, conn: Conn):
-    """Add the conversations in an exported JSON file (all of them, or none if it isn't a valid export)."""
-    data = await file.read(backup.MAX_IMPORT_BYTES + 1)
-    if len(data) > backup.MAX_IMPORT_BYTES:
-        raise HTTPException(413, f"That file is too large to import (over {backup.MAX_IMPORT_BYTES // 1_000_000} MB).")
+async def import_conversations(file: UploadFile, request: Request, conn: Conn):
+    """Add the conversations in an exported file: the JSON, or the zip with files (all of them, or none if it isn't
+    a valid export)."""
+    is_zip = await file.read(4) == b"PK\x03\x04"
+    await file.seek(0)
     try:
+        if is_zip:
+            if (file.size or 0) > backup.MAX_ARCHIVE_BYTES:
+                raise _too_large(backup.MAX_ARCHIVE_BYTES)
+            files_dir = request.app.state.settings.attachments_dir
+            return await asyncio.to_thread(backup.import_archive, conn, file.file, files_dir)
+        data = await file.read(backup.MAX_IMPORT_BYTES + 1)
+        if len(data) > backup.MAX_IMPORT_BYTES:
+            raise _too_large(backup.MAX_IMPORT_BYTES)
         return backup.import_chats(conn, data)
     except backup.ImportRejected as e:
         raise HTTPException(422, str(e)) from e
