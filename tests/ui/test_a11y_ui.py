@@ -221,3 +221,13 @@ def test_the_page_has_one_main_landmark_a_language_and_a_title(page_with_axe):
     assert page.locator("h1:visible").count() == 1  # one level-one heading at a time: the greeting, then the title
     say(page, "hello")
     assert page.locator("h1:visible").count() == 1
+
+
+def test_the_undo_toast(page_with_axe):
+    page = page_with_axe
+    say(page, "hello")
+    page.get_by_role("button", name="Show conversations").first.click()
+    page.get_by_role("button", name="Delete").first.click(force=True)
+    page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+    expect(page.locator("#toast")).to_be_visible()
+    assert violations(page) == []

@@ -3,7 +3,7 @@ import re
 from playwright.sync_api import expect
 
 from tests.helpers import PNG, make_pdf
-from tests.ui.test_chat_ui import open_app, open_sidebar, saved_messages, send
+from tests.ui.test_chat_ui import finish_delete, open_app, open_sidebar, saved_messages, send
 
 NOTES = ("notes.txt", b"remember the milk", "text/plain")
 PIC = ("pic.png", PNG, "image/png")
@@ -324,6 +324,7 @@ def test_deleting_the_conversation_deletes_its_files(page, app_url):
     page.get_by_role("button", name=re.compile('^Delete "')).click()
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
+    finish_delete(page)
     assert page.request.get(f"{app_url}{href}").status == 404
 
 

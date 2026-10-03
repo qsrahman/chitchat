@@ -90,6 +90,11 @@
     <input id="file-input" type="file" multiple hidden>
   </form>
 
+  <div id="toast" role="status" hidden>
+    <span></span>
+    <button type="button" class="btn">Undo</button>
+  </div>
+
   <div id="drop" hidden>
     <p>Drop files to attach them</p>
   </div>
@@ -126,7 +131,7 @@
 <dialog id="delete-dialog" closedby="any" aria-labelledby="delete-heading">
   <form method="dialog">
     <h2 id="delete-heading">Delete this conversation?</h2>
-    <p><strong id="delete-name"></strong> and all its messages will be removed. This can't be undone.</p>
+    <p><strong id="delete-name"></strong> and all its messages will be removed. You can undo it for a few seconds afterwards.</p>
     <div class="dialog-actions">
       <button type="button" class="btn" data-cancel>Keep it</button>
       <button type="submit" value="delete" class="btn danger">Delete</button>

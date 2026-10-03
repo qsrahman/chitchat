@@ -1,5 +1,5 @@
 // The sidebar: the conversation list, search, rename and delete, and the drawer that shows or hides it.
-import { $, ICONS, api, bus, iconButton, showDialog, state } from "./core.js";
+import { $, ICONS, api, bus, iconButton, showDialog, state, thread } from "./core.js";
 import { jumpTo } from "./messages.js";
 
 // ---- sidebar ----
@@ -52,7 +52,7 @@ const withMarks = (text) => text.split(/\x02(.*?)\x03/s).map((t, i) => // the ca
 async function runSearch() {
   const q = searchBox.value.trim();
   if (!q) return renderList();
-  const results = await api(`/search?q=${encodeURIComponent(q)}`);
+  const results = (await api(`/search?q=${encodeURIComponent(q)}`)).filter((r) => r.id !== pending?.conv.id);
   if (q !== searchBox.value.trim()) return; // typed on meanwhile
   const nav = $("conversations");
   if (!results.length) {
@@ -97,11 +97,12 @@ async function runSearch() {
 function renderList() {
   if (searchBox.value.trim()) return; // results are showing; they stay until the box is cleared
   const nav = $("conversations");
-  if (!state.convs.length) {
+  const shown = state.convs.filter((c) => c.id !== pending?.conv.id); // a chat waiting to be deleted is hidden
+  if (!shown.length) {
     nav.replaceChildren(Object.assign(document.createElement("p"), { className: "no-convs", textContent: "Your conversations will show up here." }));
     return;
   }
-  const groups = Map.groupBy(state.convs, (c) => groupOf(c.updated_at)); // list is already newest-first
+  const groups = Map.groupBy(shown, (c) => groupOf(c.updated_at)); // list is already newest-first
   nav.replaceChildren(...[...groups].flatMap(([name, convs]) => {
     const h = Object.assign(document.createElement("h2"), { textContent: name });
     const ul = document.createElement("ul");
@@ -143,13 +144,49 @@ async function renameConv(c) {
   refreshList();
 }
 
+// A deleted chat is hidden at once but only deleted on the server after UNDO_MS, so "Undo" is just un-hiding it.
+// Deleting another chat, or leaving the page, makes a waiting delete final straight away.
+const UNDO_MS = 10_000;
+let pending = null; // { conv, wasOpen, timer }
+
 async function deleteConv(c) {
   $("delete-name").textContent = c.title;
   if ((await showDialog($("delete-dialog"))) !== "delete") return;
-  await api(`/conversations/${c.id}`, { method: "DELETE" });
-  if (c.id === state.id) bus.dispatchEvent(new CustomEvent("open", { detail: null })); // app.js opens a new chat
-  else refreshList();
+  await commitDelete();
+  pending = { conv: c, wasOpen: c.id === state.id, timer: setTimeout(commitDelete, UNDO_MS) };
+  $("toast").firstElementChild.textContent = `Deleted "${c.title}"`;
+  $("toast").hidden = false;
+  if (pending.wasOpen) bus.dispatchEvent(new CustomEvent("open", { detail: null })); // app.js opens a new chat
+  else renderList();
 }
+
+async function commitDelete() {
+  if (!pending) return;
+  const { conv, timer } = pending;
+  clearTimeout(timer);
+  pending = null;
+  $("toast").hidden = true;
+  try {
+    await api(`/conversations/${conv.id}`, { method: "DELETE" });
+  } finally {
+    await refreshList();
+  }
+}
+
+$("toast").querySelector("button").onclick = () => {
+  const { conv, wasOpen, timer } = pending;
+  clearTimeout(timer);
+  pending = null;
+  $("toast").hidden = true;
+  // Back on the blank chat the delete left behind: show the chat again. Anywhere else, only the list changes.
+  if (wasOpen && state.id === null && !thread.children.length) bus.dispatchEvent(new CustomEvent("open", { detail: conv.id }));
+  else renderList();
+};
+
+// keepalive lets the request finish while the page closes
+window.addEventListener("pagehide", () => {
+  if (pending) fetch(`/api/conversations/${pending.conv.id}`, { method: "DELETE", keepalive: true });
+});
 
 // ---- navigation ----
 // The sidebar starts closed. On narrow screens it is an overlay, so choosing something closes it.

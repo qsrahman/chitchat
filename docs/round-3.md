@@ -24,3 +24,11 @@ The only trace of a failure used to be what the UI showed. `app/logs.py` now giv
 - **What is never logged:** message text, replies, tool arguments or results, file names, and the provider's or a tool's error message (these can quote a key or a URL with a token; the user still sees them in the UI). Tests check this.
 - **Setting:** `LOG_LEVEL` (default `INFO`; `WARNING` keeps only problems).
 Not done: a file or JSON log format, log rotation, and logging of the SSE events themselves. `uv run uvicorn` shows it all in the terminal.
+
+## 4. Undo for delete
+Deleting a chat used to be final after one confirmation. Now, after the confirmation, the chat disappears from the sidebar (and from search results) and a toast says `Deleted "<title>"` with an **Undo** button, for 10 seconds. The server is only asked to delete when that time is up, so Undo is just un-hiding the chat: nothing is restored from anywhere and nothing is half-deleted.
+- Undo on the chat you were in, while you are still on the blank chat the delete opened, reopens it. Otherwise only the sidebar changes.
+- Deleting a second chat makes the first delete final at once (one toast at a time). Leaving or closing the page makes a waiting delete final too (`pagehide`, a `keepalive` request), so closing the tab does what you asked.
+- The confirmation dialog stays (its text now says the delete can be undone for a few seconds); the API is unchanged: `DELETE /api/conversations/{id}` still deletes at once and its attachment files go with it.
+- Limits: the server sees nothing until the 10 seconds are up, so a second tab or an export in that time still shows the chat; if the browser crashes or the network is down during the wait, the chat is simply still there afterwards (the safe direction). The toast is a status message for screen readers, with the Undo button reachable by keyboard.
+Tests: `tests/ui/test_history_ui.py` (undo for the open chat and for another chat, the delete becoming final after the wait with a faked clock, a second delete finalizing the first, search), `tests/ui/test_a11y_ui.py`.

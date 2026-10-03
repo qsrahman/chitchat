@@ -350,6 +350,12 @@ def test_rename_can_be_cancelled_with_escape(page, app_url):
     expect(page.locator("#conversations a")).to_have_text("stay put")
 
 
+def finish_delete(page):
+    """The chat is hidden at once and deleted on the server after a few seconds; leaving the page makes it final."""
+    with page.expect_response(lambda r: r.request.method == "DELETE"):
+        page.evaluate("window.dispatchEvent(new Event('pagehide'))")
+
+
 def test_delete_asks_first_then_removes(page, app_url):
     open_app(page, app_url)
     send(page, "doomed chat")

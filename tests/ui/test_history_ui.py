@@ -156,3 +156,83 @@ def test_the_shortcuts_are_in_the_tooltips(page, app_url):
     open_sidebar(page)
     expect(page.locator("#new-chat")).to_have_attribute("title", re.compile(r"New chat \((⌘|Ctrl\+)Shift\+O\)"))
     expect(search_box(page)).to_have_attribute("title", re.compile(r"Search chats \((⌘|Ctrl\+)K\)"))
+
+
+# ---- undo for delete ----
+
+def delete_chat(page, title):
+    open_sidebar(page)
+    page.get_by_role("button", name=f'Delete "{title}"').click()
+    page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+
+
+def chat_exists(page, app_url, cid):
+    return page.request.get(f"{app_url}/api/conversations/{cid}").status == 200
+
+
+def test_undo_brings_back_the_open_chat_with_its_messages(page, app_url):
+    open_app(page, app_url)
+    send(page, "tell me about quokkas")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    cid = page.url.split("#")[1]
+    delete_chat(page, "tell me about quokkas")
+    expect(page.get_by_role("status")).to_contain_text('Deleted "tell me about quokkas"')
+    expect(page.get_by_text("Your conversations will show up here.")).to_be_visible()  # hidden at once
+    expect(page.locator(".msg")).to_have_count(0)
+    page.get_by_role("button", name="Undo").click()
+    expect(page.locator(".msg.user .body")).to_have_text("tell me about quokkas")
+    expect(page.locator("#conversations a")).to_have_text("tell me about quokkas")
+    expect(page.locator("#toast")).to_be_hidden()
+    assert chat_exists(page, app_url, cid)
+
+
+def test_undo_for_a_chat_that_was_not_open_only_restores_the_list(page, app_url):
+    open_app(page, app_url)
+    send(page, "first chat")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    page.get_by_role("button", name="New chat").first.click()
+    send(page, "second chat")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    delete_chat(page, "first chat")
+    expect(page.locator("#conversations a")).to_have_count(1)
+    expect(page.locator("#conversations a")).to_have_text("second chat")
+    expect(page.locator(".msg.user .body")).to_have_text("second chat")  # still where it was
+    page.get_by_role("button", name="Undo").click()
+    expect(page.locator("#conversations a")).to_have_text(["second chat", "first chat"])
+    expect(page.locator(".msg.user .body")).to_have_text("second chat")
+
+
+def test_the_delete_becomes_final_after_the_wait(page, app_url):
+    page.clock.install()
+    open_app(page, app_url)
+    send(page, "doomed chat")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    cid = page.url.split("#")[1]
+    delete_chat(page, "doomed chat")
+    assert chat_exists(page, app_url, cid)  # not yet
+    with page.expect_response(lambda r: r.request.method == "DELETE"):
+        page.clock.fast_forward(11_000)
+    expect(page.locator("#toast")).to_be_hidden()
+    assert not chat_exists(page, app_url, cid)
+
+
+def test_deleting_a_second_chat_makes_the_first_delete_final(page, app_url):
+    seed_chats(page, app_url, 2)
+    open_app(page, app_url)
+    ids = [c["id"] for c in page.request.get(f"{app_url}/api/conversations").json()]
+    delete_chat(page, "chat 001")
+    with page.expect_response(lambda r: r.request.method == "DELETE"):
+        page.get_by_role("button", name='Delete "chat 000"').click()
+        page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+    expect(page.get_by_role("status")).to_contain_text('Deleted "chat 000"')
+    assert not chat_exists(page, app_url, ids[0])  # chat 001, the first one
+    assert chat_exists(page, app_url, ids[1])  # chat 000 can still be undone
+
+
+def test_a_chat_waiting_to_be_deleted_is_not_in_search_results(page, app_url):
+    open_app(page, app_url)
+    send(page, "tell me about quokkas")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    delete_chat(page, "tell me about quokkas")
+    search_box(page).fill("quokkas")
+    expect(page.get_by_text("No chats match.")).to_be_visible()

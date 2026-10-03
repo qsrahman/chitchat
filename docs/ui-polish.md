@@ -8,7 +8,7 @@ Reading-first. Replies have no bubbles, so long answers read like a document (th
 ## What changed
 - **Layout:** sidebar with conversations grouped by recency (Today, Yesterday, Previous 7 days, Older), a slim top bar with the conversation title, a centered reading column, and a composer with a send/stop button. The sidebar is closed by default (toggle button in the top bar). On wide screens it pushes the content aside and stays open while you switch chats; under 760px it is an overlay drawer that closes when you pick a chat.
 - **Empty state:** "What are you working on?" with four starter prompts.
-- **Rename / delete:** native `<dialog>` (focus trap, Esc, light dismiss where supported) replaces `prompt()` and `confirm()`. Delete defaults focus to "Keep it".
+- **Rename / delete:** native `<dialog>` (focus trap, Esc, light dismiss where supported) replaces `prompt()` and `confirm()`. Delete defaults focus to "Keep it", and a deleted chat can be undone for 10 seconds (`docs/round-3.md`).
 - **Replies:** thinking indicator before the first token, markdown re-rendered once per frame, syntax-highlighted code blocks with a language label and Copy button, links open in a new tab with `noopener`.
 - **Scrolling:** the view follows the stream only while you are at the bottom. If you scroll up, it stays put and a "Jump to latest" button appears.
 - **Security:** model output is sanitized with DOMPurify and `<img>` is removed entirely: a remote image URL in a reply would make the browser send requests, and whatever the URL encodes, to a third party. Revisit when image output becomes a feature.
