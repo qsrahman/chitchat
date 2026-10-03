@@ -7,7 +7,7 @@
 
 [marked]
 package = "marked"
-version = "16.4.2"
+version = "18.0.14"
 purpose = "Markdown to HTML for replies"
 [marked.files]
 "marked.umd.js" = "lib/marked.umd.js"

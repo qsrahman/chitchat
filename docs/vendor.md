@@ -5,7 +5,7 @@ The third-party code the page runs is copied into `app/static/vendor/`: no CDN (
 | Library | Version | Used for | Source file in the npm package |
 |---|---|---|---|
 | [DOMPurify](https://github.com/cure53/DOMPurify) | 3.4.16 | Sanitizes everything rendered from model output. **The one that matters most.** | `dist/purify.min.js` |
-| [marked](https://github.com/markedjs/marked) | 16.4.2 | Markdown to HTML | `lib/marked.umd.js` (the npm package has no minified build; it was misnamed `marked.min.js` before) |
+| [marked](https://github.com/markedjs/marked) | 18.0.14 | Markdown to HTML | `lib/marked.umd.js` (the npm package has no minified build; it was misnamed `marked.min.js` before) |
 | [highlight.js](https://highlightjs.org) | 11.12.0 | Syntax highlighting (the "common languages" build) | `@highlightjs/cdn-assets`: `highlight.min.js` |
 | [KaTeX](https://katex.org) | 0.19.0 | Math | `dist/katex.min.js`, `dist/katex.min.css`, `dist/fonts/*.woff2` |
 | [Open Props](https://open-props.style) | 1.7.23 | Design tokens (CSS variables) | six files from the package root, see the manifest |
@@ -17,7 +17,7 @@ All of these were verified byte for byte against the official npm packages, with
 ```
 uv run python scripts/vendor.py check
 ```
-For each library: do the files match the official package at the pinned version (anything changed, missing, or not in the manifest fails with exit code 1), and is there a newer release (information only). It needs the network, so the tests don't run it. As of writing: everything is pristine; DOMPurify and KaTeX are current; highlight.js has 11.12.0; **marked is two major versions behind** (16.4.2, latest 18.0.14). The math support (`markdown.js`) uses marked's extension API, so a major update needs the math, reasoning and sanitizer tests to pass again before it ships; it hasn't been tried.
+For each library: do the files match the official package at the pinned version (anything changed, missing, or not in the manifest fails with exit code 1), and is there a newer release (information only). It needs the network, so the tests don't run it. As of 2026-10-03 everything is pristine and current. The math support (`markdown.js`) uses marked's extension API, so a major marked update needs the math, reasoning, sanitizer and incremental-render tests to pass again before it ships (they did for 16 to 18, with no code change; see `docs/round-3.md`).
 
 ## Updating
 ```
