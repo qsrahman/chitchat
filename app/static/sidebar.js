@@ -171,6 +171,28 @@ document.querySelectorAll(".nav-toggle").forEach((b) => {
 });
 $("scrim").onclick = () => setNavOpen(false);
 
+// ---- keyboard shortcuts ----
+// Mod+K searches chats, Mod+Shift+O starts a new chat (as on chatgpt.com). Mod is Cmd on a Mac, Ctrl elsewhere.
+const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+$("search").title = `Search chats (${mod}K)`;
+$("new-chat").title = `New chat (${mod}Shift+O)`;
+$("search").setAttribute("aria-keyshortcuts", "Control+K Meta+K");
+$("new-chat").setAttribute("aria-keyshortcuts", "Control+Shift+O Meta+Shift+O");
+
+document.addEventListener("keydown", (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || document.querySelector("dialog[open]")) return;
+  const key = e.key.toLowerCase();
+  if (key === "k" && !e.shiftKey) {
+    e.preventDefault();
+    setNavOpen(true);
+    searchBox.focus();
+    searchBox.select();
+  } else if (key === "o" && e.shiftKey) {
+    e.preventDefault();
+    $("new-chat").click();
+  }
+});
+
 // ---- backup ----
 // Export is two links (the server builds the files). Import sends a chosen JSON file and says what came of it.
 const chats = (n) => `${n} chat${n === 1 ? "" : "s"}`;

@@ -1,4 +1,6 @@
 """Phase 8 in the browser: searching chats, exporting one, and the compaction note."""
+import re
+
 from playwright.sync_api import expect
 
 from tests.ui.test_chat_ui import open_app, open_sidebar, send
@@ -125,3 +127,32 @@ def test_a_chat_beyond_the_first_page_opens_with_its_title_and_stays_loaded_on_r
     expect(page.locator("#title")).to_have_text("chat 000")
     page.get_by_role("button", name="New chat").first.click()
     expect(page.locator("#title")).to_have_text("New chat")
+
+
+def test_mod_k_focuses_search_and_mod_shift_o_starts_a_new_chat(page, app_url):
+    open_app(page, app_url)
+    send(page, "tell me about quokkas")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    page.keyboard.press("Control+k")
+    expect(search_box(page)).to_be_focused()
+    expect(page.locator("body")).to_have_class(re.compile("nav-open"))
+    page.keyboard.press("Control+Shift+O")
+    expect(page.locator(".msg")).to_have_count(0)
+    expect(page.locator("#title")).to_have_text("New chat")
+    expect(page.locator("#input")).to_be_focused()
+
+
+def test_the_shortcuts_are_ignored_while_a_dialog_is_open_and_without_the_modifier(page, app_url):
+    open_app(page, app_url)
+    page.keyboard.press("k")  # plain letters belong to the message box
+    expect(page.locator("#input")).to_have_value("k")
+    page.get_by_role("button", name="Chat settings").click()
+    page.keyboard.press("Control+k")
+    expect(page.locator("body")).not_to_have_class(re.compile("nav-open"))  # nothing opened behind the dialog
+
+
+def test_the_shortcuts_are_in_the_tooltips(page, app_url):
+    open_app(page, app_url)
+    open_sidebar(page)
+    expect(page.locator("#new-chat")).to_have_attribute("title", re.compile(r"New chat \((⌘|Ctrl\+)Shift\+O\)"))
+    expect(search_box(page)).to_have_attribute("title", re.compile(r"Search chats \((⌘|Ctrl\+)K\)"))

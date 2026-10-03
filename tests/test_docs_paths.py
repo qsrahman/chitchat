@@ -1,4 +1,4 @@
-"""Docs name files in backticks (`app/tools.py`, `docs/phase-8.md`); a renamed or deleted file must not leave a stale name."""
+"""Docs name files in backticks (`app/tools.py`); a renamed or deleted file must not leave a stale name."""
 import re
 from pathlib import Path
 
@@ -7,18 +7,20 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = [ROOT / n for n in ("README.md", "CLAUDE.md", "PLAN.md")] + sorted((ROOT / "docs").glob("*.md"))
 TOKEN = re.compile(r"`([^`\s]+)`")
-# A file name is a token with an extension we have, in a directory the repo has (or a bare name at the top level).
 EXTENSIONS = (".py", ".js", ".mjs", ".css", ".html", ".md", ".toml", ".json", ".sh")
 # Placeholders, a library's name, and paths inside npm packages (docs/vendor.md lists those) are not files here.
 NOT_FILES = {"phase-N.md", "docs/phase-N.md", "date-title-idprefix.md", "highlight.js", "marked.min.js",
              "dist/katex.min.css", "dist/katex.min.js", "dist/purify.min.js", "lib/marked.umd.js"}
-LOCATIONS = ("app/static/vendor/", "app/static/vendor/katex/", "tests/ui/assets/", "", "app/", "app/static/", "docs/", "tests/", "tests/ui/", "scripts/", ".githooks/")
+LOCATIONS = ("", "app/", "app/static/", "app/static/vendor/", "app/static/vendor/katex/", "docs/", "tests/",
+             "tests/ui/", "tests/ui/assets/", "scripts/", ".githooks/")
 
 
 def names(doc):
     for token in TOKEN.findall(doc.read_text()):
         token = token.removesuffix(",").removesuffix(".").split("::")[0].split(":")[0]
-        if token not in NOT_FILES and token.endswith(EXTENSIONS) and not any(c in token for c in "*<>{}$=()") and not token.startswith(("http", ".")):
+        placeholder = any(c in token for c in "*<>{}$=()")
+        is_file = token.endswith(EXTENSIONS) and not token.startswith(("http", "."))
+        if is_file and not placeholder and token not in NOT_FILES:
             yield token
 
 
