@@ -16,9 +16,10 @@ export const bus = new EventTarget();
 
 // id: current conversation (null = new chat, created lazily on first send).
 // stick: keep the view pinned to the bottom unless the reader scrolled up.
+// jumpTo: id of a message to scroll to when the next conversation opens (set by a search result).
 // settings: the current conversation's settings (kept client-side until a new chat's first send creates it).
 export const DEFAULT_SETTINGS = { model: null, system_prompt: "", reasoning_effort: null, temperature: null, tools: [] };
-export const state = { id: null, busy: false, abort: null, stick: true, convs: [], settings: { ...DEFAULT_SETTINGS }, tools: [] };
+export const state = { id: null, jumpTo: null, busy: false, abort: null, stick: true, convs: [], settings: { ...DEFAULT_SETTINGS }, tools: [] };
 
 // 20x20 stroke icons (see iconButton).
 export const ICONS = {

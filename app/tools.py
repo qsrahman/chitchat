@@ -200,7 +200,8 @@ async def search_chats(args: dict, *, db_path: str) -> ToolResult:
     for i, r in enumerate(found, 1):
         snippet = r["snippet"].replace("\x02", "").replace("\x03", "")
         who = "the user" if r["role"] == "user" else "the assistant"
-        lines.append(f"\n{i}. \"{r['title']}\" ({r['updated_at'][:10]}), {who} wrote: {snippet}")
+        said = f", {who} wrote: {snippet}" if r["message_id"] else ": the title matches"
+        lines.append(f"\n{i}. \"{r['title']}\" ({r['updated_at'][:10]}){said}")
     if not found:
         lines.append("\nNo matches.")
     shown = [{"id": r["id"], "title": r["title"], "snippet": r["snippet"].replace("\x02", "").replace("\x03", "")}

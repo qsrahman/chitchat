@@ -20,7 +20,8 @@ def test_search_shows_matching_chats_with_the_match_highlighted(page, app_url):
     result = page.locator(".result")
     expect(result).to_have_count(1)
     expect(result.locator("strong")).to_have_text("tell me about quokkas")
-    expect(result.locator("mark")).to_have_text("quokkas")  # the matched word, as the last-word prefix
+    # the prefix matched the word, in the title and in the snippet
+    expect(result.locator("mark")).to_have_text(["quokkas", "quokkas"])
     expect(page.locator("#conversations h2")).to_have_count(0)  # the dated list is replaced
 
 

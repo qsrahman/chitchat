@@ -15,6 +15,18 @@ $("jump").onclick = () => { state.stick = true; scrollToBottom(); };
 // ---- messages ----
 // Each .msg = [details.reasoning] + .body (rendered text) + .note (stopped / cut off / compacted) + .actions.
 // el._text and el._reasoning are the raw texts.
+// Scroll a message (by its id in the database) into the middle of the view and light it up for a moment. False if
+// it isn't in the thread.
+export function jumpTo(id) {
+  const el = id && thread.querySelector(`.msg[data-id="${id}"]`);
+  if (!el) return false;
+  state.stick = false;
+  el.scrollIntoView({ block: "center" });
+  el.classList.add("is-found");
+  setTimeout(() => el.classList.remove("is-found"), 2500);
+  return true;
+}
+
 export function addMessage(role, text = "", meta = {}) {
   const el = document.createElement("div");
   el.className = `msg ${role}`;

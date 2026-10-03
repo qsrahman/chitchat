@@ -141,6 +141,7 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 
 /* messages */
 .msg { margin: 0 0 var(--size-5); }
+.msg.is-found { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: var(--r-lg); box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 14%, transparent); }
 /* The edge of the reply that is still being written: the one place the accent says "in progress". It goes when
    the reply is done; a failed reply gets a red one. The text keeps its place: the edge sits in the margin. */
 .msg.assistant .body, .msg.error .body { margin-left: -16px; padding-left: 14px; border-left: 2px solid transparent; transition: border-color .25s var(--ease-out-3); }
@@ -222,7 +223,7 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 #model-menu:popover-open, #tools-menu:popover-open, dialog[open] { transition: opacity .16s var(--ease-out-3), translate .16s var(--ease-out-3); }
 dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 @starting-style { #model-menu:popover-open, #tools-menu:popover-open, dialog[open] { opacity: 0; translate: 0 -6px; } dialog[open]::backdrop { opacity: 0; } }
-.msg { transition: opacity .25s var(--ease-out-3); }
+.msg { transition: opacity .25s var(--ease-out-3), background-color 1s, box-shadow 1s; } /* the last two: the highlight of a search hit fading */
 @starting-style { .msg { opacity: 0; } }
 @keyframes pulse { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .dots i, .tool-call[data-status="running"] summary { animation: none; opacity: .6; } .actions { transition: none; } }

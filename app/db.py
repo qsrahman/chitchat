@@ -59,8 +59,27 @@ CREATE TRIGGER messages_fts_update AFTER UPDATE OF content ON messages BEGIN
 END;
 """
 
+# v5: the same for conversation titles, so a search finds a chat by its name too. (SQLite keeps an implicit
+# rowid on `conversations`, which is what the index points at.)
+TITLE_SEARCH = """
+CREATE VIRTUAL TABLE conversations_fts USING fts5(
+    title, content='conversations', content_rowid='rowid', tokenize='porter unicode61'
+);
+INSERT INTO conversations_fts(rowid, title) SELECT rowid, title FROM conversations;
+CREATE TRIGGER conversations_fts_insert AFTER INSERT ON conversations BEGIN
+    INSERT INTO conversations_fts(rowid, title) VALUES (new.rowid, new.title);
+END;
+CREATE TRIGGER conversations_fts_delete AFTER DELETE ON conversations BEGIN
+    INSERT INTO conversations_fts(conversations_fts, rowid, title) VALUES ('delete', old.rowid, old.title);
+END;
+CREATE TRIGGER conversations_fts_update AFTER UPDATE OF title ON conversations BEGIN
+    INSERT INTO conversations_fts(conversations_fts, rowid, title) VALUES ('delete', old.rowid, old.title);
+    INSERT INTO conversations_fts(rowid, title) VALUES (new.rowid, new.title);
+END;
+"""
+
 # Each entry upgrades the schema by one version; PRAGMA user_version records how many ran.
-MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS, SEARCH]
+MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS, SEARCH, TITLE_SEARCH]
 
 
 def connect(path: str) -> sqlite3.Connection:

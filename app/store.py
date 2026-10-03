@@ -132,24 +132,42 @@ def delete_messages_after(conn: sqlite3.Connection, cid: str, message_id: int) -
     conn.commit()
 
 
-def search_conversations(conn: sqlite3.Connection, query: str, limit: int = 20, tokens: int = 12) -> list[dict]:
-    """Conversations with a message matching every word of `query` (the last one as a prefix, so results follow
-    the typing), best match first. Each has a snippet where the control characters STX and ETX enclose matches."""
+def search_conversations(
+    conn: sqlite3.Connection, query: str, limit: int = 20, tokens: int = 12, exclude: str | None = None
+) -> list[dict]:
+    """Conversations whose title or a message matches every word of `query` (the last one as a prefix, so results
+    follow the typing), those matching by title first. One row per conversation: id, title, updated_at, and
+    title_marked (the title, with the control characters STX and ETX around matches); and, when a message matches,
+    its message_id, role and a snippet marked the same way (otherwise message_id is None and snippet ""). `exclude`
+    leaves one conversation out."""
     words = re.findall(r"\w+", query)  # only words reach FTS5's query syntax, so no input can break it
     if not words:
         return []
     match = " ".join(f'"{w}"' for w in words) + "*"
-    rows = conn.execute(
-        """SELECT c.id, c.title, c.updated_at, m.role, snippet(messages_fts, 0, char(2), char(3), '…', ?) AS snippet
-           FROM messages_fts JOIN messages m ON m.id = messages_fts.rowid
-           JOIN conversations c ON c.id = m.conversation_id
-           WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?""",
-        (tokens, match, limit * 5),
+    skip, extra = ("AND c.id != ?", (exclude,)) if exclude else ("", ())
+    by_title = conn.execute(
+        f"""SELECT c.id, c.title, c.updated_at, highlight(conversations_fts, 0, char(2), char(3)) AS title_marked
+            FROM conversations_fts JOIN conversations c ON c.rowid = conversations_fts.rowid
+            WHERE conversations_fts MATCH ? {skip} ORDER BY rank LIMIT ?""",
+        (match, *extra, limit),
     )
-    best = {}
-    for r in rows:  # in rank order, so the first row of a conversation is its best message
-        best.setdefault(r["id"], dict(r))
-    return list(best.values())[:limit]
+    by_message = conn.execute(
+        f"""SELECT c.id, c.title, c.updated_at, m.id AS message_id, m.role,
+                   snippet(messages_fts, 0, char(2), char(3), '…', ?) AS snippet
+            FROM messages_fts JOIN messages m ON m.id = messages_fts.rowid
+            JOIN conversations c ON c.id = m.conversation_id
+            WHERE messages_fts MATCH ? {skip} ORDER BY rank LIMIT ?""",
+        (tokens, match, *extra, limit * 5),
+    )
+    found = {}
+    for r in by_title:
+        found[r["id"]] = {**dict(r), "message_id": None, "role": None, "snippet": ""}
+    for r in by_message:  # in rank order, so the first row of a conversation is its best message
+        row = found.setdefault(r["id"], {"id": r["id"], "title": r["title"], "updated_at": r["updated_at"],
+                                         "title_marked": r["title"], "message_id": None, "role": None, "snippet": ""})
+        if row["message_id"] is None:
+            row.update(message_id=r["message_id"], role=r["role"], snippet=r["snippet"])
+    return list(found.values())[:limit]
 
 
 # ---- attachments (files live on disk, see attachments.py; these rows say what they are) ----

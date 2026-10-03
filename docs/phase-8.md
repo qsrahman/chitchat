@@ -35,7 +35,7 @@ Full-text search over message text with SQLite FTS5 (migration v4: an external-c
 - The query is built from the `\w+` words of the input, each quoted, so no input can hit FTS5's own syntax (`AND`, `NEAR`, `col:`, quotes).
 - Snippets mark matches with STX/ETX control characters, which cannot appear in the text being searched in practice; the UI splits on them and builds `<mark>` elements, so a snippet is never parsed as HTML.
 - UI: a search box in the sidebar replaces the dated list with results while it has text (debounced, hidden in the icon rail).
-- Titles are not searched, only message text.
+- Titles are searched too, and a result opens the chat at the matching message: see "Search, later" below.
 
 ## Export
 `GET /api/conversations/{id}/export?format=md|json` downloads the chat. Markdown has the title, then `## You` / `## Assistant` sections (attachments listed by name). JSON is the conversation with its messages, metadata included (reasoning, usage, tool calls) minus the encrypted compaction item. Attachment files are not included. The links are in the chat settings dialog.
@@ -48,3 +48,8 @@ Full-text search over message text with SQLite FTS5 (migration v4: an external-c
 - A manual "compact now" button (`responses.compact` is available if wanted).
 - Searching titles, or opening a conversation at the matched message.
 - Importing an export.
+
+## Search, later: titles, and jumping to the message
+- **Titles are searched** (migration v5: a second FTS5 index over `conversations.title`, kept in step by triggers for insert, rename and delete). A chat comes up if its title or any message matches every word; those matching by title come first. Each result is one row: `id`, `title`, `title_marked` (the title with STX/ETX around matches), and, when a message matches, `message_id`, `role` and `snippet`; a title-only match has `message_id: null` and an empty snippet. The `search_chats` tool reports those as "the title matches".
+- **A result opens at its message:** the sidebar sets `state.jumpTo` to the message id before the hash changes; `openConversation` puts each message's database id on its element (`data-id`) and, after rendering, scrolls the match to the middle of the view and lights it (`.is-found`, about 2.5 s, fading). A title match opens the chat at the end as before. If the chat is already open the hash does not change, so the page scrolls there directly, or, when the message was streamed in this session and has no id on the page yet, opens the chat again to get the ids.
+- Tests: `tests/test_search_titles.py`, `tests/ui/test_search_jump_ui.py`.

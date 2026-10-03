@@ -1,5 +1,6 @@
 // The sidebar: the conversation list, search, rename and delete, and the drawer that shows or hides it.
 import { $, ICONS, api, bus, iconButton, showDialog, state } from "./core.js";
+import { jumpTo } from "./messages.js";
 
 // ---- sidebar ----
 const DAY = 864e5;
@@ -29,6 +30,10 @@ searchBox.addEventListener("input", () => {
   searchTimer = setTimeout(runSearch, 200);
 });
 
+// A string with matches between STX and ETX, as text with <mark> around them (never as HTML).
+const withMarks = (text) => text.split(/\x02(.*?)\x03/s).map((t, i) => // the captured (matched) parts are the odd ones
+  i % 2 ? Object.assign(document.createElement("mark"), { textContent: t }) : t);
+
 async function runSearch() {
   const q = searchBox.value.trim();
   if (!q) return renderList();
@@ -47,12 +52,27 @@ async function runSearch() {
     a.className = "result";
     a.dir = "auto";
     a.href = `#${r.id}`;
-    a.onclick = closeNavIfOverlay;
-    const snippet = document.createElement("span");
-    // split() puts the captured (matched) parts at the odd indexes
-    snippet.append(...r.snippet.split(/\x02(.*?)\x03/s).map((t, i) =>
-      i % 2 ? Object.assign(document.createElement("mark"), { textContent: t }) : t));
-    a.append(Object.assign(document.createElement("strong"), { textContent: r.title }), snippet);
+    a.onclick = (e) => {
+      closeNavIfOverlay();
+      if (r.id !== state.id) {
+        state.jumpTo = r.message_id; // the hash change opens the chat there (null: a title match, opened as usual)
+        return;
+      }
+      e.preventDefault(); // already open: the hash won't change
+      // A message streamed in this session has no id on the page yet; opening the chat again gives them all one.
+      if (r.message_id && !jumpTo(r.message_id)) {
+        state.jumpTo = r.message_id;
+        bus.dispatchEvent(new CustomEvent("open", { detail: r.id }));
+      }
+    };
+    const title = document.createElement("strong");
+    title.append(...withMarks(r.title_marked));
+    a.append(title);
+    if (r.snippet) {
+      const snippet = document.createElement("span");
+      snippet.append(...withMarks(r.snippet));
+      a.append(snippet);
+    }
     li.append(a);
     return li;
   }));
