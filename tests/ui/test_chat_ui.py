@@ -397,6 +397,6 @@ def test_mobile_sidebar_is_a_drawer(page, app_url):
 def test_follows_system_color_scheme(page, app_url):
     page.emulate_media(color_scheme="light")
     open_app(page, app_url)
-    expect(page.locator("body")).to_have_css("background-color", "rgb(255, 255, 255)")
+    expect(page.locator("body")).to_have_css("background-color", "rgb(252, 251, 250)")
     page.emulate_media(color_scheme="dark")
-    expect(page.locator("body")).to_have_css("background-color", "rgb(22, 25, 31)")
+    expect(page.locator("body")).to_have_css("background-color", "rgb(27, 26, 25)")

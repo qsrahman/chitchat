@@ -1,20 +1,23 @@
 :root {
   color-scheme: light dark;
-  --bg: light-dark(#f4f5f8, #0f1115);
-  --surface: light-dark(#ffffff, #16191f);
-  --raised: light-dark(#ffffff, #222730); /* the composer: lifted off the page */
-  --ink: light-dark(#16181d, #e7e9ee);
-  --muted: light-dark(#596070, #9aa2b0);
-  --line: light-dark(#e1e4ea, #282d36);
-  --hover: light-dark(#e9ecf1, #1f232b);
-  --accent: light-dark(#3652e3, #93a5ff);
-  --on-accent: light-dark(#ffffff, #0f1115);
+  /* Warm graphite and paper, one deep teal accent. Light: paper page (--bg, also the sidebar), brighter sheet
+     (--surface) for the conversation. Dark: warm charcoal, never pure black. */
+  --bg: light-dark(#f3f1ee, #141312);
+  --surface: light-dark(#fcfbfa, #1b1a19);
+  --raised: light-dark(#ffffff, #262422); /* the composer: lifted off the page */
+  --ink: light-dark(#201e1c, #ece9e5);
+  --muted: light-dark(#6a655f, #a39d96);
+  --line: light-dark(#e4e0da, #2f2c29);
+  --hover: light-dark(#eae6e0, #2a2724);
+  --accent: light-dark(#0f7b6c, #5fd0bc);
+  --on-accent: light-dark(#ffffff, #0f1412);
   --danger: light-dark(#b42318, #ff9087);
-  --spark-1: light-dark(#3652e3, #93a5ff); /* the send button's hover gradient: the accent, then three more hues */
-  --spark-2: light-dark(#8a3fd1, #c4a1ff);
-  --spark-3: light-dark(#e0407f, #ff9bc2);
+  --spark-1: var(--accent); /* the send button's hover gradient: the accent, then three more hues */
+  --spark-2: light-dark(#3b5bdb, #8fa4ff);
+  --spark-3: light-dark(#d6336c, #ff9bc2);
   --spark-4: light-dark(#e8801f, #ffc07a);
-  --bubble: light-dark(#eceef3, #242934); /* sent messages and inline code: a step above the page */
+  --bubble: light-dark(#ebe7e1, #2a2724); /* sent messages and inline code: a step above the page */
+  --shadow-color: 30 10% 14%; /* Open Props' shadows take their hue from here: warm, to match */
   --r-sm: var(--size-2); /* controls */
   --r-lg: var(--size-3); /* containers: menus, dialogs, code blocks, bubbles */
   --text-sm: .875rem; /* secondary text; --font-size-0 (.75rem) is for the smallest */
@@ -23,7 +26,9 @@
   --sans: ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --col: 46rem;
+  --measure: 62ch; /* the longest line of answer text; code, tables and math may run to the column */
 }
+@media (prefers-color-scheme: dark) { :root { --shadow-color: 30 20% 2%; } }
 
 * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -126,11 +131,19 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 
 /* messages */
 .msg { margin: 0 0 var(--size-5); }
+/* The edge of the reply that is still being written: the one place the accent says "in progress". It goes when
+   the reply is done; a failed reply gets a red one. The text keeps its place: the edge sits in the margin. */
+.msg.assistant .body, .msg.error .body { margin-left: -16px; padding-left: 14px; border-left: 2px solid transparent; transition: border-color .25s var(--ease-out-3); }
+#thread[aria-busy="true"] > .msg.assistant:last-child .body { border-left-color: var(--accent); }
+.msg.error .body { border-left-color: var(--danger); }
 .msg.user { display: flex; flex-direction: column; align-items: flex-end; }
 .msg.user .body { max-width: 85%; padding: 9px 14px; border-radius: var(--r-lg) var(--r-lg) var(--size-1) var(--r-lg); background: var(--bubble); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.assistant .body { font: 1rem/1.75 var(--sans); overflow-wrap: anywhere; }
+.msg.assistant .body :is(p, ul, ol, blockquote) { max-width: var(--measure); }
 .msg.assistant .body :is(p, li, blockquote) { text-wrap: pretty; }
-.msg.error .body { padding-left: 12px; border-left: 3px solid var(--danger); color: var(--danger); }
+.msg.assistant .body strong { font-weight: var(--font-weight-6); }
+.msg.assistant .body a { text-underline-offset: .2em; text-decoration-thickness: 1px; }
+.msg.error .body { color: var(--danger); }
 .reasoning { margin: 0 0 12px; font: .9rem/1.55 var(--sans); color: var(--muted); }
 .reasoning summary { width: fit-content; padding: 2px 0; cursor: pointer; }
 .reasoning summary:hover { color: var(--ink); }
@@ -274,7 +287,7 @@ dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
 .tile-file:hover { background: var(--hover); }
 .tile-file .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
 .msg.user .body:empty { display: none; }
-#drop { position: fixed; inset: 0; z-index: var(--layer-5); display: grid; place-items: center; background: light-dark(#ffffffd9, #0f1115d9); pointer-events: none; }
+#drop { position: fixed; inset: 0; z-index: var(--layer-5); display: grid; place-items: center; background: light-dark(#fcfbfad9, #141312d9); pointer-events: none; }
 #drop p { margin: 0; padding: 28px 40px; border: 2px dashed var(--accent); border-radius: var(--size-5); font-size: 1.1rem; }
 
 
