@@ -1,0 +1,50 @@
+# The third-party files copied into app/static/vendor/ (no CDN, no build step: see CLAUDE.md), and where each
+# came from. `uv run python scripts/vendor.py check` compares them with the official npm packages and looks for
+# newer releases; `... update NAME` replaces a library and bumps its version here. See docs/vendor.md.
+#
+# files: path under app/static/vendor/ = path inside the npm package. A key ending in "/" with a "*" in the value
+# is a set of files. transforms: the one edit we make to a file, by name (see TRANSFORMS in vendor.py).
+
+[marked]
+package = "marked"
+version = "16.4.2"
+purpose = "Markdown to HTML for replies"
+[marked.files]
+"marked.umd.js" = "lib/marked.umd.js"
+
+[dompurify]
+package = "dompurify"
+version = "3.4.16"
+purpose = "Sanitizes everything rendered from model output: the one that matters most for security"
+[dompurify.files]
+"purify.min.js" = "dist/purify.min.js"
+
+[highlightjs]
+package = "@highlightjs/cdn-assets"
+version = "11.11.1"
+purpose = "Syntax highlighting in code blocks (the common languages build)"
+[highlightjs.files]
+"highlight.min.js" = "highlight.min.js"
+
+[katex]
+package = "katex"
+version = "0.19.0"
+purpose = "Typesets math"
+[katex.files]
+"katex/katex.min.js" = "dist/katex.min.js"
+"katex/katex.min.css" = "dist/katex.min.css"
+"katex/fonts/" = "dist/fonts/*.woff2"
+[katex.transforms]
+"katex/katex.min.css" = "woff2-only"
+
+[open-props]
+package = "open-props"
+version = "1.7.23"
+purpose = "Design tokens (CSS variables): sizes, shadows, easings, type, layers"
+[open-props.files]
+"open-props/sizes.min.css" = "sizes.min.css"
+"open-props/shadows.min.css" = "shadows.min.css"
+"open-props/easings.min.css" = "easings.min.css"
+"open-props/fonts.min.css" = "fonts.min.css"
+"open-props/zindex.min.css" = "zindex.min.css"
+"open-props/LICENSE" = "LICENSE"
