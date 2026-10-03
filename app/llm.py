@@ -15,6 +15,7 @@ import base64
 import json
 import logging
 import re
+import time
 import typing
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -29,6 +30,7 @@ from app.config import Settings
 from app.tools import Tool, ToolError
 
 Event = dict
+MODELS_TTL = 300  # seconds to keep the model list
 logger = logging.getLogger(__name__)
 
 # The SDK's own list of effort levels (its type is Optional[Literal[...]]). Which of them a model accepts varies.
@@ -163,6 +165,7 @@ class OpenAILLM:
     def __init__(self, settings: Settings, client: AsyncOpenAI | None = None):
         self.settings = settings
         self._client = client
+        self._models: tuple[float, list[str]] | None = None  # (when fetched, ids): see list_models
 
     @property
     def client(self) -> AsyncOpenAI:
@@ -175,7 +178,10 @@ class OpenAILLM:
         return self._client
 
     async def list_models(self) -> list[str]:
-        """Chat models the endpoint offers, newest first; [] if it can't be listed."""
+        """Chat models the endpoint offers, newest first; [] if it can't be listed. Remembered for MODELS_TTL
+        seconds, since it is a remote call made whenever the page or the picker asks; a failure is not remembered."""
+        if self._models and time.monotonic() - self._models[0] < MODELS_TTL:
+            return self._models[1]
         try:
             models = [m async for m in self.client.models.list()]
         except openai.OpenAIError:
@@ -186,7 +192,9 @@ class OpenAILLM:
             snapshot = _SNAPSHOT.match(model.id)
             return not _NOT_CHAT.search(model.id) and not (snapshot and snapshot["alias"] in listed)
 
-        return [m.id for m in sorted(filter(wanted, models), key=lambda m: (-(getattr(m, "created", 0) or 0), m.id))]
+        ids = [m.id for m in sorted(filter(wanted, models), key=lambda m: (-(getattr(m, "created", 0) or 0), m.id))]
+        self._models = (time.monotonic(), ids)
+        return ids
 
     async def stream_reply(
         self,

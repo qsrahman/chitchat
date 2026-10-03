@@ -572,3 +572,52 @@ async def test_a_stored_compaction_item_is_sent_as_it_is_in_place_of_earlier_tur
     messages = [{"compaction": COMPACTION}, {"role": "user", "content": "next"}]
     [e async for e in llm.stream_reply("m", messages)]
     assert requests[0]["input"] == [COMPACTION, {"role": "user", "content": "next"}]
+
+
+# ---- the model list is remembered briefly ----
+
+def counting_models_llm(*models, fail_after=None):
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        if fail_after is not None and len(requests) > fail_after:
+            return httpx.Response(500, json={"error": {"message": "down"}})
+        return models_response(*models)
+
+    return make_llm(handler), requests
+
+
+async def test_the_model_list_is_fetched_once_within_the_ttl(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("app.llm.time.monotonic", lambda: clock[0])
+    llm, requests = counting_models_llm(("a-model", 1))
+    assert await llm.list_models() == ["a-model"]
+    clock[0] += 299
+    assert await llm.list_models() == ["a-model"]
+    assert len(requests) == 1
+
+
+async def test_the_model_list_is_fetched_again_after_the_ttl(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("app.llm.time.monotonic", lambda: clock[0])
+    llm, requests = counting_models_llm(("a-model", 1))
+    await llm.list_models()
+    clock[0] += 301
+    await llm.list_models()
+    assert len(requests) == 2
+
+
+async def test_a_failed_listing_is_not_remembered(monkeypatch):
+    llm, requests = counting_models_llm(("a-model", 1), fail_after=0)
+    assert await llm.list_models() == [] and await llm.list_models() == []
+    assert len(requests) == 2  # tried again, not served from a cache of nothing
+
+
+async def test_when_a_refresh_fails_the_old_list_is_not_served_as_if_new(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("app.llm.time.monotonic", lambda: clock[0])
+    llm, requests = counting_models_llm(("a-model", 1), fail_after=1)
+    assert await llm.list_models() == ["a-model"]
+    clock[0] += 400
+    assert await llm.list_models() == []  # the endpoint is down now, and the picker should say so
