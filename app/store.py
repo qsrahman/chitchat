@@ -9,10 +9,11 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
-from app import tools
+from app import db, tools
 from app.llm import ReasoningEffort
 
 DEFAULT_TITLE = "New chat"
+BULK_IMPORT = 200  # messages: from this many an import indexes them in one go (see import_conversations)
 
 Instructions = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10_000)]  # may be empty = unset
 
@@ -236,7 +237,17 @@ def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
     rows for files already on disk: id, name, mime, kind, size, created_at. One whose id is already here, or repeated
     in `chats`, is skipped. Returns {"imported", "skipped", "messages", "attachments"}."""
     imported = skipped = messages = files = 0
+    bulk = sum(len(c["messages"]) for c in chats) >= BULK_IMPORT
+    first_new = 0
     try:
+        if bulk:
+            # Indexing a message as it is inserted costs about 0.2 ms each, and one INSERT ... SELECT over all of
+            # them costs a tenth of that (100,000 messages: 40 s against 4 s). The change is made inside the
+            # transaction, so a failure rolls the trigger back with everything else.
+            if not conn.in_transaction:
+                conn.execute("BEGIN")
+            first_new = conn.execute("SELECT COALESCE(MAX(id), 0) FROM messages").fetchone()[0]
+            conn.execute("DROP TRIGGER messages_fts_insert")
         for c in chats:
             if conn.execute("SELECT 1 FROM conversations WHERE id = ?", (c["id"],)).fetchone():
                 skipped += 1
@@ -267,6 +278,10 @@ def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
             files += len(c.get("attachments", []))
             imported += 1
             messages += len(c["messages"])
+        if bulk:
+            conn.execute("INSERT INTO messages_fts(rowid, content) SELECT id, content FROM messages WHERE id > ?",
+                         (first_new,))
+            conn.execute(db.MESSAGES_FTS_INSERT_TRIGGER)  # one statement: executescript would commit
         conn.commit()
     except Exception:
         conn.rollback()

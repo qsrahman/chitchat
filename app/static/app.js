@@ -4,12 +4,16 @@ import { $, DEFAULT_SETTINGS, api, bus, main, state, thread } from "./core.js";
 import { addMessage, jumpTo, render, scrollToBottom } from "./messages.js";
 import { clearPending, focusComposer, loadAttachmentLimits, loadDraft, syncSend } from "./composer.js";
 import { updateActions } from "./chat.js";
-import { closeNavIfOverlay, refreshList, setTitle } from "./sidebar.js";
+import { refreshList, setTitle } from "./list.js";
+import { closeNavIfOverlay } from "./nav.js";
 import { refreshModels, setSettings } from "./settings.js";
 import { loadTools } from "./controls.js";
+import "./backup.js";
+import "./delete.js";
 import "./model-menu.js";
 import "./retry-menu.js";
 import "./appearance.js";
+import "./shortcuts.js";
 
 async function openConversation(id) {
   const target = state.jumpTo; // a search result asked to open at this message
@@ -38,7 +42,9 @@ async function openConversation(id) {
         el.dataset.id = m.id;
         el._siblings = m.siblings;
       });
-      thread.querySelectorAll(".msg").forEach(render);
+      state.stick = false; // render() scrolls to the end when this is on, and reading the scroll height forces the
+      thread.querySelectorAll(".msg").forEach(render); // page to lay out again: once per message is quadratic
+      state.stick = true;
     } catch {
       return openConversation(null); // stale link
     }

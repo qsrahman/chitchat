@@ -1,8 +1,9 @@
-// The sidebar: the conversation list, search, rename and delete, and the drawer that shows or hides it.
-import { $, ICONS, api, bus, iconButton, showDialog, state, thread } from "./core.js";
+// The sidebar's list of conversations: paging, search, rename, pin and archive. Delete is in delete.js, the drawer in
+// nav.js, the shortcuts in shortcuts.js, and backup and import in backup.js.
+import { $, ICONS, api, bus, iconButton, showDialog, state } from "./core.js";
 import { jumpTo } from "./messages.js";
+import { closeNavIfOverlay } from "./nav.js";
 
-// ---- sidebar ----
 const DAY = 864e5;
 function groupOf(iso) {
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -53,7 +54,7 @@ const withMarks = (text) => text.split(/\x02(.*?)\x03/s).map((t, i) => // the ca
 async function runSearch() {
   const q = searchBox.value.trim();
   if (!q) return renderList();
-  const results = (await api(`/search?q=${encodeURIComponent(q)}`)).filter((r) => r.id !== pending?.conv.id);
+  const results = (await api(`/search?q=${encodeURIComponent(q)}`)).filter((r) => r.id !== hiddenId);
   if (q !== searchBox.value.trim()) return; // typed on meanwhile
   const nav = $("conversations");
   if (!results.length) {
@@ -95,10 +96,17 @@ async function runSearch() {
   nav.replaceChildren(ul);
 }
 
-function renderList() {
+// A chat that is being deleted (delete.js: gone for good in ten seconds unless undone) is hidden from the list.
+let hiddenId = null;
+export function hideChat(id, render = true) {
+  hiddenId = id;
+  if (render) renderList();
+}
+
+export function renderList() {
   if (searchBox.value.trim()) return; // results are showing; they stay until the box is cleared
   const nav = $("conversations");
-  const shown = state.convs.filter((c) => c.id !== pending?.conv.id); // a chat waiting to be deleted is hidden
+  const shown = state.convs.filter((c) => c.id !== hiddenId); // a chat waiting to be deleted is hidden
   if (!shown.length) {
     const empty = showArchived ? "Archived chats will show up here." : "Your conversations will show up here.";
     nav.replaceChildren(Object.assign(document.createElement("p"), { className: "no-convs", textContent: empty }));
@@ -138,7 +146,7 @@ function renderConv(c) {
     iconButton(`Rename "${c.title}"`, ICONS.pencil, () => renameConv(c)),
     iconButton(`${showArchived ? "Unarchive" : "Archive"} "${c.title}"`, ICONS.archive,
       () => setFlags(c, { archived: !showArchived })),
-    iconButton(`Delete "${c.title}"`, ICONS.trash, () => deleteConv(c)),
+    iconButton(`Delete "${c.title}"`, ICONS.trash, () => bus.dispatchEvent(new CustomEvent("delete-chat", { detail: c }))),
   );
   return li;
 }
@@ -164,133 +172,3 @@ async function renameConv(c) {
   await api(`/conversations/${c.id}`, { method: "PATCH", body: JSON.stringify({ title }) });
   refreshList();
 }
-
-// A deleted chat is hidden at once but only deleted on the server after UNDO_MS, so "Undo" is just un-hiding it.
-// Deleting another chat, or leaving the page, makes a waiting delete final straight away.
-const UNDO_MS = 10_000;
-let pending = null; // { conv, wasOpen, timer }
-
-async function deleteConv(c) {
-  $("delete-name").textContent = c.title;
-  if ((await showDialog($("delete-dialog"))) !== "delete") return;
-  await commitDelete();
-  pending = { conv: c, wasOpen: c.id === state.id, timer: setTimeout(commitDelete, UNDO_MS) };
-  $("toast").firstElementChild.textContent = `Deleted "${c.title}"`;
-  $("toast").hidden = false;
-  if (pending.wasOpen) bus.dispatchEvent(new CustomEvent("open", { detail: null })); // app.js opens a new chat
-  else renderList();
-}
-
-async function commitDelete() {
-  if (!pending) return;
-  const { conv, timer } = pending;
-  clearTimeout(timer);
-  pending = null;
-  $("toast").hidden = true;
-  try {
-    await api(`/conversations/${conv.id}`, { method: "DELETE" });
-  } catch { /* already gone (another tab, or the page was closing): that is what was wanted */ }
-  await refreshList();
-}
-
-$("toast").querySelector("button").onclick = () => {
-  if (!pending) return;
-  const { conv, wasOpen, timer } = pending;
-  clearTimeout(timer);
-  pending = null;
-  $("toast").hidden = true;
-  // Back on the blank chat the delete left behind: show the chat again. Anywhere else, only the list changes.
-  if (wasOpen && state.id === null && !thread.children.length) bus.dispatchEvent(new CustomEvent("open", { detail: conv.id }));
-  else renderList();
-};
-
-// keepalive lets the request finish while the page closes
-window.addEventListener("pagehide", () => {
-  if (!pending) return;
-  fetch(`/api/conversations/${pending.conv.id}`, { method: "DELETE", keepalive: true });
-  clearTimeout(pending.timer);
-  pending = null; // sent: nothing is waiting any more (the page may come back from the back-forward cache)
-  $("toast").hidden = true;
-});
-
-// ---- navigation ----
-// The sidebar starts closed. On narrow screens it is an overlay, so choosing something closes it.
-function setNavOpen(open) {
-  document.body.classList.toggle("nav-open", open);
-  $("scrim").hidden = !open;
-  const label = open ? "Hide conversations" : "Show conversations";
-  for (const toggle of document.querySelectorAll(".nav-toggle")) {
-    toggle.setAttribute("aria-expanded", String(open));
-    toggle.setAttribute("aria-label", label);
-    toggle.title = label;
-  }
-}
-export function closeNavIfOverlay() {
-  if (matchMedia("(max-width: 760px)").matches) setNavOpen(false);
-}
-document.querySelectorAll(".nav-toggle").forEach((b) => {
-  b.onclick = () => setNavOpen(!document.body.classList.contains("nav-open"));
-});
-$("scrim").onclick = () => setNavOpen(false);
-
-// ---- keyboard shortcuts ----
-// Mod+K searches chats, Mod+Shift+O starts a new chat (as on chatgpt.com). Mod is Cmd on a Mac, Ctrl elsewhere.
-const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
-$("search").title = `Search chats (${mod}K)`;
-$("new-chat").title = `New chat (${mod}Shift+O)`;
-$("search").setAttribute("aria-keyshortcuts", "Control+K Meta+K");
-$("new-chat").setAttribute("aria-keyshortcuts", "Control+Shift+O Meta+Shift+O");
-
-document.addEventListener("keydown", (e) => {
-  if (!(e.metaKey || e.ctrlKey) || e.altKey || document.querySelector("dialog[open]")) return;
-  const key = e.key.toLowerCase();
-  if (key === "k" && !e.shiftKey) {
-    e.preventDefault();
-    setNavOpen(true);
-    searchBox.focus();
-    searchBox.select();
-  } else if (key === "o" && e.shiftKey) {
-    e.preventDefault();
-    document.activeElement?.blur(); // so the new chat gets the cursor even if it was in the search box
-    $("new-chat").click();
-  }
-});
-
-// ---- backup ----
-// Export is links (the server builds the files). Import sends a chosen JSON or zip file and says what came of it.
-const chats = (n) => `${n} chat${n === 1 ? "" : "s"}`;
-
-function setBackupStatus(text, failed = false) {
-  const status = $("backup-status");
-  status.textContent = text;
-  status.hidden = !text;
-  status.classList.toggle("is-error", failed);
-}
-
-$("backup-btn").onclick = () => {
-  setBackupStatus("");
-  $("backup-dialog").showModal();
-};
-
-$("import-file").onchange = async (e) => {
-  const [file] = e.target.files;
-  e.target.value = ""; // so choosing the same file again still counts
-  if (!file) return;
-  setBackupStatus(`Importing ${file.name}…`);
-  await commitDelete(); // a chat deleted a moment ago is gone for good now, so an import of it is not hidden or deleted again
-  const body = new FormData();
-  body.append("file", file);
-  try {
-    const res = await fetch("/api/import", { method: "POST", body });
-    const result = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(typeof result.detail === "string" ? result.detail : `The import failed (${res.status}).`);
-    const files = result.attachments ? ` with ${result.attachments} file${result.attachments === 1 ? "" : "s"}` : "";
-    const instructions = result.custom_instructions ? "; custom instructions added" : "";
-    setBackupStatus(result.imported
-      ? `Imported ${chats(result.imported)}${files}${result.skipped ? `; ${result.skipped} already here` : ""}${instructions}.`
-      : `Nothing new: ${chats(result.skipped)} already here${instructions}.`);
-    await refreshList();
-  } catch (err) {
-    setBackupStatus(err instanceof TypeError ? "Couldn't reach the server." : err.message, true);
-  }
-};

@@ -441,3 +441,61 @@ async def test_a_leaf_of_null_means_the_last_message(second):
     await import_file(second, document)
     messages = (await second.get(f"/api/conversations/{'c' * 32}")).json()["messages"]
     assert [m["content"] for m in messages] == ["q", "a2"]
+
+
+# ---- a big import is indexed in one go ----
+
+def big_document(chats, per_chat, word="zebrafish"):
+    return {"conversations": [{"id": f"{i:032x}", "title": f"chat {i}", "messages": [
+        {"role": "user" if j % 2 == 0 else "assistant", "content": f"{word} number {i} message {j}"}
+        for j in range(per_chat)]} for i in range(chats)]}
+
+
+def fts_count(conn_or_app, word):
+    from contextlib import closing
+    path = conn_or_app.state.settings.db_path
+    with closing(db.connect(path)) as conn:
+        return (conn.execute("SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH ?", (word,)).fetchone()[0],
+                conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0],
+                conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE name = 'messages_fts_insert'").fetchone()[0])
+
+
+async def test_a_big_import_is_searchable_and_the_index_matches_the_messages_exactly(second):
+    r = await import_file(second, big_document(30, 20))  # 600 messages: over the bulk threshold
+    assert r.json()["messages"] == 600
+    indexed, messages, trigger = fts_count(second.app, "zebrafish")
+    assert (indexed, messages, trigger) == (600, 600, 1)  # none missing, none twice, trigger back in place
+    found = (await second.get("/api/search", params={"q": "message 7"})).json()
+    assert len(found) == 20  # one per chat, up to the search's limit
+
+
+async def test_what_was_there_before_a_big_import_is_not_indexed_twice(second):
+    second.app.state.llm.events = [{"type": "delta", "text": "zebrafish already here"}, {"type": "done"}]
+    cid = await new_conv(second)
+    await second.post(f"/api/conversations/{cid}/chat", json={"content": "zebrafish first"})
+    assert fts_count(second.app, "zebrafish")[:2] == (2, 2)
+    await import_file(second, big_document(30, 20))
+    assert fts_count(second.app, "zebrafish")[:2] == (602, 602)  # each message once
+
+
+async def test_messages_sent_after_a_big_import_are_indexed_too(second):
+    await import_file(second, big_document(30, 20))
+    cid = await new_conv(second)
+    await second.post(f"/api/conversations/{cid}/chat", json={"content": "a unique word: quokkaboo"})
+    assert fts_count(second.app, "quokkaboo")[0] == 1
+
+
+async def test_a_big_import_that_fails_leaves_the_index_and_its_trigger_as_they_were(second):
+    document = big_document(30, 20)
+    document["conversations"][-1]["leaf"] = 99  # the last chat is refused, after all the others were inserted
+    r = await import_file(second, document)
+    assert r.status_code == 422
+    assert fts_count(second.app, "zebrafish") == (0, 0, 1)  # nothing, and the trigger is still there
+
+
+async def test_importing_a_big_file_again_adds_and_indexes_nothing(second):
+    document = big_document(30, 20)
+    await import_file(second, document)
+    r = await import_file(second, document)
+    assert r.json()["skipped"] == 30 and r.json()["messages"] == 0
+    assert fts_count(second.app, "zebrafish") == (600, 600, 1)

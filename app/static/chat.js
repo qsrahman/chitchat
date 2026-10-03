@@ -2,7 +2,7 @@
 import { ICONS, actionsOf, api, bodyOf, bus, form, iconButton, input, state, textEl, thread } from "./core.js";
 import { addMessage, finishReasoning, reasoningOf, render, renderFresh, setNote, setReasoning, setText } from "./messages.js";
 import { clearPending, focusComposer, pending, saveDraft, scheduleComposer, syncSend } from "./composer.js";
-import { refreshList } from "./sidebar.js";
+import { refreshList } from "./list.js";
 import { openRetryMenu } from "./retry-menu.js";
 import { renderToolCall } from "./tools-ui.js";
 

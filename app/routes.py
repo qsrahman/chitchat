@@ -183,7 +183,7 @@ async def import_conversations(file: UploadFile, request: Request, conn: Conn):
         data = await file.read(backup.MAX_IMPORT_BYTES + 1)
         if len(data) > backup.MAX_IMPORT_BYTES:
             raise _too_large(backup.MAX_IMPORT_BYTES)
-        return backup.import_chats(conn, data)
+        return await asyncio.to_thread(backup.import_chats, conn, data)  # a big import takes seconds: not on the loop
     except backup.ImportRejected as e:
         raise HTTPException(422, str(e)) from e
 

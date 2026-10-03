@@ -64,6 +64,13 @@ CREATE TRIGGER messages_fts_update AFTER UPDATE OF content ON messages BEGIN
 END;
 """
 
+# The trigger above, for store.import_conversations to put back after it has indexed a big import in one go.
+MESSAGES_FTS_INSERT_TRIGGER = """
+CREATE TRIGGER messages_fts_insert AFTER INSERT ON messages BEGIN
+    INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+END;
+"""
+
 # v5: the same for conversation titles, so a search finds a chat by its name too. (SQLite keeps an implicit
 # rowid on `conversations`, which is what the index points at.)
 TITLE_SEARCH = """
