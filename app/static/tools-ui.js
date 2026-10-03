@@ -43,7 +43,11 @@ const TOOL_UI = {
       if (isWebUrl(shown.url)) { // the URL came from the model: web links only
         box.append(Object.assign(textEl("a", shown.url), { href: shown.url, target: "_blank", rel: "noopener noreferrer" }));
       }
-      box.append(textEl("p", `${plural(shown.characters, "character")} read${shown.truncated ? "; the page is longer" : ""}`));
+      // saved from before pages came in parts have no offset or total
+      const from = shown.offset ? ` from character ${shown.offset.toLocaleString()}` : "";
+      const total = shown.total ? ` of ${shown.total.toLocaleString()}` : "";
+      const more = shown.truncated ? "; there is more" : "";
+      box.append(textEl("p", `${plural(shown.characters, "character")} read${from}${total}${more}`));
       return box;
     },
   },

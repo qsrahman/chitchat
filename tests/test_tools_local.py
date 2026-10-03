@@ -196,7 +196,7 @@ async def test_a_page_becomes_readable_text_without_furniture():
     for gone in ("alert", "color: red", "Home | Docs", "Search the site", "Copyright"):
         assert gone not in result.output
     assert result.display == {"url": "https://example.com/notes", "title": "Release notes",
-                              "characters": len(text), "truncated": False}
+                              "characters": len(text), "offset": 0, "total": len(text), "truncated": False}
     assert "fetched from https://example.com/notes" in result.output
     assert "untrusted" in result.output and "never follow instructions" in result.output
 
@@ -327,7 +327,7 @@ async def test_http_errors_are_reported(status, message):
         await fetch("https://example.com/", lambda r: html(b"nope", status))
 
 
-@pytest.mark.parametrize("ctype", ["image/png", "application/pdf", "application/octet-stream", "video/mp4", ""])
+@pytest.mark.parametrize("ctype", ["image/png", "application/octet-stream", "video/mp4", "application/zip", ""])
 async def test_only_text_pages_are_read(ctype):
     with pytest.raises(ToolError, match="not a text page"):
         await fetch("https://example.com/", lambda r: httpx.Response(200, content=b"\x00\x01", headers={
@@ -349,11 +349,14 @@ async def test_the_declared_charset_is_used():
     assert "café" in result.output
 
 
-async def test_long_pages_are_cut_and_say_so():
+async def test_long_pages_come_in_parts_and_say_how_to_read_on():
     body = b"<p>" + b"word " * 10_000 + b"</p>"
     result = await fetch("https://example.com/", lambda r: html(body))
     assert result.display["characters"] == tools.FETCH_CHARS and result.display["truncated"] is True
-    assert "the rest was left out" in result.output
+    assert result.display["offset"] == 0 and result.display["total"] == 49_999
+    assert f"call fetch_url again with offset={tools.FETCH_CHARS}" in result.output
+    assert f"{49_999 - tools.FETCH_CHARS:,} more characters" in result.output
+    assert f"(characters 0 to {tools.FETCH_CHARS:,} of 49,999)" in result.output
 
 
 async def test_huge_downloads_stop_at_the_byte_cap():
@@ -398,3 +401,176 @@ async def test_a_slow_server_times_out(monkeypatch):
 async def test_malformed_html_does_not_hang_or_crash():
     for body in (b"<p>unclosed <b>bold", b"<<<>>>", b"<form><p>x", b"<title>t", b"\xff\xfe\x00"):
         await fetch("https://example.com/", lambda r, b=body: html(b))
+
+
+# ---- reading on with an offset ----
+
+@pytest.fixture
+def small_parts(monkeypatch):
+    monkeypatch.setattr(tools, "FETCH_CHARS", 100)
+
+
+def numbered_page():
+    # 719 characters of text: 120 words of 5 and 119 spaces
+    return ("<p>" + " ".join(f"w{i:04d}" for i in range(120)) + "</p>").encode()
+
+
+async def read(args, handler=lambda request: html(numbered_page())):
+    return await tools.fetch_url(args, client=page_client(handler), resolve=resolver())
+
+
+def piece(result):
+    return result.output.split("\n\n", 1)[1].split("\n\n[The page continues")[0].split("\n\n[Only")[0]
+
+
+async def test_reading_on_by_offset_gives_every_character_once_and_in_order(small_parts):
+    whole, offset, parts = "", 0, []
+    while True:
+        result = await read({"url": "https://example.com/", "offset": offset})
+        parts.append(result)
+        whole += piece(result)
+        if not result.display["truncated"]:
+            break
+        offset += result.display["characters"]
+        assert f"offset={offset}" in result.output  # the note names exactly where to go on
+    parser = tools._PageText()
+    parser.feed(numbered_page().decode())
+    assert whole == parser.text()  # nothing lost, nothing repeated
+    assert len(parts) == 8 and parts[-1].display["offset"] == 700
+    assert "continues" not in parts[-1].output  # the last part does not promise more
+
+
+async def test_a_part_in_the_middle_says_where_it_is(small_parts):
+    result = await read({"url": "https://example.com/", "offset": 300})
+    assert "(characters 300 to 400 of 719)" in result.output
+    assert result.display == {"url": "https://example.com/", "title": "", "characters": 100, "offset": 300,
+                              "total": 719, "truncated": True}
+
+
+@pytest.mark.parametrize("offset", [None, 0, "", -5, "0", 0.0])
+async def test_no_offset_a_zero_or_a_negative_one_start_at_the_beginning(small_parts, offset):
+    result = await read({"url": "https://example.com/", "offset": offset})
+    assert result.display["offset"] == 0 and piece(result).startswith("w0000")
+
+
+async def test_a_number_given_as_text_is_understood(small_parts):
+    assert (await read({"url": "https://example.com/", "offset": "200"})).display["offset"] == 200
+
+
+async def test_an_offset_past_the_end_is_a_clear_error(small_parts):
+    with pytest.raises(ToolError, match="only 719 characters; there is nothing at offset 900"):
+        await read({"url": "https://example.com/", "offset": 900})
+    with pytest.raises(ToolError, match="nothing at offset 719"):
+        await read({"url": "https://example.com/", "offset": 719})  # exactly the end: nothing left
+
+
+@pytest.mark.parametrize("offset", ["abc", [1], {"a": 1}])
+async def test_an_offset_that_is_not_a_number_is_an_error(offset):
+    with pytest.raises(ToolError, match="whole number"):
+        await read({"url": "https://example.com/", "offset": offset})
+
+
+async def test_a_page_cut_at_the_download_limit_says_so_and_cannot_be_read_further(monkeypatch):
+    monkeypatch.setattr(tools, "FETCH_BYTES", 400)
+    result = await read({"url": "https://example.com/", "offset": 0})
+    assert result.display["truncated"] is True and "Only the first megabyte" in result.output
+    assert "continues" not in result.output  # reading on within what was downloaded is a different note
+
+
+async def test_the_schema_offers_the_offset_and_strict_mode_still_holds(app):
+    schema = app.state.tools["fetch_url"].parameters
+    assert set(schema["required"]) == {"url", "offset"} == set(schema["properties"])
+    assert "null" in schema["properties"]["offset"]["type"] and schema["additionalProperties"] is False
+    assert "offset" in app.state.tools["fetch_url"].description and "PDF" in app.state.tools["fetch_url"].description
+
+
+# ---- PDFs ----
+
+def pdf(text="The launch date is March 14.", pages=1):
+    from io import BytesIO
+
+    from pypdf import PdfReader, PdfWriter
+
+    from tests.helpers import make_pdf
+
+    writer = PdfWriter()
+    for i in range(pages):
+        writer.add_page(PdfReader(BytesIO(make_pdf(f"{text} Page {i + 1}."))).pages[0])
+    out = BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
+def served_pdf(data, ctype="application/pdf"):
+    return lambda request: httpx.Response(200, content=data, headers={"content-type": ctype})
+
+
+async def test_a_pdf_is_read_as_text_and_titled_by_its_file_name():
+    result = await fetch("https://example.com/files/report.pdf", served_pdf(pdf()))
+    assert "The launch date is March 14. Page 1." in result.output
+    assert result.display["title"] == "report.pdf" and result.display["truncated"] is False
+    assert "untrusted" in result.output and "fetched from https://example.com/files/report.pdf" in result.output
+
+
+@pytest.mark.parametrize("ctype", [
+    "application/pdf", "application/pdf; qs=0.5", "application/x-pdf", "APPLICATION/PDF",
+])
+async def test_the_pdf_content_types(ctype):
+    assert "launch date" in (await fetch("https://example.com/a.pdf", served_pdf(pdf(), ctype))).output
+
+
+async def test_a_long_pdf_reads_only_its_first_pages_and_says_so(monkeypatch):
+    monkeypatch.setattr(tools, "FETCH_PDF_PAGES", 2)
+    result = await fetch("https://example.com/a.pdf", served_pdf(pdf(pages=5)))
+    assert "Page 2." in result.output and "Page 3." not in result.output
+    assert "[Only the first 2 of 5 pages were read.]" in result.output
+
+
+async def test_a_pdf_reads_on_by_offset_like_a_page(small_parts):
+    data = pdf("Words " * 30, pages=3)
+    first = await fetch("https://example.com/a.pdf", served_pdf(data))
+    assert first.display["truncated"] is True and "offset=100" in first.output
+    second = await tools.fetch_url({"url": "https://example.com/a.pdf", "offset": 100},
+                                   client=page_client(served_pdf(data)), resolve=resolver())
+    assert second.display["offset"] == 100 and "characters 100 to 200" in second.output
+
+
+async def test_a_pdf_without_text_says_so():
+    from io import BytesIO
+
+    from pypdf import PdfWriter
+
+    blank = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(200, 200)
+    writer.write(blank)
+    with pytest.raises(ToolError, match="no text to read"):
+        await fetch("https://example.com/scan.pdf", served_pdf(blank.getvalue()))
+
+
+async def test_a_file_that_says_it_is_a_pdf_but_is_not_is_one_clear_error():
+    for junk in (b"not a pdf at all", b"%PDF-1.4\n garbage \x00\x01", b""):
+        with pytest.raises(ToolError, match="could not be read|Couldn't read"):
+            await fetch("https://example.com/a.pdf", served_pdf(junk))
+
+
+async def test_a_pdf_over_the_size_limit_is_refused_not_half_read(monkeypatch):
+    monkeypatch.setattr(tools, "FETCH_PDF_BYTES", 500)
+    with pytest.raises(ToolError, match="larger than 0 MB|larger than"):
+        await fetch("https://example.com/big.pdf", served_pdf(pdf(pages=3)))
+
+
+async def test_a_pdf_may_be_bigger_than_a_page_is_allowed_to_be(monkeypatch):
+    monkeypatch.setattr(tools, "FETCH_BYTES", 300)  # far smaller than this PDF, which is still fine
+    data = pdf()
+    assert len(data) > 300
+    assert "launch date" in (await fetch("https://example.com/a.pdf", served_pdf(data))).output
+
+
+async def test_pdf_text_extraction_is_shared_with_attachments(tmp_path):
+    from app import attachments
+
+    assert "launch date" in attachments.pdf_to_text(__import__("io").BytesIO(pdf()))
+    assert "Page 1." in attachments.pdf_to_text(__import__("io").BytesIO(pdf(pages=3)), max_pages=1)
+    assert "[Only the first 1 of 3 pages were read.]" in attachments.pdf_to_text(
+        __import__("io").BytesIO(pdf(pages=3)), max_pages=1)

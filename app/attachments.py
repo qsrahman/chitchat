@@ -64,20 +64,31 @@ def delete_files(directory: str, ids: list[str]) -> None:
         path(directory, aid).with_suffix(".txt").unlink(missing_ok=True)
 
 
+def pdf_to_text(source, max_pages: int | None = None) -> str:
+    """The text of a PDF (a path or a file object), the first `max_pages` pages of it if that is given. Rejected if
+    it can't be read, is password-protected, or has no text."""
+    try:
+        reader = PdfReader(source)
+        if reader.is_encrypted and not reader.decrypt(""):
+            raise Rejected(422, "That PDF is password-protected.")
+        pages = list(reader.pages) if max_pages is None else list(reader.pages[:max_pages])
+        text = "\n\n".join(page.extract_text() for page in pages).strip()
+        total = len(reader.pages)
+    except PyPdfError as e:
+        raise Rejected(422, "Couldn't read that PDF.") from e
+    if not text:
+        raise Rejected(422, "That PDF has no text to read (it may be scanned images).")
+    if total > len(pages):
+        text += f"\n\n[Only the first {len(pages)} of {total} pages were read.]"
+    return text
+
+
 def pdf_text(directory: str, aid: str) -> str:
     """The text of a stored PDF, extracted once and cached next to it. Rejected if there is none to read."""
     cache = path(directory, aid).with_suffix(".txt")
     if cache.exists():
         return cache.read_text(encoding="utf-8")
-    try:
-        reader = PdfReader(path(directory, aid))
-        if reader.is_encrypted and not reader.decrypt(""):
-            raise Rejected(422, "That PDF is password-protected.")
-        text = "\n\n".join(page.extract_text() for page in reader.pages).strip()
-    except PyPdfError as e:
-        raise Rejected(422, "Couldn't read that PDF.") from e
-    if not text:
-        raise Rejected(422, "That PDF has no text to read (it may be scanned images).")
+    text = pdf_to_text(path(directory, aid))
     if len(text) > MAX_TEXT_CHARS:
         text = text[:MAX_TEXT_CHARS] + "\n[Text truncated.]"
     cache.write_text(text, encoding="utf-8")

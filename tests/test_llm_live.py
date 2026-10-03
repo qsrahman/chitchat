@@ -111,3 +111,14 @@ async def test_live_fetch_url_reads_a_real_page_through_the_pinned_connection():
     assert "Example Domain" in result.output and result.display["title"] == "Example Domain"
     with pytest.raises(tools.ToolError, match="not a public website"):
         await tools.fetch_url({"url": "http://localhost/"})
+
+
+@pytest.mark.live
+async def test_live_fetch_url_reads_a_real_pdf_and_a_long_page_in_parts():
+    pdf = await tools.fetch_url({"url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"})
+    assert "Dummy PDF file" in pdf.output and pdf.display["title"] == "dummy.pdf"
+    url = "https://docs.python.org/3/whatsnew/3.14.html"  # a long page: well over one part
+    first = await tools.fetch_url({"url": url, "offset": None})
+    assert first.display["truncated"] and f"offset={first.display['characters']}" in first.output
+    second = await tools.fetch_url({"url": url, "offset": first.display["characters"]})
+    assert second.display["offset"] == first.display["characters"] and second.display["total"] == first.display["total"]

@@ -171,7 +171,7 @@ def test_a_fetched_page_shows_its_title_link_and_size(page, app_url):
     expect(link).to_have_attribute("href", "https://example.com/post")
     expect(link).to_have_attribute("rel", "noopener noreferrer")
     expect(link).to_have_attribute("target", "_blank")
-    expect(page.locator(".tool-body p")).to_have_text("1,234 characters read; the page is longer")
+    expect(page.locator(".tool-body p")).to_have_text("1,234 characters read of 5,000; there is more")
 
 
 def test_a_fetched_page_with_a_hostile_url_and_title_stays_inert(page, app_url):
@@ -189,3 +189,34 @@ def test_the_running_lines_name_what_is_happening(page, app_url):
     open_app(page, app_url)
     send(page, "readpage")
     expect(page.locator(".tool-call summary")).to_have_text(re.compile(r"Reading example\.com…|Read Example post"))
+
+
+def fetched(page, display):
+    from tests.ui.test_search_ui import fake_turn
+
+    call = {"type": "tool_call", "id": "f1", "name": "fetch_url", "arguments": {"url": "https://example.com/p"}}
+    fake_turn(page, {**call, "status": "running"}, {**call, "status": "done", "display": display},
+              {"type": "delta", "text": "ok"}, {"type": "done"})
+    send(page, "read it")
+    page.locator(".tool-call summary").click()
+    return page.locator(".tool-body p")
+
+
+def test_a_later_part_of_a_page_says_where_it_starts(page, app_url):
+    open_app(page, app_url)
+    shown = {"url": "https://example.com/p", "title": "Long", "characters": 12000, "offset": 12000, "total": 30000,
+             "truncated": True}
+    expect(fetched(page, shown)).to_have_text("12,000 characters read from character 12,000 of 30,000; there is more")
+
+
+def test_the_last_part_does_not_claim_there_is_more(page, app_url):
+    open_app(page, app_url)
+    shown = {"url": "https://example.com/p", "title": "Long", "characters": 6000, "offset": 24000, "total": 30000,
+             "truncated": False}
+    expect(fetched(page, shown)).to_have_text("6,000 characters read from character 24,000 of 30,000")
+
+
+def test_a_page_saved_before_pages_came_in_parts_still_shows(page, app_url):
+    open_app(page, app_url)
+    older = {"url": "https://example.com/p", "title": "Old", "characters": 900, "truncated": False}  # no offset, total
+    expect(fetched(page, older)).to_have_text("900 characters read")

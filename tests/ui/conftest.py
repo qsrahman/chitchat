@@ -142,7 +142,8 @@ class ScriptedLLM:
             yield {**call, "status": "running"}
             await asyncio.sleep(0.3)
             title = "Example post" if text == "readpage" else "<img src=x onerror=window.__xss=1>"
-            shown = {"url": url, "title": title, "characters": 1234, "truncated": text == "readpage"}
+            shown = {"url": url, "title": title, "characters": 1234, "offset": 0, "total": 5000,
+                     "truncated": text == "readpage"}
             yield {**call, "status": "done", "display": shown}
             yield {"type": "delta", "text": "The page says hello."}
         elif "compactme" in text:  # the context was compacted during this reply
