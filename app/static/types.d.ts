@@ -80,9 +80,17 @@ type StreamEvent =
   | { type: "done"; model: string; incomplete?: string; branch?: { user: Versions; assistant: Versions } };
 
 interface ModelInfo {
-  default: string | null;
+  default: string | null; // the model a chat uses when it picks none: the one chosen in Settings, else the server's
+  server_default?: string;
   efforts?: string[];
   models: { id: string; reasoning: boolean }[];
+}
+
+// GET/PUT /api/defaults: chosen in Settings, for chats that don't pick their own (the tools: for new chats).
+interface Defaults {
+  model: string | null;
+  reasoning_effort: string | null;
+  tools: string[];
 }
 
 interface ToolInfo {

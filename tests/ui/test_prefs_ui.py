@@ -3,7 +3,7 @@ import re
 
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app, open_prefs, open_sidebar
+from tests.ui.test_chat_ui import open_app, open_prefs, open_sidebar, send
 
 TABS = ["General", "Personalization", "Data controls", "Server"]
 
@@ -19,6 +19,18 @@ def test_the_gear_opens_settings_on_general_with_four_sections(page, app_url):
     expect(d.get_by_role("tab", name="General")).to_have_attribute("aria-selected", "true")
     expect(d.get_by_role("tabpanel")).to_have_count(1)  # only the selected one is shown
     expect(d.get_by_role("heading", name="Keyboard shortcuts")).to_be_visible()
+
+
+def test_settings_opens_on_the_tab_it_was_left_on_and_reload_keeps_it(page, app_url):
+    open_app(page, app_url)
+    open_prefs(page, "Data controls")
+    page.keyboard.press("Escape")
+    for _ in range(2):
+        page.get_by_role("button", name="Settings", exact=True).click()
+        expect(dialog(page).get_by_role("tab", name="Data controls")).to_have_attribute("aria-selected", "true")
+        expect(dialog(page).get_by_role("tabpanel")).to_contain_text("Export")
+        page.keyboard.press("Escape")
+        page.reload()
 
 
 def test_the_scattered_buttons_are_gone_from_the_sidebar(page, app_url):
@@ -91,7 +103,7 @@ def test_the_shortcuts_are_listed_for_this_platform(page, app_url):
 
 def test_the_note_says_where_the_per_chat_settings_are(page, app_url):
     open_app(page, app_url)
-    expect(open_prefs(page)).to_contain_text("set for one chat at a time")
+    expect(open_prefs(page)).to_contain_text("One chat can differ")
 
 
 # ---- Personalization ----
@@ -154,6 +166,86 @@ def test_the_server_tab_says_when_it_cannot_reach_the_server(page, app_url, expe
     page.route("**/api/config", lambda r: r.fulfill(status=500, body="no"))
     d = open_prefs(page, "Server")
     expect(d.get_by_role("alert")).to_have_text("Couldn't reach the server.")
+
+
+# ---- New chats: the defaults ----
+
+def test_the_default_model_applies_to_chats_that_pick_none_and_survives_a_reload(page, app_url):
+    open_app(page, app_url)
+    d = open_prefs(page)
+    model = d.get_by_label("Model", exact=True)
+    expect(model.locator("option")).to_have_text(
+        ["Server default (scripted-default)", "scripted-default", "alpha-model", "gpt-5-mini"])
+    model.select_option("alpha-model")
+    expect(page.get_by_role("button", name="alpha-model")).to_be_visible()  # the header follows the new default
+    page.keyboard.press("Escape")
+    send(page, "hello")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("[model=alpha-model]")
+
+    page.reload()
+    d = open_prefs(page)
+    expect(d.get_by_label("Model", exact=True)).to_have_value("alpha-model")
+    d.get_by_label("Model", exact=True).select_option("")  # back to the server's
+    page.keyboard.press("Escape")
+    page.get_by_role("button", name="New chat").click()
+    send(page, "again")
+    expect(page.locator(".msg.assistant .body")).not_to_contain_text("[model=")
+
+
+def test_the_default_thinking_effort_is_used_by_a_thinking_model(page, app_url):
+    open_app(page, app_url)
+    d = open_prefs(page)
+    d.get_by_label("Model", exact=True).select_option("gpt-5-mini")
+    d.get_by_label("Thinking effort").select_option("high")
+    page.keyboard.press("Escape")
+    send(page, "think")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("[effort=high]")
+
+
+def test_new_chats_start_with_web_search_when_the_switch_is_on(page, app_url):
+    open_app(page, app_url)
+    d = open_prefs(page)
+    switch = d.get_by_role("switch", name="Web search")
+    expect(switch).not_to_be_checked()
+    switch.check()
+    page.keyboard.press("Escape")
+    search = page.get_by_role("button", name="Web search")
+    expect(search).to_have_attribute("aria-pressed", "true")  # the chat on screen is a new one: it follows at once
+    send(page, "look it up")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("[tools=web_search]")
+    search.click()  # this chat turns it off for itself
+    expect(search).to_have_attribute("aria-pressed", "false")
+
+    page.get_by_role("button", name="New chat").click()
+    # other chats still start with it on
+    expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "true")
+
+    d = open_prefs(page)
+    d.get_by_role("switch", name="Web search").uncheck()
+    page.keyboard.press("Escape")
+    expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "false")
+
+
+def test_a_failed_save_is_said_and_the_control_goes_back(page, app_url, expected_console_errors):
+    open_app(page, app_url)
+    expected_console_errors.append("net::ERR_FAILED")
+    page.route("**/api/defaults", lambda route: route.abort() if route.request.method == "PUT" else route.continue_())
+    d = open_prefs(page)
+    d.get_by_label("Model", exact=True).select_option("alpha-model")
+    expect(d.get_by_role("alert")).to_contain_text("Couldn't save")
+    expect(d.get_by_label("Model", exact=True)).to_have_value("")
+    page.unroute("**/api/defaults")
+    d.get_by_label("Model", exact=True).select_option("alpha-model")
+    expect(d.get_by_role("alert")).to_be_hidden()
+    expect(d.get_by_label("Model", exact=True)).to_have_value("alpha-model")
+
+
+def test_the_web_search_switch_is_off_and_says_why_when_the_server_has_no_search(page, app_url):
+    page.route("**/api/tools", lambda route: route.fulfill(json=[]))
+    open_app(page, app_url)
+    d = open_prefs(page)
+    expect(d.get_by_role("switch", name="Web search")).to_be_disabled()
+    expect(d).to_contain_text("set BRAVE_API_KEY")
 
 
 # ---- the phone ----

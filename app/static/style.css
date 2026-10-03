@@ -363,6 +363,12 @@ dialog input[type=number] { margin-top: 4px; }
 #prefs-dialog a.btn { color: var(--ink); text-decoration: none; }
 #prefs-dialog input[type=file]::file-selector-button { margin-inline-end: 10px; padding: 5px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
 #prefs-dialog input[type=file]::file-selector-button:hover { background: var(--hover); }
+/* The switch: a checkbox that reads as on/off (role="switch"), 32x20 as in ChatGPT's settings. */
+#prefs-dialog input[role="switch"] { appearance: none; flex: none; width: 32px; height: 20px; margin: 0; border-radius: 999px; background: color-mix(in srgb, var(--muted) 45%, var(--surface)); cursor: pointer; transition: background-color .15s var(--ease-out-3); }
+#prefs-dialog input[role="switch"]::before { content: ""; display: block; width: 16px; height: 16px; margin: 2px; border-radius: 50%; background: var(--on-accent); transition: translate .15s var(--ease-out-3); }
+#prefs-dialog input[role="switch"]:checked { background: var(--accent); }
+#prefs-dialog input[role="switch"]:checked::before { translate: 12px; }
+#prefs-dialog input[role="switch"]:disabled { opacity: .5; cursor: default; }
 .pref-note { margin: 10px 2px 0; font-size: var(--text-sm); }
 #prefs-dialog .pref-lead { margin: 0 2px 18px; }
 .pref-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }

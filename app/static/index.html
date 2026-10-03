@@ -197,9 +197,25 @@
             </select>
           </div>
         </div>
+        <h3>New chats</h3>
+        <div class="pref-card">
+          <div class="pref-row">
+            <div class="pref-text"><label for="pref-model">Model</label><p id="pref-model-note">Used by every chat that doesn't pick its own.</p></div>
+            <select id="pref-model" aria-describedby="pref-model-note"></select>
+          </div>
+          <div class="pref-row">
+            <div class="pref-text"><label for="pref-effort">Thinking effort</label><p id="pref-effort-note">For models that think before they answer.</p></div>
+            <select id="pref-effort" aria-describedby="pref-effort-note"></select>
+          </div>
+          <div class="pref-row">
+            <div class="pref-text"><label for="pref-search">Web search</label><p id="pref-search-note">Start new chats with web search on.</p></div>
+            <input id="pref-search" type="checkbox" role="switch" aria-describedby="pref-search-note">
+          </div>
+        </div>
+        <p id="defaults-error" class="field-error" role="alert" hidden>Couldn't save. Check your connection and try again.</p>
         <h3>Keyboard shortcuts</h3>
         <div class="pref-card" id="shortcut-list"></div>
-        <p class="pref-note">The model, system prompt and temperature are set for one chat at a time: use the sliders button at the top right of a chat.</p>
+        <p class="pref-note">One chat can differ: the sliders button at the top right of a chat sets its own model, system prompt and temperature.</p>
       </section>
 
       <section role="tabpanel" id="panel-personalization" aria-labelledby="tab-personalization" tabindex="0" hidden>

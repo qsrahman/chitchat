@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from app import attachments, backup, context, db, store, tools
 from app.llm import REASONING_EFFORTS, supports_reasoning
-from app.store import ConversationSettings, Instructions
+from app.store import ConversationSettings, Defaults, Instructions
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -102,7 +102,10 @@ def list_conversations(conn: Conn, limit: Annotated[int, Query(ge=1, le=500)] = 
 
 @router.post("/conversations", status_code=201)
 def create_conversation(conn: Conn, body: NewConversation | None = None):
-    settings = body.settings.model_dump() if body and body.settings else None
+    if body and body.settings:
+        settings = body.settings.model_dump()
+    else:  # a chat made without settings starts with the tools chosen in Settings (the page sends its own, with them)
+        settings = {**store.DEFAULT_SETTINGS, "tools": store.get_defaults(conn)["tools"]}
     return store.create_conversation(conn, settings=settings)
 
 
@@ -202,13 +205,25 @@ def update_conversation(cid: str, body: ConversationUpdate, conn: Conn):
     return store.get_conversation(conn, cid)
 
 
+@router.get("/defaults")
+def get_defaults(conn: Conn):
+    return store.get_defaults(conn)
+
+
+@router.put("/defaults")
+def put_defaults(body: Defaults, conn: Conn):
+    return store.set_defaults(conn, body)
+
+
 @router.get("/models")
-async def list_models(request: Request):
-    """Models to offer in the picker: the configured default first, then whatever the endpoint lists."""
-    default = request.app.state.settings.openai_model
+async def list_models(request: Request, conn: Conn):
+    """Models to offer in the picker: the default first (the one chosen in Settings, else the server's), then
+    whatever the endpoint lists."""
+    default = store.get_defaults(conn)["model"] or request.app.state.settings.openai_model
     ids = [default] + [m for m in await request.app.state.llm.list_models() if m != default]
     return {
         "default": default,
+        "server_default": request.app.state.settings.openai_model,
         "efforts": REASONING_EFFORTS,
         "models": [{"id": m, "reasoning": supports_reasoning(m)} for m in ids],
     }
@@ -350,7 +365,7 @@ def _model_options(request: Request, conn: sqlite3.Connection, conv: dict, model
         options["tools"] = enabled
         options["max_tool_calls"] = request.app.state.settings.max_tool_calls
     if supports_reasoning(model):
-        options["reasoning_effort"] = s["reasoning_effort"]
+        options["reasoning_effort"] = s["reasoning_effort"] or store.get_defaults(conn)["reasoning_effort"]
     else:
         options["temperature"] = s["temperature"]
     return options
@@ -375,7 +390,7 @@ class Turn:
 def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], reply_to: int,
                model: str | None = None):
     settings = request.app.state.settings
-    chosen: str = model or conv["settings"]["model"] or settings.openai_model
+    chosen: str = model or conv["settings"]["model"] or store.get_defaults(conn)["model"] or settings.openai_model
     options = _model_options(request, conn, conv, chosen)
     trimmed = 0
     if settings.history_tokens:  # room for the instructions and the reply, then as much history as fits

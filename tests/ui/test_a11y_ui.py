@@ -174,7 +174,7 @@ def test_with_thinking_effort_and_search_switched_on(page_with_axe):
     page = page_with_axe
     page.locator("#model-btn").click()
     page.get_by_role("menuitemradio", name="gpt-5-mini").click()
-    page.get_by_label("Thinking effort").select_option("high")
+    page.locator("#effort").select_option("high")
     page.get_by_role("button", name="Web search").click()
     expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "true")
     assert violations(page) == []
@@ -246,6 +246,7 @@ def test_a_forced_theme_on_either_system_theme(page_with_axe):
     open: it is the page that changes colour behind it and the dialog itself."""
     page = page_with_axe
     dialog = open_prefs(page)
+    dialog.get_by_role("switch", name="Web search").check()  # the switch's "on" colors too
     for choice in ("light", "dark"):
         dialog.get_by_label("Appearance").select_option(choice)
         # colors are read mid-fade otherwise

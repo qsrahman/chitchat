@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
 from app import db, tools
 from app.llm import ReasoningEffort
@@ -18,26 +18,40 @@ BULK_IMPORT = 200  # messages: from this many an import indexes them in one go (
 Instructions = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10_000)]  # may be empty = unset
 
 
+def _known_tools(names: list[str]) -> list[str]:
+    if unknown := set(names) - set(tools.NAMES):
+        raise ValueError(f"unknown tool: {', '.join(sorted(unknown))}")
+    return list(dict.fromkeys(names))
+
+
+ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+ToolNames = Annotated[list[str], AfterValidator(_known_tools)]  # tool names (tools.NAMES), each once
+
+
 class ConversationSettings(BaseModel):
     """Per-conversation settings. None / "" mean "use the default"."""
 
     model_config = ConfigDict(extra="forbid")
 
-    model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] | None = None
+    model: ModelName | None = None
     system_prompt: Instructions = ""
     reasoning_effort: ReasoningEffort = None
     temperature: Annotated[float, Field(ge=0, le=2)] | None = None
-    tools: list[str] = Field(default_factory=list)  # tool names switched on for this conversation (tools.NAMES)
-
-    @field_validator("tools")
-    @classmethod
-    def _known_tools(cls, names: list[str]) -> list[str]:
-        if unknown := set(names) - set(tools.NAMES):
-            raise ValueError(f"unknown tool: {', '.join(sorted(unknown))}")
-        return list(dict.fromkeys(names))
+    tools: ToolNames = Field(default_factory=list)  # switched on for this conversation
 
 
 DEFAULT_SETTINGS = ConversationSettings().model_dump()
+
+
+class Defaults(BaseModel):
+    """What a conversation uses where its own settings say "default" (model, thinking effort), and the tools a new
+    chat starts with. The server's environment (OPENAI_MODEL) is what an unset model falls back to."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model: ModelName | None = None
+    reasoning_effort: ReasoningEffort = None
+    tools: ToolNames = Field(default_factory=list)
 
 
 def _now() -> str:
@@ -109,6 +123,18 @@ def set_app_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
         (key, value),
     )
     conn.commit()
+
+
+def get_defaults(conn: sqlite3.Connection) -> dict:
+    try:
+        return Defaults.model_validate_json(get_app_setting(conn, "defaults") or "{}").model_dump()
+    except ValueError:  # saved by an older version that had other choices (a tool that no longer exists)
+        return Defaults().model_dump()
+
+
+def set_defaults(conn: sqlite3.Connection, defaults: Defaults) -> dict:
+    set_app_setting(conn, "defaults", defaults.model_dump_json())
+    return defaults.model_dump()
 
 
 def delete_conversation(conn: sqlite3.Connection, cid: str) -> bool:

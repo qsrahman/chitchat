@@ -5,7 +5,7 @@ from tests.ui.test_model_picker_ui import pick
 
 
 def effort(page):
-    return page.get_by_label("Thinking effort")
+    return page.locator("#effort")
 
 
 def saved_effort(page):

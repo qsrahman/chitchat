@@ -34,6 +34,25 @@ function bindSave(dlg, save) {
   });
 }
 
+// ---- the defaults chosen in Settings ----
+// GET /api/defaults: the model and thinking effort for chats that pick none (the server applies them: a chat's null
+// means "follow the default"), and the tools a new chat starts with (applied here, as a new chat's settings are held
+// until its first message).
+/** @type {Defaults} */
+export let defaults = { model: null, reasoning_effort: null, tools: [] };
+
+export async function loadDefaults() {
+  try { defaults = await api("/defaults"); } catch { /* the chat works without them; Settings reports real problems */ }
+}
+
+/** @param {Defaults} next */
+export async function saveDefaults(next) {
+  defaults = await api("/defaults", { method: "PUT", body: JSON.stringify(next) });
+  refreshModels(); // the model that is "Default (...)" may have changed
+}
+
+export const newChatSettings = () => ({ ...DEFAULT_SETTINGS, tools: [...defaults.tools] });
+
 // ---- the model list ----
 // From GET /api/models; the picker, the settings dialog and the thinking select all read it.
 /** @type {ModelInfo} */

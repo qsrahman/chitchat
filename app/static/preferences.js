@@ -1,13 +1,17 @@
 // The Settings dialog (the sidebar's gear): appearance and shortcuts, custom instructions, export and import, and what
 // the server is set up with. Settings that belong to one chat (model, system prompt, temperature) are in
 // settings.js; the import itself is in backup.js. The design and what is where: docs/settings-dialog.md.
-import { $, api } from "./core.js";
+import { $, api, bus, state } from "./core.js";
 import { closeNavIfOverlay } from "./nav.js";
+import { defaults, modelInfo, newChatSettings, saveDefaults, setSettings } from "./settings.js";
 
 const dialog = $("prefs-dialog");
 const tabs = [...dialog.querySelectorAll('[role="tab"]')];
 
 // ---- tabs ----
+function lastTab() {
+  try { return tabs.find((t) => t.id === localStorage.getItem("prefsTab"))?.id ?? "tab-general"; } catch { return "tab-general"; }
+}
 // A vertical tab list with the keyboard contract of the pattern: arrows move between tabs (and show them), Home and
 // End jump, only the selected tab is in the tab order, and the panel is in the tab order after it.
 function showTab(tab, focus = false) {
@@ -20,6 +24,7 @@ function showTab(tab, focus = false) {
   if (focus) tab.focus();
   tab.scrollIntoView({ block: "nearest", inline: "nearest" }); // in the phone's row of tabs it may be off to the side
   if (tab.id === "tab-server") loadServer();
+  try { localStorage.setItem("prefsTab", tab.id); } catch { /* storage blocked: it opens on General next time */ }
 }
 tabs.forEach((t) => (t.onclick = () => showTab(t)));
 dialog.querySelector('[role="tablist"]').addEventListener("keydown", (e) => {
@@ -30,9 +35,11 @@ dialog.querySelector('[role="tablist"]').addEventListener("keydown", (e) => {
   showTab(tabs[(to + tabs.length) % tabs.length], true);
 });
 
-export function openPreferences(tabId = "tab-general") {
+// Opens on the tab it was last left on (kept in this browser), General the first time.
+export function openPreferences(tabId = lastTab()) {
   $("backup-status").hidden = true; // what the last import said is not news
   loadInstructions();
+  fillDefaults();
   showTab($(tabId));
   closeNavIfOverlay(); // on a phone the drawer was open to reach the gear; it is in the way behind the dialog
   dialog.showModal();
@@ -52,6 +59,53 @@ theme.onchange = () => {
     else localStorage.setItem("theme", theme.value);
   } catch { /* storage blocked: the choice lasts until the page closes */ }
 };
+
+// ---- General: new chats ----
+// The model and thinking effort a chat uses when it picks none, and whether new chats start with web search. They are
+// saved as they change (no Save button), and the chat's own settings (settings.js) still win.
+const defaultModel = $("pref-model");
+const defaultEffort = $("pref-effort");
+const defaultSearch = $("pref-search");
+const SEARCH = "web_search";
+
+function fillDefaults() {
+  const { models, efforts = [], server_default: server } = modelInfo;
+  const saved = defaults.model;
+  const ids = models.map((m) => m.id);
+  if (saved && !ids.includes(saved)) ids.push(saved); // no longer listed by the provider: keep showing the choice
+  defaultModel.replaceChildren(new Option(`Server default (${server ?? modelInfo.default ?? "…"})`, ""), ...ids.map((id) => new Option(id, id)));
+  defaultModel.value = saved ?? "";
+  defaultEffort.replaceChildren(new Option("Auto", ""), ...efforts.map((e) => new Option(e[0].toUpperCase() + e.slice(1), e)));
+  defaultEffort.value = defaults.reasoning_effort ?? "";
+  const tool = state.tools.find((t) => t.name === SEARCH);
+  defaultSearch.disabled = !tool;
+  defaultSearch.checked = !!tool && defaults.tools.includes(SEARCH);
+  $("pref-search-note").textContent = tool ? "Start new chats with web search on." : "Unavailable: set BRAVE_API_KEY on the server.";
+}
+bus.addEventListener("models", fillDefaults);
+
+// One save at a time, each built from what the one before saved: PUT replaces all of them, so two changes made in
+// quick succession would otherwise each start from the old values and the later one would undo the earlier.
+let saving = Promise.resolve();
+/** @param {Partial<Defaults>} change */
+const saveDefault = (change) => (saving = saving.then(() => storeDefault(change)));
+
+/** @param {Partial<Defaults>} change */
+async function storeDefault(change) {
+  $("defaults-error").hidden = true;
+  try {
+    await saveDefaults({ ...defaults, ...change });
+    if (!state.id) setSettings({ ...state.settings, tools: newChatSettings().tools }); // the chat on screen is a new one
+  } catch {
+    $("defaults-error").hidden = false;
+    fillDefaults(); // back to what is saved
+  }
+}
+defaultModel.onchange = () => saveDefault({ model: defaultModel.value || null });
+defaultEffort.onchange = () => saveDefault({ reasoning_effort: defaultEffort.value || null });
+defaultSearch.onchange = () => saveDefault({
+  tools: defaultSearch.checked ? [...new Set([...defaults.tools, SEARCH])] : defaults.tools.filter((t) => t !== SEARCH),
+});
 
 // ---- General: shortcuts ----
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";

@@ -6,7 +6,7 @@ import { clearPending, focusComposer, loadAttachmentLimits, loadDraft, syncSend 
 import { updateActions } from "./chat.js";
 import { refreshList, setTitle } from "./list.js";
 import { closeNavIfOverlay } from "./nav.js";
-import { refreshModels, setSettings } from "./settings.js";
+import { loadDefaults, newChatSettings, refreshModels, setSettings } from "./settings.js";
 import { loadTools } from "./controls.js";
 import "./backup.js";
 import "./delete.js";
@@ -26,7 +26,7 @@ async function openConversation(id) {
   main.classList.remove("is-started");
   closeNavIfOverlay();
   if (location.hash.slice(1) !== (id ?? "")) history.replaceState(null, "", id ? `#${id}` : location.pathname);
-  setSettings({ ...DEFAULT_SETTINGS });
+  setSettings(id ? { ...DEFAULT_SETTINGS } : newChatSettings());
   setTitle(null);
   if (id) {
     try {
@@ -67,6 +67,7 @@ syncSend();
 refreshModels();
 loadAttachmentLimits();
 loadTools();
+await loadDefaults(); // a new chat starts with the tools chosen there
 // The first conversation is open and the message box has the focus (that comes last): the UI tests wait for this
 // before they type or click, or the focus would move from under them.
 openConversation(location.hash.slice(1) || null).then(() => { document.body.dataset.ready = ""; });
