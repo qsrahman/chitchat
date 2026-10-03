@@ -72,7 +72,7 @@ def _content(message: dict) -> str | list[ResponseInputContentParam]:
     for a in message["attachments"]:
         match a["kind"]:
             case "image":
-                parts.append({"type": "input_image", "image_url": _data_url(a)})
+                parts.append({"type": "input_image", "image_url": _data_url(a), "detail": "auto"})
             case "file":
                 parts.append({"type": "input_file", "filename": a["name"], "file_data": _data_url(a)})
             case _:
@@ -83,7 +83,7 @@ def _content(message: dict) -> str | list[ResponseInputContentParam]:
     return parts
 
 
-def _inputs(messages: list[dict]) -> list[dict]:
+def _inputs(messages: list[dict]) -> list[typing.Any]:
     # A {"compaction": item} entry stands for every earlier turn: it is sent as the item OpenAI gave us.
     return [m["compaction"] if "compaction" in m else {"role": m["role"], "content": _content(m)} for m in messages]
 
@@ -288,7 +288,7 @@ class OpenAILLM:
                     calls_run += 1
                     yield {"type": "tool_call", "id": call.call_id, "name": call.name, "status": "running",
                            "arguments": _loads(call.arguments)}
-                    text, fields = await _run_tool(call, tools, allowed=calls_run <= max_tool_calls)
+                    text, fields = await _run_tool(call, tools or {}, allowed=calls_run <= max_tool_calls)
                     yield {"type": "tool_call", "id": call.call_id, "name": call.name, **fields}
                     items.append({"type": "function_call_output", "call_id": call.call_id, "output": text})
             yield {"type": "error", "message": "The model kept calling tools without answering."}

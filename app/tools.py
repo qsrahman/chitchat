@@ -57,7 +57,7 @@ class Tool:
     label: str
     description: str
     parameters: dict  # JSON schema, written to satisfy OpenAI's strict mode (every property required)
-    run: Callable[[dict], Awaitable[ToolResult]]
+    run: Callable[..., Awaitable[ToolResult]]  # (args), and (args, conversation_id=) when per_chat
     guidance: str = ""  # added to the instructions while the tool is switched on
     hint: str = ""  # one line for the user, in the Tools menu
     per_chat: bool = False  # run() also takes `conversation_id`, bound for each reply by the route (see bound_to)
@@ -73,7 +73,7 @@ async def web_search(args: dict, *, key: str, client: httpx.AsyncClient | None =
     if not query:
         raise ToolError("The search query was empty.")
     params = {"q": query[:400], "count": RESULTS}  # Brave rejects queries over 400 characters
-    if freshness := FRESHNESS.get(args.get("freshness")):
+    if freshness := FRESHNESS.get(str(args.get("freshness") or "")):
         params["freshness"] = freshness
     try:
         async with nullcontext(client) if client else httpx.AsyncClient(timeout=10) as http:
@@ -142,11 +142,11 @@ def _power(base, exponent):
     return base**exponent
 
 
-def _evaluate(node):
+def _evaluate(node) -> float:
     match node:
         case ast.Expression(body=body):
             return _evaluate(body)
-        case ast.Constant(value=value) if type(value) in (int, float):
+        case ast.Constant(value=int() | float() as value) if type(value) is not bool:
             return value
         case ast.Name(id=name) if name in _CONSTANTS:
             return _CONSTANTS[name]
@@ -276,12 +276,12 @@ class _PageText(HTMLParser):
 
 async def _resolve(host: str, port: int) -> list[str]:
     infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
-    return [i[4][0] for i in infos]
+    return [str(i[4][0]) for i in infos]
 
 
 def _is_public(address: str) -> bool:
     ip = ipaddress.ip_address(address.split("%")[0])
-    if ip.version == 6 and ip.ipv4_mapped:
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
         ip = ip.ipv4_mapped
     return ip.is_global and not ip.is_multicast
 

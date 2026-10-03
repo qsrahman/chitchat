@@ -53,7 +53,9 @@ def create_conversation(conn: sqlite3.Connection, title: str = DEFAULT_TITLE, se
         (cid, title, now, now, json.dumps(settings or {})),
     )
     conn.commit()
-    return get_conversation(conn, cid)
+    conv = get_conversation(conn, cid)
+    assert conv  # just inserted
+    return conv
 
 
 def get_conversation(conn: sqlite3.Connection, cid: str) -> dict | None:
@@ -209,7 +211,9 @@ def add_attachment(conn: sqlite3.Connection, aid: str, name: str, mime: str, kin
         (aid, name, mime, kind, size, _now()),
     )
     conn.commit()
-    return get_attachment(conn, aid)
+    row = get_attachment(conn, aid)
+    assert row  # just inserted
+    return row
 
 
 def get_attachment(conn: sqlite3.Connection, aid: str) -> dict | None:

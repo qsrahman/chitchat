@@ -271,7 +271,8 @@ async def test_attachments_become_input_parts_before_the_text(tmp_path):
     first, second = sent[0]["input"]
     assert second == {"role": "assistant", "content": "an earlier reply"}  # no attachments: plain text, as before
     assert first["content"] == [
-        {"type": "input_image", "image_url": "data:image/png;base64," + base64.b64encode(b"IMAGE-BYTES").decode()},
+        {"type": "input_image", "detail": "auto",
+         "image_url": "data:image/png;base64," + base64.b64encode(b"IMAGE-BYTES").decode()},
         {"type": "input_file", "filename": "doc.pdf",
          "file_data": "data:application/pdf;base64," + base64.b64encode(b"PDF-BYTES").decode()},
         {"type": "input_text", "text": '<file name="notes.txt">\nremember the milk\n</file>'},

@@ -120,10 +120,12 @@ def _parse(data: bytes) -> list[_Chat]:
         raise ImportRejected(f"That doesn't look like a ChitChat export ({where}: {first['msg']}).") from e
 
 
-def _when(value: str | None, fallback: str) -> str:
+def _when(value: object, fallback: str) -> str:
+    if not isinstance(value, str):
+        return fallback
     try:
         moment = datetime.fromisoformat(value)
-    except (TypeError, ValueError):
+    except ValueError:
         return fallback
     return (moment if moment.tzinfo else moment.replace(tzinfo=UTC)).astimezone(UTC).isoformat()
 
@@ -156,7 +158,7 @@ def _clean_meta(meta: dict) -> tuple[dict, list[str]]:
         kept["incomplete"] = meta["incomplete"][:100]
     if isinstance(meta.get("trimmed"), int) and not isinstance(meta["trimmed"], bool) and meta["trimmed"] > 0:
         kept["trimmed"] = meta["trimmed"]
-    files = meta.get("attachments") if isinstance(meta.get("attachments"), list) else []
+    files = meta["attachments"] if isinstance(meta.get("attachments"), list) else []
     names = [a["name"][:200] for a in files if isinstance(a, dict) and isinstance(a.get("name"), str)][:10]
     return kept, names
 

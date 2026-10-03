@@ -260,7 +260,7 @@ def _model_options(request: Request, conn: sqlite3.Connection, conv: dict, model
     guidance = [t.guidance for t in enabled.values()]
     base = request.app.state.settings.default_system_prompt.replace("{date}", date.today().isoformat())
     parts = [base, store.get_app_setting(conn, "custom_instructions"), s["system_prompt"], *guidance]
-    options = {"instructions": "\n\n".join(filter(None, parts)) or None}
+    options: dict[str, Any] = {"instructions": "\n\n".join(filter(None, parts)) or None}
     if enabled:
         options["tools"] = enabled
         options["max_tool_calls"] = request.app.state.settings.max_tool_calls
@@ -288,14 +288,14 @@ class Turn:
 
 def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], model: str | None = None):
     settings = request.app.state.settings
-    model = model or conv["settings"]["model"] or settings.openai_model
-    options = _model_options(request, conn, conv, model)
+    chosen: str = model or conv["settings"]["model"] or settings.openai_model
+    options = _model_options(request, conn, conv, chosen)
     trimmed = 0
     if settings.history_tokens:  # room for the instructions and the reply, then as much history as fits
         instructions = context.estimate({"content": options.get("instructions")})
         reserve = instructions + (settings.openai_max_output_tokens or 2_000)
         history, trimmed = context.fit(history, settings.history_tokens - reserve)
-    return Turn(conn, request.app.state.llm, settings.title_model_name, conv, history, model, options, trimmed)
+    return Turn(conn, request.app.state.llm, settings.title_model_name, conv, history, chosen, options, trimmed)
 
 
 def _redo_last_user_turn(
