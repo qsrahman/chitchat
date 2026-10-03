@@ -338,3 +338,10 @@ def test_the_composer_stays_tidy_with_chips_on_a_phone(page, app_url):
         box = chips(page).nth(i).bounding_box()
         assert box["x"] + box["width"] <= composer["x"] + composer["width"] + 1
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+
+def test_the_attach_button_is_a_plus_icon_named_attach_files(page, app_url):
+    open_app(page, app_url)
+    button = page.get_by_role("button", name="Attach files")
+    expect(button).to_have_attribute("title", "Attach files")
+    expect(button.locator("path")).to_have_attribute("d", "M10 4v12M4 10h12")  # a plus, not a paperclip

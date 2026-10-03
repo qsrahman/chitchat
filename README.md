@@ -9,7 +9,7 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Reading-focused UI: ChatGPT's system font stack, highlighted code with copy, typeset math (KaTeX), light/dark theme, centered new-chat composer that reflows as you type, icon rail sidebar, mobile drawer, smart autoscroll, drafts that survive a reload
 - Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
 - Reasoning summaries in a collapsible block
-- Attachments: images, PDFs and text files via the paperclip, drag and drop or paste
+- Attachments: images, PDFs and text files via the + button, drag and drop or paste
 - Composer controls: web search on/off (globe) and thinking effort (for reasoning models; "None" turns thinking off)
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
 - Tools menu (per chat): a calculator for exact arithmetic, search over your past chats, and a page reader for links (public sites only). See `docs/tools.md`
