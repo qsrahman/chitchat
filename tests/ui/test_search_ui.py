@@ -289,13 +289,15 @@ def test_on_a_phone_the_toggle_fits_when_on(page, app_url):
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
 
-def test_the_pressed_toggle_looks_different_without_any_label(page, app_url):
+def test_the_pressed_toggle_changes_color_only_with_no_label_or_background(page, app_url):
     open_app(page, app_url)
     colors = lambda: toggle(page).evaluate(  # noqa: E731
         "e => { const s = getComputedStyle(e); return [s.color, s.backgroundColor]; }")
     page.locator("#search-toggle").evaluate("e => e.style.transition = 'none'")
     off = colors()
     search_on(page)
+    page.mouse.move(0, 0)  # the hover background is not the pressed state
     on = colors()
-    assert on[0] != off[0] and on[1] != off[1]  # accent color and a tinted background
+    assert on[0] != off[0]  # accent color
+    assert on[1] == off[1]  # no background highlight
     assert toggle(page).bounding_box()["width"] == page.locator("#attach").bounding_box()["width"]  # no wider when on
