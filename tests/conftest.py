@@ -19,11 +19,13 @@ class FakeLLM:
         self.calls = []
         self.title = "Fake title"
         self.models = []
+        self.hanging = asyncio.Event()  # set once the stream reaches a "hang" event: a test cancels after that
 
     async def stream_reply(self, model, messages, **options):
         self.calls.append({"model": model, "messages": messages, "options": options})
         for e in self.events:
             if e["type"] == "hang":  # simulates a slow stream so a test can disconnect mid-reply
+                self.hanging.set()
                 await asyncio.Event().wait()
             yield e
 

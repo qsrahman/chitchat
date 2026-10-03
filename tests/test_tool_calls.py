@@ -139,7 +139,7 @@ async def test_a_call_still_running_when_the_reply_is_stopped_is_saved_as_stoppe
     llm.events = [{"type": "delta", "text": "Let me look"}, RUN, {"type": "hang"}]
     cid = await create(client, tools=["web_search"])
     task = asyncio.create_task(chat(client, cid))
-    await asyncio.sleep(0.1)
+    await asyncio.wait_for(llm.hanging.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task

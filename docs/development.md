@@ -4,13 +4,13 @@
 ```
 uv run python scripts/check.py
 ```
-Runs, and stops at the first failure: `ruff` (Python lint), `pyright` (types, `app/` only, config in `pyproject.toml`), `eslint` (the JavaScript in `app/static`, when Node is installed), and the whole test suite. About 20 seconds. The JavaScript lint is there because a missing import in the UI only shows when that line runs, and nothing else would find it (config: `eslint.config.mjs`; `tests/test_static_modules.py` checks import names without Node).
+Runs, and stops at the first failure: `ruff` (Python lint), `pyright` (types, `app/` only, config in `pyproject.toml`), `eslint` (the JavaScript in `app/static`, when Node is installed), and the whole test suite. About 30 seconds. The JavaScript lint is there because a missing import in the UI only shows when that line runs, and nothing else would find it (config: `eslint.config.mjs`; `tests/test_static_modules.py` checks import names without Node).
 
 To run it before every commit, once per clone:
 ```
 git config core.hooksPath .githooks
 ```
-Skip it for one commit with `git commit --no-verify`.
+Skip it for one commit with `git commit --no-verify`. The hook is enabled in the maintainer's clone (since `docs/round-4.md`); a new clone has to run the command above. It checks the working tree, not just what is staged, so a half-finished file you are not committing can still fail it.
 
 ## Tests
 `uv run pytest` runs in parallel (`pytest-xdist`, `-n auto` in `pyproject.toml`): 653 tests in about 20 seconds on 14 cores, against about 150 serially (checked repeatedly for flaky tests; each test has its own database, files and server port). For one test or for debugging use `-n 0`:

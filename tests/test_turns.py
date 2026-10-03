@@ -66,7 +66,7 @@ async def test_disconnect_saves_partial_reply_as_stopped(client, llm):
     llm.events = [{"type": "delta", "text": "par"}, {"type": "delta", "text": "tial"}, {"type": "hang"}]
     cid = await new_conv(client)
     task = asyncio.create_task(chat(client, cid, "hi"))
-    await asyncio.sleep(0.1)
+    await asyncio.wait_for(llm.hanging.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
@@ -80,7 +80,7 @@ async def test_disconnect_before_any_text_saves_no_reply(client, llm):
     llm.events = [{"type": "hang"}]
     cid = await new_conv(client)
     task = asyncio.create_task(chat(client, cid, "hi"))
-    await asyncio.sleep(0.1)
+    await asyncio.wait_for(llm.hanging.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
@@ -109,7 +109,7 @@ async def test_stopped_reply_keeps_its_reasoning(client, llm):
     llm.events = [{"type": "reasoning_delta", "text": "Hmm."}, {"type": "delta", "text": "part"}, {"type": "hang"}]
     cid = await new_conv(client)
     task = asyncio.create_task(chat(client, cid, "hi"))
-    await asyncio.sleep(0.1)
+    await asyncio.wait_for(llm.hanging.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
@@ -120,7 +120,7 @@ async def test_reasoning_without_an_answer_is_not_saved_when_stopped(client, llm
     llm.events = [{"type": "reasoning_delta", "text": "Hmm."}, {"type": "hang"}]
     cid = await new_conv(client)
     task = asyncio.create_task(chat(client, cid, "hi"))
-    await asyncio.sleep(0.1)
+    await asyncio.wait_for(llm.hanging.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task

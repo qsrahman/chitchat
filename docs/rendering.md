@@ -28,4 +28,19 @@ Where the time went (one render of 100,000 characters): sanitizing 137 ms, repla
 
 **One full render at the end.** When a stream finishes, the reply is rendered once in full with nothing reused (`renderFresh`), so what is saved is exactly what a reload shows (tested). That is the single remaining freeze in the table above: 114 ms at 20,000 characters, about half a second at 100,000, once.
 
-**Not done / limits:** a very long single block (a 20,000-line code block, one enormous list item) is still re-rendered whole each frame, because it is one block; a reply of that shape would need highlighting that continues instead of restarting. This was not measured: the benchmark's blocks are ordinary sized, so how bad a single huge block is remains unknown.
+**Limits: one huge block.** The saving above comes from reusing finished blocks, so a reply that is mostly one block gets none of it. Measured (`scripts/bench_render.py`, the same method; 14-core Mac, Chromium, the stream alone takes about as long as "ideal"):
+
+| One block of | Characters | Main thread blocked while streaming | Longest freeze |
+|---|---|---|---|
+| code, 1,000 lines | 65,000 | 0 s | none |
+| code, 5,000 lines | 337,000 | 4.5 s of 7.8 s | 115 ms |
+| code, 20,000 lines | 1,390,000 | 28.5 s of 32.3 s | 482 ms |
+| one paragraph, 5,000 lines | 330,000 | 7.5 s of 10.6 s | 262 ms |
+| one paragraph, 20,000 lines | 1,300,000 | 41.4 s of 44.8 s | 2.8 s |
+| one list item, 1,000 lines | 65,000 | 0.8 s | 104 ms |
+| one list item, 5,000 lines | 340,000 | 12.4 s of 13.7 s | 2.1 s |
+| one list item, 20,000 lines | 1,400,000 | 80.4 s of 81.8 s | **35 s** |
+
+So: up to about 1,000 lines (65,000 characters, roughly 20,000 tokens, which is a very long answer) a single block is fine. A code block stays tolerable for a long way (the page is sluggish, not frozen: the longest task at 20,000 lines is half a second). A single enormous **list item** is the bad case, 35 s in one freeze at 20,000 lines, and gets worse faster than linearly, which I did not investigate (likely the browser's layout of one very tall item, not our code). The cost of one render of a code block is linear in its size: at 5,000 lines it is 83 ms, of which sanitizing is 64, highlighting 21 (the lexing is nothing), so each frame costs that much again as the block grows.
+
+**What it means:** replies of that size need about 100,000 output tokens, which few models produce, and none of the models this app is aimed at do by default (`OPENAI_MAX_OUTPUT_TOKENS` is unset, so the model's own limit applies). I judged it not worth fixing now. If it ever is, the general fix is to cap the share of the main thread that rendering may take (after a render that took t ms, skip frames for the next 2t ms), which helps every shape at once and needs no knowledge of block types; stopping highlighting a code block past a size while it streams would only help code.
