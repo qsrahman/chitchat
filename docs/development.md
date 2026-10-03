@@ -27,4 +27,4 @@ uv run pytest -n 0 tests/ui/test_chat_ui.py -k retry
 | Outdated Python packages | `uv pip list --outdated`; update with `uv lock --upgrade-package NAME && uv sync` | Run the tests after: the OpenAI SDK moves fast |
 | Real-service tests | `uv run pytest -m live` | needs the keys in `.env` |
 
-State when last checked: no known vulnerabilities; outdated (not updated): `openai` 3.22.1 (3.24.0 available), plus ruff, websockets, pydantic-core and two transitive packages.
+State when last checked (2026-10-03): no known vulnerabilities in 56 packages; everything is current except `pydantic-core` (held by `pydantic`) and two transitive packages of Playwright (`pyee`, `python-slugify`).
