@@ -1,6 +1,6 @@
 // A turn: streaming a reply into the thread, and the actions on messages (copy, edit, regenerate, retry).
 import { ICONS, actionsOf, api, bodyOf, form, iconButton, input, state, thread } from "./core.js";
-import { addMessage, finishReasoning, render, reasoningOf, setNote, setReasoning, setText } from "./messages.js";
+import { addMessage, finishReasoning, reasoningOf, render, renderFresh, setNote, setReasoning, setText } from "./messages.js";
 import { clearPending, pending, saveDraft, scheduleComposer, syncSend } from "./composer.js";
 import { refreshList } from "./sidebar.js";
 import { renderToolCall } from "./tools-ui.js";
@@ -175,7 +175,7 @@ async function runTurn(path, payload = {}) {
       renderToolCall(el, { id: row.dataset.id, name: row.dataset.name, status: "stopped" });
     }
     finishReasoning(el);
-    render(el);
+    renderFresh(el);
     if (el.classList.contains("assistant") && !el._text && !el._reasoning && !el.querySelector(".tool-call")) el.remove();
     if (state.abort === ctrl) { // a newer turn may already own the UI (e.g. after switching chats)
       state.busy = false;

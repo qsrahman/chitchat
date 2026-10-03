@@ -85,9 +85,37 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
 // URL encodes) to a third party. Revisit when image output is a feature.
 // KaTeX's accessible MathML wraps the formula in <semantics> with the TeX in an <annotation>; DOMPurify
 // drops both by default, which would leave that TeX source as stray text.
-const sanitize = (html) => DOMPurify.sanitize(html, {
-  FORBID_TAGS: ["img"], ADD_TAGS: ["semantics", "annotation"], ADD_ATTR: ["encoding"],
-});
+const SANITIZE = { FORBID_TAGS: ["img"], ADD_TAGS: ["semantics", "annotation"], ADD_ATTR: ["encoding"] };
+const sanitize = (html) => DOMPurify.sanitize(html, SANITIZE);
 
 export const renderMarkdown = (text) => sanitize(marked.parse(text));
 export const renderReasoning = (text) => sanitize(reasoningMarked.parse(text));
+
+// Rendering a reply that is still streaming. Rendering all of it again for every frame costs more the longer it
+// gets (150 ms a frame at 100,000 characters, nearly all of it sanitizing and replacing the DOM), so the page
+// froze on long answers. But only the last block of the text is ever still changing, so the top-level blocks
+// (paragraphs, lists, code blocks...) are kept as DOM, and only from the first block that differs is anything
+// made again. The result is the same HTML as a full render (tests/ui/test_incremental_render_ui.py checks that
+// at every step of streaming tricky documents). The container remembers its blocks in `_blocks`; anything else
+// that replaces its content must set that to null. A reference-style link definition arriving later changes how
+// earlier paragraphs read without changing their text, so a change in the known definitions starts afresh.
+function renderBlocks(instance, container, text) {
+  const tokens = instance.lexer(text);
+  const links = JSON.stringify(tokens.links);
+  if (container._blocks?.links !== links) {
+    container.replaceChildren();
+    container._blocks = { links, list: [] };
+  }
+  const { list } = container._blocks;
+  let same = 0;
+  while (same < tokens.length && same < list.length && list[same].raw === tokens[same].raw) same++;
+  for (const block of list.splice(same)) block.nodes.forEach((node) => node.remove());
+  for (const token of tokens.slice(same)) {
+    const fragment = DOMPurify.sanitize(instance.parser([token]), { ...SANITIZE, RETURN_DOM_FRAGMENT: true });
+    list.push({ raw: token.raw, nodes: [...fragment.childNodes] });
+    container.append(fragment);
+  }
+}
+
+export const renderMarkdownInto = (container, text) => renderBlocks(marked, container, text);
+export const renderReasoningInto = (container, text) => renderBlocks(reasoningMarked, container, text);

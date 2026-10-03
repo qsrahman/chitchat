@@ -1,5 +1,5 @@
 // The thread: building a message (text, reasoning, tool calls, attachments, note), rendering it, and scrolling.
-import { renderMarkdown, renderReasoning } from "./markdown.js";
+import { renderMarkdownInto, renderReasoningInto } from "./markdown.js";
 import { $, ICONS, bodyOf, icon, main, messagesEl, noteOf, state, thread } from "./core.js";
 import { renderToolCall } from "./tools-ui.js";
 
@@ -108,13 +108,23 @@ export function render(el) {
   cancelAnimationFrame(el._frame);
   el._frame = null;
   const body = bodyOf(el);
-  if (el._reasoning) reasoningOf(el).querySelector(".reasoning-body").innerHTML = renderReasoning(el._reasoning);
-  if (el.classList.contains("assistant")) {
-    if (el._text) body.innerHTML = renderMarkdown(el._text);
+  if (el._reasoning) renderReasoningInto(reasoningOf(el).querySelector(".reasoning-body"), el._reasoning);
+  if (el.classList.contains("assistant") && el._text) renderMarkdownInto(body, el._text); // reuses what has not changed
+  else {
+    body._blocks = null; // the content is replaced by something else: the next markdown render starts afresh
+    if (!el.classList.contains("assistant")) body.textContent = el._text;
     else if (el._reasoning || el.querySelector(".tool-call")) body.replaceChildren(); // those are the progress indicator
     else body.innerHTML = '<span class="dots" role="status" aria-label="Thinking"><i></i><i></i><i></i></span>';
-  } else body.textContent = el._text;
+  }
   if (state.stick) scrollToBottom();
+}
+
+// One full render with nothing reused: at the end of a stream, so a saved reply is exactly what a reload shows.
+export function renderFresh(el) {
+  bodyOf(el)._blocks = null;
+  const reasoning = el.querySelector(".reasoning-body");
+  if (reasoning) reasoning._blocks = null;
+  render(el);
 }
 
 // Copy button inside rendered code blocks (event delegation: the HTML is re-rendered while streaming).
