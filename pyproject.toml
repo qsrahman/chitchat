@@ -18,13 +18,14 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-playwright>=0.9.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.16.1",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = ["live: hits the real OpenAI API (needs OPENAI_API_KEY)"]
-addopts = "-m 'not live'"
+addopts = "-m 'not live' -n auto"  # tests run in parallel (pytest-xdist); `-n 0` to run in one process, e.g. to debug
 
 [tool.ruff]
 line-length = 120

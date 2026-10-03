@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the project's checks before every commit. Turn it on once per clone:  git config core.hooksPath .githooks
+# Skip it for one commit (when you know why):  git commit --no-verify
+exec uv run python scripts/check.py

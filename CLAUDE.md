@@ -5,7 +5,8 @@ ChitChat: a ChatGPT-style web chat app on the OpenAI Responses API. Built in pha
 ## Commands
 ```
 uv run uvicorn app.main:create_app --factory --reload   # dev server on :8000
-uv run pytest                          # API + Playwright UI tests, no network
+uv run python scripts/check.py        # ruff + eslint + all tests, ~20s: run before committing (docs/development.md)
+uv run pytest                          # API + Playwright UI tests, no network, in parallel (-n 0 for one process)
 uv run pytest tests/ui                 # UI tests only (needs: uv run playwright install chromium)
 uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 ```
