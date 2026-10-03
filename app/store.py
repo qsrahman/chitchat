@@ -4,6 +4,7 @@ import re
 import sqlite3
 import uuid
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
@@ -63,11 +64,25 @@ def get_conversation(conn: sqlite3.Connection, cid: str) -> dict | None:
     return _conversation(row) if row else None
 
 
-def list_conversations(conn: sqlite3.Connection, limit: int = -1, offset: int = 0) -> list[dict]:
-    """Newest first. `limit=-1` is SQLite's "no limit"."""
-    rows = conn.execute("SELECT * FROM conversations ORDER BY updated_at DESC, rowid DESC LIMIT ? OFFSET ?",
-                        (limit, offset))
+def list_conversations(conn: sqlite3.Connection, limit: int = -1, offset: int = 0,
+                       archived: bool | None = False) -> list[dict]:
+    """Pinned chats first, then newest first. By default the chats that are not archived; `archived=True` the archived
+    ones, None all of them. `limit=-1` is SQLite's "no limit"."""
+    where, args = ("", ()) if archived is None else ("WHERE archived = ?", (int(archived),))
+    rows = conn.execute(
+        f"SELECT * FROM conversations {where} ORDER BY pinned DESC, updated_at DESC, rowid DESC LIMIT ? OFFSET ?",
+        (*args, limit, offset))
     return [_conversation(r) for r in rows]
+
+
+def set_flags(conn: sqlite3.Connection, cid: str, pinned: bool | None = None,
+              archived: bool | None = None) -> dict | None:
+    """Pin or archive a chat (None leaves a flag as it is). Does not count as activity: the order by recency stays."""
+    for column, value in (("pinned", pinned), ("archived", archived)):
+        if value is not None:
+            conn.execute(f"UPDATE conversations SET {column} = ? WHERE id = ?", (int(value), cid))
+    conn.commit()
+    return get_conversation(conn, cid)
 
 
 def rename_conversation(conn: sqlite3.Connection, cid: str, title: str) -> dict | None:
@@ -113,9 +128,12 @@ def add_message(conn: sqlite3.Connection, cid: str, role: str, content: str, met
     """Add a message after `parent_id` (default: the end of the path shown; None: a new first message) and make it
     the end of the path."""
     now = _now()
+    row = conn.execute("SELECT leaf_id FROM conversations WHERE id = ?", (cid,)).fetchone()
+    leaf = row["leaf_id"] if row else None
     if parent_id == LEAF:
-        row = conn.execute("SELECT leaf_id FROM conversations WHERE id = ?", (cid,)).fetchone()
-        parent_id = row["leaf_id"] if row else None
+        parent_id = leaf
+    elif parent_id != leaf:  # a new version beside something: the path shown now is being left
+        _remember_path(conn, cid)
     cur = conn.execute(
         "INSERT INTO messages (conversation_id, parent_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         (cid, parent_id, role, content, json.dumps(meta or {}), now),
@@ -165,16 +183,40 @@ def siblings_of(conn: sqlite3.Connection, cid: str, message_id: int) -> list[int
     return [r["id"] for r in ids]
 
 
+def _path_ids(conn: sqlite3.Connection, cid: str) -> list[int]:
+    """The ids of the path shown, first to last."""
+    rows = conn.execute(
+        """WITH RECURSIVE path(id, parent_id) AS (
+               SELECT m.id, m.parent_id FROM messages m JOIN conversations c ON c.leaf_id = m.id WHERE c.id = ?
+               UNION ALL SELECT m.id, m.parent_id FROM messages m JOIN path ON m.id = path.parent_id)
+           SELECT id FROM path ORDER BY id""", (cid,))
+    return [r["id"] for r in rows]
+
+
+def _remember_path(conn: sqlite3.Connection, cid: str) -> None:
+    """Note, on each message of the path shown, which message came next on it (`chosen_id`): the path is about to be
+    left, and this is how select_branch finds its way back. Not committed here."""
+    shown = _path_ids(conn, cid)
+    conn.executemany("UPDATE messages SET chosen_id = ? WHERE id = ?", [(b, a) for a, b in pairwise(shown)])
+
+
 def select_branch(conn: sqlite3.Connection, cid: str, message_id: int) -> bool:
-    """Show the path through `message_id`: from it, follow the newest child again and again to the end. False if the
-    message is not in this conversation."""
+    """Show the path through `message_id`, continued to its end the way it was last shown: at each step the reply
+    that was showing the last time the path was left (`chosen_id`), else the newest. Leaving the path shown now
+    is remembered the same way, so coming back lands here. False if the message is not in this conversation."""
     if not conn.execute("SELECT 1 FROM messages WHERE id = ? AND conversation_id = ?", (message_id, cid)).fetchone():
         return False
+    _remember_path(conn, cid)
     leaf = message_id
-    while child := conn.execute(
-        "SELECT MAX(id) AS id FROM messages WHERE conversation_id = ? AND parent_id = ?", (cid, leaf)
-    ).fetchone()["id"]:
-        leaf = child
+    while True:
+        row = conn.execute(
+            """SELECT COALESCE(
+                   (SELECT c.id FROM messages c WHERE c.id = p.chosen_id AND c.parent_id = p.id),
+                   (SELECT MAX(c.id) FROM messages c WHERE c.conversation_id = ? AND c.parent_id = p.id)) AS next
+               FROM messages p WHERE p.id = ?""", (cid, leaf)).fetchone()
+        if not row["next"]:
+            break
+        leaf = row["next"]
     conn.execute("UPDATE conversations SET leaf_id = ? WHERE id = ?", (leaf, cid))
     conn.commit()
     return True
@@ -182,6 +224,7 @@ def select_branch(conn: sqlite3.Connection, cid: str, message_id: int) -> bool:
 
 def set_leaf(conn: sqlite3.Connection, cid: str, message_id: int) -> None:
     """Make `message_id` the end of the path shown (a reply is about to be added to it)."""
+    _remember_path(conn, cid)
     conn.execute("UPDATE conversations SET leaf_id = ? WHERE id = ?", (message_id, cid))
     conn.commit()
 
@@ -199,8 +242,10 @@ def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
                 skipped += 1
                 continue
             conn.execute(
-                "INSERT INTO conversations (id, title, created_at, updated_at, settings) VALUES (?, ?, ?, ?, ?)",
-                (c["id"], c["title"], c["created_at"], c["updated_at"], json.dumps(c["settings"])),
+                "INSERT INTO conversations (id, title, created_at, updated_at, settings, pinned, archived)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (c["id"], c["title"], c["created_at"], c["updated_at"], json.dumps(c["settings"]),
+                 int(c.get("pinned", False)), int(c.get("archived", False))),
             )
             ids: list[int] = []
             for m in c["messages"]:

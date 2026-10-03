@@ -78,3 +78,26 @@ def test_a_copy_that_exists_is_not_overwritten(tmp_path):
     db.init(path)
     assert Path(f"{path}.bak-v5").read_bytes() == b"the first copy"
     assert version(path) == len(db.MIGRATIONS)  # and the upgrade still ran
+
+
+def test_only_the_copies_of_the_most_recent_versions_are_kept(tmp_path):
+    path = str(tmp_path / "chats.db")
+    for v in (1, 2, 3):
+        (tmp_path / f"chats.db.bak-v{v}").write_bytes(b"old")
+    unrelated = [tmp_path / "chats.db.bak-v2.keep", tmp_path / "other.db.bak-v1", tmp_path / "chats.db.bak-vx"]
+    for f in unrelated:
+        f.write_bytes(b"mine")
+    old_database(path, upgrades=5)
+    db.init(path)  # makes bak-v5, then prunes
+    assert sorted(p.name for p in tmp_path.glob("chats.db.bak-v*") if p.name[-1].isdigit()) == [
+        "chats.db.bak-v3", "chats.db.bak-v5"]
+    assert all(f.exists() for f in unrelated)  # nothing that is not ours is touched
+
+
+def test_nothing_is_pruned_when_nothing_is_upgraded(tmp_path):
+    path = str(tmp_path / "chats.db")
+    db.init(path)
+    for v in (1, 2, 3):
+        (tmp_path / f"chats.db.bak-v{v}").write_bytes(b"old")
+    db.init(path)
+    assert len(list(tmp_path.glob("chats.db.bak-v*"))) == 3

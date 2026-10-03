@@ -6,10 +6,10 @@
 - `GET /api/export` (or "Export all chats"): **one JSON file** with every conversation, which can be imported again:
   ```json
   {"format": "chitchat-backup", "version": 2, "exported_at": "...",
-   "conversations": [{"id", "title", "settings", "created_at", "updated_at", "leaf",
+   "conversations": [{"id", "title", "settings", "created_at", "updated_at", "leaf", "pinned", "archived",
                       "messages": [{"role", "content", "meta", "created_at", "parent"}]}]}
   ```
-  Oldest chat first. Message `meta` carries what the page shows (reasoning, usage, tool calls, notes). **Every version** of every message is in the file (`docs/branching.md`): `parent` is the position in the list of the message a message follows (null for the first), `leaf` the position of the last message of the path that was showing. Version 1 files (no `parent`, no `leaf`) import as one straight path.
+  Oldest chat first. Message `meta` carries what the page shows (reasoning, usage, tool calls, notes). Whether a chat is pinned or archived is in the file (`pinned`, `archived`, true or false). **Every version** of every message is in the file (`docs/branching.md`): `parent` is the position in the list of the message a message follows (null for the first), `leaf` the position of the last message of the path that was showing. Version 1 files (no `parent`, no `leaf`) import as one straight path.
 - `GET /api/export?format=full` ("Export with attachments"): a **zip** with `chats.json` (the same document) and `attachments/<id>` for every file the chats mention. It is built in a temporary file and streamed, not held in memory. A file that is gone from disk is left out, and the import says so for that message. The JSON also carries your `custom_instructions` (one text), in this zip and in the plain JSON export.
 - `GET /api/export?format=md` ("Export as Markdown"): a **zip with a Markdown file per conversation**, named `date-title-idprefix.md` (the id prefix is why two chats with the same title don't collide). Meant for reading, not for importing.
 - The export of one chat (settings dialog) is the path showing, without the other versions (and without `parent` and `leaf`), and its JSON can be imported too. The Markdown zip is the same: the path showing.

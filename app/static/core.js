@@ -30,6 +30,8 @@ export const ICONS = {
   trash: "M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10",
   file: "M6 3h6l4 4v10H6zM12 3v4h4",
   close: "M5 5l10 10M15 5L5 15",
+  pin: "M7 3h6l-.8 5.2L15 11H5l2.8-2.8zM10 11v6",
+  archive: "M3 5h14v3H3zM4 8v8h12V8M8 11.5h4",
   chevronDown: "M6 8l4 4 4-4",
   previous: "M12 5l-5 5 5 5",
   next: "M8 5l5 5-5 5",

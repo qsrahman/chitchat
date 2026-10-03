@@ -83,6 +83,8 @@ body.nav-open { grid-template-columns: 17rem minmax(0, 1fr); }
 .conv .icon-btn svg { width: 16px; height: 16px; }
 .conv:hover .icon-btn, .conv:focus-within .icon-btn { opacity: 1; }
 .conv .icon-btn:hover { color: var(--ink); }
+.conv .icon-btn.is-on { opacity: 1; color: var(--accent); }
+#archived-btn[aria-pressed="true"] { background: var(--hover); box-shadow: inset 2px 0 0 var(--accent); }
 .side-foot { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
 .show-more { margin: 8px 10px; justify-content: center; width: calc(100% - 20px); color: var(--muted); font-size: var(--text-sm); }
 .no-convs { margin: 12px 10px; color: var(--muted); font-size: var(--text-sm); }

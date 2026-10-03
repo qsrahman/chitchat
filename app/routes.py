@@ -38,11 +38,13 @@ Conn = Annotated[sqlite3.Connection, Depends(get_db)]
 class ConversationUpdate(BaseModel):
     title: Title | None = None
     settings: ConversationSettings | None = None
+    pinned: bool | None = None
+    archived: bool | None = None
 
     @model_validator(mode="after")
     def _something_to_change(self):
-        if self.title is None and self.settings is None:
-            raise ValueError("send a title, settings, or both")
+        if all(v is None for v in (self.title, self.settings, self.pinned, self.archived)):
+            raise ValueError("send a title, settings, pinned or archived")
         return self
 
 
@@ -92,8 +94,9 @@ def _require(conn: sqlite3.Connection, cid: str) -> dict:
 
 @router.get("/conversations")
 def list_conversations(conn: Conn, limit: Annotated[int, Query(ge=1, le=500)] = 50,
-                       offset: Annotated[int, Query(ge=0)] = 0):
-    return store.list_conversations(conn, limit, offset)
+                       offset: Annotated[int, Query(ge=0)] = 0, archived: bool = False):
+    """Pinned chats first, then newest first: the chats that are not archived, or with `archived=true` the archived."""
+    return store.list_conversations(conn, limit, offset, archived)
 
 
 @router.post("/conversations", status_code=201)
@@ -187,8 +190,10 @@ async def import_conversations(file: UploadFile, request: Request, conn: Conn):
 
 @router.patch("/conversations/{cid}")
 def update_conversation(cid: str, body: ConversationUpdate, conn: Conn):
-    """Rename and/or replace the conversation's settings."""
+    """Rename, replace the settings, pin or unpin, archive or unarchive: any of them."""
     _require(conn, cid)
+    if body.pinned is not None or body.archived is not None:
+        store.set_flags(conn, cid, body.pinned, body.archived)
     if body.title is not None:
         store.rename_conversation(conn, cid, body.title)
     if body.settings is not None:

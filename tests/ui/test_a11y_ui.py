@@ -266,3 +266,16 @@ def test_the_try_again_menu(page_with_axe):
     page.get_by_role("button", name="Try again with another model").click()
     expect(page.locator("#retry-menu")).to_be_visible()
     assert violations(page) == []
+
+
+def test_pinned_and_archived_lists(page_with_axe):
+    page = page_with_axe
+    say(page, "hello")
+    page.get_by_role("button", name="Show conversations").first.click()
+    page.get_by_role("button", name=re.compile('^Pin "')).click()
+    expect(page.locator("#conversations h2").first).to_have_text("Pinned")
+    assert violations(page) == []
+    page.get_by_role("button", name=re.compile('^Archive "')).click()
+    page.get_by_role("button", name="Archived chats").click()
+    expect(page.get_by_role("button", name=re.compile('^Unarchive "'))).to_be_visible()
+    assert violations(page) == []

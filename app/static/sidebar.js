@@ -13,10 +13,11 @@ function groupOf(iso) {
 // The list loads a page at a time ("Show more" asks for the next). A refresh reloads as many as are showing.
 const PAGE = 50;
 let more = false; // the last request came back full, so there may be older chats
+let showArchived = false; // the list is the archived chats (the "Archived chats" button in the footer)
 
 export async function refreshList() {
   const limit = Math.min(500, Math.max(PAGE, state.convs.length));
-  state.convs = await api(`/conversations?limit=${limit}`);
+  state.convs = await api(`/conversations?limit=${limit}&archived=${showArchived}`);
   more = state.convs.length === limit;
   renderList();
   const current = state.convs.find((c) => c.id === state.id);
@@ -24,7 +25,7 @@ export async function refreshList() {
 }
 
 async function showMore() {
-  const next = await api(`/conversations?limit=${PAGE}&offset=${state.convs.length}`);
+  const next = await api(`/conversations?limit=${PAGE}&offset=${state.convs.length}&archived=${showArchived}`);
   state.convs.push(...next);
   more = next.length === PAGE;
   renderList();
@@ -99,10 +100,12 @@ function renderList() {
   const nav = $("conversations");
   const shown = state.convs.filter((c) => c.id !== pending?.conv.id); // a chat waiting to be deleted is hidden
   if (!shown.length) {
-    nav.replaceChildren(Object.assign(document.createElement("p"), { className: "no-convs", textContent: "Your conversations will show up here." }));
+    const empty = showArchived ? "Archived chats will show up here." : "Your conversations will show up here.";
+    nav.replaceChildren(Object.assign(document.createElement("p"), { className: "no-convs", textContent: empty }));
     return;
   }
-  const groups = Map.groupBy(shown, (c) => groupOf(c.updated_at)); // list is already newest-first
+  // Pinned chats first, in a group of their own; the rest by date. The list is already pinned first, newest first.
+  const groups = Map.groupBy(shown, (c) => (c.pinned ? "Pinned" : groupOf(c.updated_at)));
   nav.replaceChildren(...[...groups].flatMap(([name, convs]) => {
     const h = Object.assign(document.createElement("h2"), { textContent: name });
     const ul = document.createElement("ul");
@@ -127,13 +130,31 @@ function renderConv(c) {
   link.title = c.title;
   if (c.id === state.id) link.setAttribute("aria-current", "page");
   link.onclick = closeNavIfOverlay;
+  const pin = iconButton(`${c.pinned ? "Unpin" : "Pin"} "${c.title}"`, ICONS.pin, () => setFlags(c, { pinned: !c.pinned }));
+  pin.classList.toggle("is-on", !!c.pinned); // a pinned chat shows it without the mouse over it
   li.append(
     link,
+    ...(showArchived ? [] : [pin]),
     iconButton(`Rename "${c.title}"`, ICONS.pencil, () => renameConv(c)),
+    iconButton(`${showArchived ? "Unarchive" : "Archive"} "${c.title}"`, ICONS.archive,
+      () => setFlags(c, { archived: !showArchived })),
     iconButton(`Delete "${c.title}"`, ICONS.trash, () => deleteConv(c)),
   );
   return li;
 }
+
+async function setFlags(c, flags) {
+  await api(`/conversations/${c.id}`, { method: "PATCH", body: JSON.stringify(flags) });
+  await refreshList();
+}
+
+// The footer button switches the list between the chats and the archive (an archived chat can still be opened).
+$("archived-btn").onclick = async () => {
+  showArchived = !showArchived;
+  $("archived-btn").setAttribute("aria-pressed", String(showArchived));
+  state.convs = []; // start from the first page of the other list
+  await refreshList();
+};
 
 async function renameConv(c) {
   $("rename-input").value = c.title;

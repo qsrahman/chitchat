@@ -1,4 +1,5 @@
 import logging
+import re
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -96,8 +97,16 @@ UPDATE conversations SET leaf_id = (SELECT MAX(id) FROM messages WHERE conversat
 CREATE INDEX messages_by_parent ON messages(conversation_id, parent_id);
 """
 
+# v7: pinned and archived chats, and for each message the reply that was last shown after it (`chosen_id`), which is
+# how switching back to a version of a message lands where you left it (see store.select_branch).
+PIN_ARCHIVE_CHOICES = """
+ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE messages ADD COLUMN chosen_id INTEGER;
+"""
+
 # Each entry upgrades the schema by one version; PRAGMA user_version records how many ran.
-MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS, SEARCH, TITLE_SEARCH, BRANCHING]
+MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS, SEARCH, TITLE_SEARCH, BRANCHING, PIN_ARCHIVE_CHOICES]
 
 
 def connect(path: str) -> sqlite3.Connection:
@@ -119,6 +128,22 @@ def _back_up(conn: sqlite3.Connection, path: str, version: int) -> None:
     with closing(sqlite3.connect(target)) as copy:
         conn.backup(copy)
     logger.info("backed up the database to %s before upgrading it to version %d", target, len(MIGRATIONS))
+    _prune(path)
+
+
+KEEP_BACKUPS = 2  # copies kept: those of the most recent versions
+
+
+def _prune(path: str) -> None:
+    """Delete the oldest copies, so they don't pile up with every upgrade. Only files named exactly like ours
+    (`<db>.bak-v<number>`) are touched, never something a person put next to the database."""
+    found = []
+    for candidate in Path(path).parent.glob(f"{Path(path).name}.bak-v*"):
+        if m := re.fullmatch(r"bak-v(\d+)", candidate.name.removeprefix(Path(path).name + ".")):
+            found.append((int(m.group(1)), candidate))
+    for _, old in sorted(found, reverse=True)[KEEP_BACKUPS:]:
+        old.unlink()
+        logger.info("removed the old database copy %s", old)
 
 
 def init(path: str) -> None:

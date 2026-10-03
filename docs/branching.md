@@ -14,7 +14,7 @@ Editing a message or regenerating a reply used to delete what came after it. Now
 | Send | `POST .../chat` | adds a user message after the leaf, then the reply under it |
 | Regenerate / Retry | `POST .../regenerate` | moves the leaf to the last user message on the path (so the old reply is no longer shown) and adds a new reply under it; the old reply stays as a version |
 | Edit | `POST .../edit {content, message_id?}` | adds a new user message with the same parent and attachments as `message_id` (default: the last user message on the path), then the reply. Any user message on the path can be edited, not only the last. What came after the old version stays with it |
-| Switch version | `POST .../branch {message_id}` | shows the path through that message, then follows the **newest** child at every step to the end. Returns the conversation like `GET` |
+| Switch version | `POST .../branch {message_id}` | shows the path through that message, then follows at every step the child remembered there (else the newest) to the end. Returns the conversation like `GET` |
 
 Edit and Regenerate set the leaf **before** the reply streams, so a reply that fails leaves the conversation ending on your message, with Retry, as a failed send always did. The model only ever sees the path shown (`routes._history`), never other versions.
 
@@ -30,7 +30,7 @@ Edit and Regenerate set the leaf **before** the reply streams, so a reply that f
 - The title, usage and compaction logic work on the path shown: a compaction item saved in a version is only used on paths that contain it.
 
 ## Limits and choices
-- **Switching goes to the newest end.** Choosing version 1 of a message shows the path through it that you used last (the newest child at each step), not "the path you were on in version 1 before you switched away"; the conversation does not remember where you stood in each version. With three or four versions this is rarely noticeable.
+- **Switching goes back to where you left.** Each message remembers which reply came after it the last time the path showing went through it (`messages.chosen_id`, migration v7), and switching to a version follows those, falling back to the newest reply where nothing is remembered. The path is remembered whenever it is left: when you switch (`select_branch`), when an edit or a regenerate starts a new version (`add_message` with another parent, `set_leaf`). So after reading reply 1 of 2, editing the message and coming back to the original, you see reply 1, not reply 2. Imported chats have no memory and start at the newest.
 - **No way to delete a version**, and no way to start a new conversation from one. Deleting a conversation removes all of its versions.
 - **Search results from versions you left** are still found, and a conversation's `search_chats` tool call can quote one.
 - **A stopped reply is a version too.** Stopping a reply keeps its text; Retry or Regenerate then adds a second version beside it.

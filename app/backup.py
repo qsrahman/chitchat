@@ -78,7 +78,8 @@ def _tree(conn, c: dict) -> dict:
     messages = [{"role": m["role"], "content": m["content"], "meta": public_message(m)["meta"],
                  "created_at": m["created_at"], "parent": position.get(m["parent_id"])} for m in rows]
     leaf = position.get(c["leaf_id"], len(rows) - 1) if rows else None
-    return {**{k: v for k, v in c.items() if k != "leaf_id"}, "leaf": leaf, "messages": messages}
+    return {**{k: v for k, v in c.items() if k != "leaf_id"}, "pinned": bool(c["pinned"]),
+            "archived": bool(c["archived"]), "leaf": leaf, "messages": messages}
 
 
 def _path(conn, c: dict) -> dict:
@@ -88,7 +89,8 @@ def _path(conn, c: dict) -> dict:
 
 def _all(conn, build) -> list[dict]:
     """Every conversation, built with `_tree` or `_path`, oldest first."""
-    return sorted((build(conn, c) for c in store.list_conversations(conn)), key=lambda c: c["created_at"])
+    return sorted((build(conn, c) for c in store.list_conversations(conn, archived=None)),
+                  key=lambda c: c["created_at"])
 
 
 def _document(conn) -> dict:
@@ -148,6 +150,8 @@ class _Chat(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
     leaf: StrictInt | None = None  # position of the last message of the path shown; its presence means versions
+    pinned: bool = False  # lax on purpose: the one-chat export has them as 0 and 1
+    archived: bool = False
     messages: list[_Message] = Field(max_length=MAX_MESSAGES)
 
 
@@ -324,7 +328,7 @@ def _prepare(chat: _Chat, now: str, files: _Files, taken: set[str]) -> dict:
                          "parent": parent})
     return {"id": cid, "title": chat.title.strip()[:200] or "Imported chat", "settings": _settings(chat.settings),
             "created_at": created, "updated_at": _when(chat.updated_at, created), "leaf": leaf, "messages": messages,
-            "attachments": rows}
+            "attachments": rows, "pinned": chat.pinned, "archived": chat.archived}
 
 
 def _import(conn, data: bytes, files: _Files) -> dict:
