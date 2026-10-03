@@ -1,11 +1,10 @@
 import json
-import re
 import sqlite3
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
@@ -13,7 +12,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.sse import EventSourceResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app import attachments, context, db, store, tools
+from app import attachments, backup, context, db, store, tools
 from app.llm import REASONING_EFFORTS, supports_reasoning
 from app.store import ConversationSettings, Instructions
 
@@ -85,16 +84,10 @@ def create_conversation(conn: Conn, body: NewConversation | None = None):
     return store.create_conversation(conn, settings=settings)
 
 
-def _public(m: dict) -> dict:
-    """A message for the browser or an export: OpenAI's encrypted compaction item is only for the model."""
-    c = m["meta"].get("compaction")
-    return {**m, "meta": {**m["meta"], "compaction": {"after_reply": c["after_reply"]}}} if c else m
-
-
 @router.get("/conversations/{cid}")
 def get_conversation(cid: str, conn: Conn):
     conv = _require(conn, cid)
-    return {**conv, "messages": [_public(m) for m in store.list_messages(conn, cid)]}
+    return {**conv, "messages": [backup.public_message(m) for m in store.list_messages(conn, cid)]}
 
 
 @router.get("/search")
@@ -103,30 +96,42 @@ def search(q: Annotated[str, Query(min_length=1, max_length=200)], conn: Conn):
     return store.search_conversations(conn, q)
 
 
-def _markdown(conv: dict, messages: list[dict]) -> str:
-    parts = [f"# {conv['title']}"]
-    for m in messages:
-        parts.append("## " + ("You" if m["role"] == "user" else "Assistant"))
-        if files := m["meta"].get("attachments"):
-            parts.append("*Attached: " + ", ".join(a["name"] for a in files) + "*")
-        parts.append(m["content"])
-    return "\n\n".join(parts) + "\n"
-
-
 @router.get("/conversations/{cid}/export")
 def export_conversation(cid: str, conn: Conn, format: Literal["md", "json"] = "md"):
     """The conversation as a Markdown or JSON download. Attachments are listed by name, not included."""
     conv = _require(conn, cid)
-    messages = [_public(m) for m in store.list_messages(conn, cid)]
+    messages = [backup.public_message(m) for m in store.list_messages(conn, cid)]
     if format == "md":
-        body, media_type = _markdown(conv, messages), "text/markdown"
+        body, media_type = backup.markdown(conv, messages), "text/markdown"
     else:
         body, media_type = json.dumps({**conv, "messages": messages}, indent=2, ensure_ascii=False), "application/json"
-    name = re.sub(r"[^A-Za-z0-9._-]+", "-", conv["title"]).strip("-") or "chat"
     return Response(
         body, media_type=f"{media_type}; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{name}.{format}"'},
+        headers={"Content-Disposition": f'attachment; filename="{backup.file_name(conv["title"])}.{format}"'},
     )
+
+
+@router.get("/export")
+def export_everything(conn: Conn, format: Literal["json", "md"] = "json"):
+    """Every conversation: one JSON file that /api/import takes back, or a zip of Markdown files."""
+    if format == "json":
+        body, media_type, extension = backup.export_json(conn), "application/json", "json"
+    else:
+        body, media_type, extension = backup.export_zip(conn), "application/zip", "zip"
+    return Response(body, media_type=media_type, headers={
+        "Content-Disposition": f'attachment; filename="chitchat-{datetime.now(UTC):%Y-%m-%d}.{extension}"'})
+
+
+@router.post("/import", status_code=201)
+async def import_conversations(file: UploadFile, conn: Conn):
+    """Add the conversations in an exported JSON file (all of them, or none if it isn't a valid export)."""
+    data = await file.read(backup.MAX_IMPORT_BYTES + 1)
+    if len(data) > backup.MAX_IMPORT_BYTES:
+        raise HTTPException(413, f"That file is too large to import (over {backup.MAX_IMPORT_BYTES // 1_000_000} MB).")
+    try:
+        return backup.import_chats(conn, data)
+    except backup.ImportRejected as e:
+        raise HTTPException(422, str(e)) from e
 
 
 @router.patch("/conversations/{cid}")

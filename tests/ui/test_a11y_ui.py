@@ -141,6 +141,7 @@ def test_the_drop_overlay(page_with_axe):
     (lambda p: p.get_by_role("button", name="Custom instructions").click(), "Custom instructions"),
     (lambda p: p.get_by_role("button", name="Rename").first.click(force=True), "Rename conversation"),
     (lambda p: p.get_by_role("button", name="Delete").first.click(force=True), "Delete this conversation?"),
+    (lambda p: p.get_by_role("button", name="Back up and import chats").click(), "Back up and import chats"),
 ])
 def test_each_dialog(page_with_axe, opener, dialog):
     page = page_with_axe

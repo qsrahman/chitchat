@@ -92,12 +92,20 @@ export function renderToolCall(el, call) {
   row.querySelector("summary").dir = "auto";
   row.dataset.status = call.status;
   row.setAttribute("aria-busy", String(call.status === "running"));
-  row.querySelector("summary").textContent = {
-    running: () => ui?.running(call.arguments ?? {}) ?? `Using ${call.name}…`,
-    done: () => ui?.done(call.arguments ?? {}, call.display) ?? `Used ${call.name}`,
-    error: () => ui?.failed(call.error) ?? `${call.name} failed: ${call.error}`,
-    stopped: () => ui?.stopped ?? `${call.name} stopped`,
-  }[call.status]();
-  const detail = call.status === "done" ? ui?.detail?.(call.display) : null;
+  let summary, detail = null;
+  try {
+    summary = {
+      running: () => ui?.running(call.arguments ?? {}) ?? `Using ${call.name}…`,
+      done: () => ui?.done(call.arguments ?? {}, call.display) ?? `Used ${call.name}`,
+      error: () => ui?.failed(call.error) ?? `${call.name} failed: ${call.error}`,
+      stopped: () => ui?.stopped ?? `${call.name} stopped`,
+    }[call.status]();
+    detail = call.status === "done" ? ui?.detail?.(call.display) : null;
+  } catch {
+    // Saved details this page doesn't expect (from an older version, or an imported file) must not break the
+    // whole conversation: it falls back to a plain line.
+    summary = `Used ${call.name}`;
+  }
+  row.querySelector("summary").textContent = summary;
   row.querySelector(".tool-body").replaceChildren(...(detail ? [detail] : []));
 }

@@ -316,6 +316,11 @@ dialog input[type=number] { margin-top: 4px; }
 #settings-dialog, #instructions-dialog { width: min(30rem, 100% - 32px); }
 .field-note { margin-top: 14px !important; font-size: var(--text-sm); }
 .field-error { margin-top: 10px !important; color: var(--danger) !important; font-size: var(--text-sm); }
+.backup-links { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 8px; }
+.backup-links a { color: var(--accent); }
+.backup-links span { display: block; font-size: var(--text-sm); color: var(--muted); }
+#backup-status { margin-top: 10px; font-size: var(--text-sm); color: var(--ink); }
+#backup-status.is-error { color: var(--danger); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
 @media (min-width: 761px) {

@@ -132,6 +132,33 @@ def delete_messages_after(conn: sqlite3.Connection, cid: str, message_id: int) -
     conn.commit()
 
 
+def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
+    """Insert prepared conversations (id, title, settings, created_at, updated_at, messages with role, content, meta
+    and created_at), all in one transaction: if anything fails, none are added. One whose id is already here, or
+    repeated in `chats`, is skipped. Returns {"imported", "skipped", "messages"}."""
+    imported = skipped = messages = 0
+    try:
+        for c in chats:
+            if conn.execute("SELECT 1 FROM conversations WHERE id = ?", (c["id"],)).fetchone():
+                skipped += 1
+                continue
+            conn.execute(
+                "INSERT INTO conversations (id, title, created_at, updated_at, settings) VALUES (?, ?, ?, ?, ?)",
+                (c["id"], c["title"], c["created_at"], c["updated_at"], json.dumps(c["settings"])),
+            )
+            conn.executemany(
+                "INSERT INTO messages (conversation_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)",
+                [(c["id"], m["role"], m["content"], json.dumps(m["meta"]), m["created_at"]) for m in c["messages"]],
+            )
+            imported += 1
+            messages += len(c["messages"])
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return {"imported": imported, "skipped": skipped, "messages": messages}
+
+
 def search_conversations(
     conn: sqlite3.Connection, query: str, limit: int = 20, tokens: int = 12, exclude: str | None = None
 ) -> list[dict]:

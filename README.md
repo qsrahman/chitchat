@@ -14,7 +14,8 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
 - Tools menu (per chat): a calculator for exact arithmetic, search over your past chats, and a page reader for links (public sites only). See `docs/tools.md`
 - Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`); on a local model the oldest turns are left out of the request instead (`CONTEXT_TOKENS`), with a note
-- Full-text search across all conversations (sidebar), and export of a chat as Markdown or JSON (chat settings)
+- Full-text search across all conversations (sidebar; titles and messages, a result opens at the matching message), and export of a chat as Markdown or JSON (chat settings)
+- Backup: export every chat as one JSON file (or a zip of Markdown) and import it back, without overwriting anything (`docs/backup.md`)
 
 ## Requirements
 Python 3.14+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key. For the browser tests, run `uv run playwright install chromium` once.

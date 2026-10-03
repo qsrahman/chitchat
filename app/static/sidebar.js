@@ -150,3 +150,39 @@ document.querySelectorAll(".nav-toggle").forEach((b) => {
   b.onclick = () => setNavOpen(!document.body.classList.contains("nav-open"));
 });
 $("scrim").onclick = () => setNavOpen(false);
+
+// ---- backup ----
+// Export is two links (the server builds the files). Import sends a chosen JSON file and says what came of it.
+const chats = (n) => `${n} chat${n === 1 ? "" : "s"}`;
+
+function setBackupStatus(text, failed = false) {
+  const status = $("backup-status");
+  status.textContent = text;
+  status.hidden = !text;
+  status.classList.toggle("is-error", failed);
+}
+
+$("backup-btn").onclick = () => {
+  setBackupStatus("");
+  $("backup-dialog").showModal();
+};
+
+$("import-file").onchange = async (e) => {
+  const [file] = e.target.files;
+  e.target.value = ""; // so choosing the same file again still counts
+  if (!file) return;
+  setBackupStatus(`Importing ${file.name}…`);
+  const body = new FormData();
+  body.append("file", file);
+  try {
+    const res = await fetch("/api/import", { method: "POST", body });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(typeof result.detail === "string" ? result.detail : `The import failed (${res.status}).`);
+    setBackupStatus(result.imported
+      ? `Imported ${chats(result.imported)}${result.skipped ? `; ${result.skipped} already here` : ""}.`
+      : `Nothing new: ${chats(result.skipped)} already here.`);
+    await refreshList();
+  } catch (err) {
+    setBackupStatus(err instanceof TypeError ? "Couldn't reach the server." : err.message, true);
+  }
+};
