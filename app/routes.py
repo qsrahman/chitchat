@@ -1,5 +1,7 @@
 import json
+import logging
 import sqlite3
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
@@ -16,6 +18,7 @@ from app import attachments, backup, context, db, store, tools
 from app.llm import REASONING_EFFORTS, supports_reasoning
 from app.store import ConversationSettings, Instructions
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 # Strip on the way in, so whitespace alone is neither a message nor a title.
@@ -356,6 +359,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     cid, conn = turn.conv["id"], turn.conn
     needs_title = turn.conv["title"] == store.DEFAULT_TITLE
     reply, reasoning, tool_calls, compaction, finished = [], [], {}, None, False
+    outcome, usage, started = "stopped", {}, time.monotonic()
     try:
         if turn.trimmed:
             yield {"type": "context_trimmed", "count": turn.trimmed}
@@ -381,7 +385,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                 if compaction:
                     meta["compaction"] = {"item": compaction["item"], "after_reply": compaction["after_reply"]}
                 store.add_message(conn, cid, "assistant", text, meta)
-                finished = True
+                finished, outcome, usage = True, "done", event.get("usage") or {}
                 yield event
                 if needs_title:
                     last = turn.history[-1]
@@ -391,9 +395,12 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                     yield {"type": "title", "title": title}
                 return
             elif event["type"] == "error":
-                finished = True
+                finished, outcome = True, "error"
             yield event
     finally:
+        logger.info("reply %s: conversation %s, model %s, %d tool calls, %s tokens in, %s out, %.1f s", outcome, cid,
+                    turn.model, len(tool_calls), usage.get("input_tokens", "?"), usage.get("output_tokens", "?"),
+                    time.monotonic() - started)
         if not finished and reply:
             meta = {"stopped": True, **({"reasoning": "".join(reasoning)} if reasoning else {})}
             if turn.trimmed:

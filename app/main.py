@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import MutableHeaders
 
-from app import attachments, db, store, tools
+from app import attachments, db, logs, store, tools
 from app.config import Settings
 from app.llm import OpenAILLM
 from app.routes import router
@@ -54,7 +54,9 @@ class SecurityHeaders:
 def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="ChitChat")
     app.add_middleware(SecurityHeaders)
+    app.add_middleware(logs.RequestId)
     app.state.settings = settings or Settings()
+    logs.setup(app.state.settings.log_level)
     db.init(app.state.settings.db_path)
     with closing(db.connect(app.state.settings.db_path)) as conn:  # uploads that were never sent
         abandoned = store.purge_orphans(conn, timedelta(hours=24))

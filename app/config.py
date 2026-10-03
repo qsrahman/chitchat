@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # Per reply, over all tools: a search, a few pages and reading one of them on is already six. Only web searches
     # cost money (Brave bills per request), so this is also the most one reply can spend there: about 4 cents.
     max_tool_calls: int = 8
+    log_level: str = "INFO"  # for the app's own log lines; see logs.py
     db_path: str = "chitchat.db"
     attachments_dir: str = "attachments"
 

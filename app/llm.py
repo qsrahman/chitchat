@@ -151,13 +151,17 @@ async def _run_tool(call, tools: dict[str, Tool], allowed: bool) -> tuple[str, d
     if not allowed:
         return ("Error: the tool call limit for this reply was reached. Answer with what you have.",
                 {**fields, "status": "error", "error": "Tool call limit reached."})
+    started = time.monotonic()
     try:
         result = await tool.run(arguments)
     except ToolError as e:
+        # Not the message: it may quote a URL, and a URL can carry a token.
+        logger.info("tool %s: error (%.0f ms)", call.name, (time.monotonic() - started) * 1000)
         return f"Error: {e}", {**fields, "status": "error", "error": str(e)}
     except Exception:  # tools are extension points: whatever one raises, the reply carries on
         logger.exception("tool %s failed", call.name)
         return "Error: the tool failed.", {**fields, "status": "error", "error": "The tool failed unexpectedly."}
+    logger.info("tool %s: done (%.0f ms)", call.name, (time.monotonic() - started) * 1000)
     return result.output, {**fields, "status": "done", "display": result.display}
 
 
@@ -293,6 +297,8 @@ class OpenAILLM:
                     items.append({"type": "function_call_output", "call_id": call.call_id, "output": text})
             yield {"type": "error", "message": "The model kept calling tools without answering."}
         except openai.OpenAIError as e:
+            # The class and status only: the provider's message is shown to the user, not written to the log.
+            logger.warning("model call failed: %s %s", type(e).__name__, getattr(e, "status_code", ""))
             yield {"type": "error", "message": _error_message(e)}
 
     async def generate_title(self, model: str, user_text: str, reply_text: str) -> str | None:
@@ -307,6 +313,7 @@ class OpenAILLM:
                 input=f"User: {user_text[:1000]}\n\nAssistant: {reply_text[:1000]}",
                 store=False,
             )
-        except openai.OpenAIError:
+        except openai.OpenAIError as e:
+            logger.warning("title generation failed: %s %s", type(e).__name__, getattr(e, "status_code", ""))
             return None
         return r.output_text.strip().strip("\"'").strip() or None

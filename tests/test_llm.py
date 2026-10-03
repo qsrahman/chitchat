@@ -630,3 +630,16 @@ async def test_when_a_refresh_fails_the_old_list_is_not_served_as_if_new(monkeyp
     assert await llm.list_models() == ["a-model"]
     clock[0] += 400
     assert await llm.list_models() == []  # the endpoint is down now, and the picker should say so
+
+
+async def test_a_tool_call_is_logged_by_name_and_outcome_not_by_its_message(caplog):
+    caplog.set_level("INFO", logger="app")
+
+    async def fails(args):
+        raise ToolError("Could not fetch https://example.com/?token=SECRET")
+
+    web, _ = tool(fails)
+    llm = make_llm(rounds([call_item(), completed()], [delta("ok"), completed()], requests=[]))
+    await events_of(llm, tools={"web_search": web})
+    assert [r.getMessage().split(" (")[0] for r in caplog.records] == ["tool web_search: error"]
+    assert "SECRET" not in caplog.text
