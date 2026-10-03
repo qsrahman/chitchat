@@ -29,7 +29,7 @@
   --measure: 62ch; /* the longest line of answer text; code, tables and math may run to the column */
 }
 @media (prefers-color-scheme: dark) { :root { --shadow-color: 30 20% 2%; } }
-/* The theme button's choice (appearance.js) beats the system's; "system" sets no attribute. */
+/* The Appearance setting's choice (preferences.js) beats the system's; "system" sets no attribute. */
 :root[data-theme="light"] { color-scheme: light; --shadow-color: 30 10% 14%; }
 :root[data-theme="dark"] { color-scheme: dark; --shadow-color: 30 20% 2%; }
 
@@ -327,19 +327,65 @@ dialog :is(select, textarea) { display: block; width: 100%; margin-top: 4px; pad
 dialog :is(input, select, textarea):focus-visible { outline-offset: 0; border-color: var(--accent); }
 dialog textarea { resize: vertical; }
 dialog input[type=number] { margin-top: 4px; }
-#settings-dialog, #instructions-dialog { width: min(30rem, 100% - 32px); }
+#settings-dialog { width: min(30rem, 100% - 32px); }
 .field-note { margin-top: 14px !important; font-size: var(--text-sm); }
 .field-error { margin-top: 10px !important; color: var(--danger) !important; font-size: var(--text-sm); }
-.backup-links { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 8px; }
-.backup-links a { color: var(--accent); }
-.backup-links span { display: block; font-size: var(--text-sm); color: var(--muted); }
 #backup-status { margin-top: 10px; font-size: var(--text-sm); color: var(--ink); }
 #backup-status.is-error { color: var(--danger); }
+
+/* The Settings dialog: a list of sections on the left, a scrolling panel on the right. In the panel each section is a
+   titled card of rows, label and description on the left and the control on the right (as in ChatGPT's settings). */
+#prefs-dialog { width: min(48rem, 100% - 32px); height: min(36rem, 100dvh - 32px); padding: 0; overflow: hidden; }
+#prefs-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.prefs-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px 24px; border-bottom: 1px solid var(--line); }
+#prefs-dialog h2 { margin: 0; }
+.prefs-body { display: grid; grid-template-columns: 12rem minmax(0, 1fr); min-height: 0; }
+.prefs-tabs { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-right: 1px solid var(--line); overflow-y: auto; }
+.prefs-tabs [role="tab"] { padding: 9px 12px; border-radius: var(--r-sm); text-align: left; color: var(--muted); }
+.prefs-tabs [role="tab"]:hover { background: var(--hover); color: var(--ink); }
+.prefs-tabs [role="tab"][aria-selected="true"] { background: var(--hover); color: var(--ink); font-weight: var(--font-weight-6); box-shadow: inset 2px 0 0 var(--accent); }
+.prefs-panels { overflow-y: auto; padding: 20px 24px 28px; }
+.prefs-panels [role="tabpanel"]:focus-visible { outline-offset: 4px; border-radius: var(--r-sm); }
+.prefs-panels h3 { margin: 24px 0 10px; font-size: var(--font-size-2); font-weight: var(--font-weight-6); }
+.prefs-panels [role="tabpanel"] > h3:first-child { margin-top: 0; }
+.pref-card { margin: 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.pref-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; }
+.pref-row + .pref-row { border-top: 1px solid var(--line); }
+.pref-stack { display: grid; gap: 10px; padding: 14px 16px; }
+.pref-text { display: grid; gap: 2px; min-width: 0; margin: 0; }
+#prefs-dialog :is(.pref-text label, .pref-label) { display: block; margin: 0; font-size: 1rem; color: var(--ink); }
+#prefs-dialog .pref-text p { margin: 0; font-size: var(--text-sm); }
+#prefs-dialog .pref-text code { font-size: var(--font-size-0); color: var(--muted); }
+.pref-value { margin: 0; text-align: right; overflow-wrap: anywhere; max-width: 55%; }
+#prefs-dialog .pref-row :is(select, .btn) { width: auto; flex: none; margin: 0; }
+#prefs-dialog textarea, #prefs-dialog input[type=file] { margin: 0; }
+#prefs-dialog input[type=file] { padding: 6px; }
+#prefs-dialog a.btn { color: var(--ink); text-decoration: none; }
+#prefs-dialog input[type=file]::file-selector-button { margin-inline-end: 10px; padding: 5px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+#prefs-dialog input[type=file]::file-selector-button:hover { background: var(--hover); }
+.pref-note { margin: 10px 2px 0; font-size: var(--text-sm); }
+#prefs-dialog .pref-lead { margin: 0 2px 18px; }
+.pref-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+#instructions-status { margin-inline-end: auto; font-size: var(--text-sm); color: var(--muted); }
+#instructions-status.is-error { color: var(--danger); }
+.pref-row kbd { padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font: inherit; font-size: var(--text-sm); color: var(--muted); }
+#default-instructions summary { cursor: pointer; }
+#default-instructions pre { max-height: 14rem; margin: 10px 0 0; padding: 10px 12px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: var(--r-sm); background: var(--bg); font: inherit; font-size: var(--text-sm); color: var(--ink); }
+@media (max-width: 640px) {
+  #prefs-dialog { height: calc(100dvh - 32px); }
+  .prefs-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .prefs-tabs { flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .prefs-tabs [role="tab"] { white-space: nowrap; box-shadow: none !important; }
+  .prefs-tabs [role="tab"][aria-selected="true"] { box-shadow: inset 0 -2px 0 var(--accent) !important; }
+  .prefs-panels { padding: 16px 16px 24px; }
+  .pref-row { flex-wrap: wrap; }
+  .pref-value { max-width: none; text-align: left; }
+}
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
 @media (min-width: 761px) {
   #scrim, #toggle-nav { display: none !important; }
-  /* the closed sidebar is an icon rail: toggle, new chat, custom instructions */
+  /* the closed sidebar is an icon rail: toggle, new chat, archive, settings */
   body:not(.nav-open) #sidebar { align-items: center; }
   body:not(.nav-open) :is(.brand, #conversations, .side-search, .side-item .label) { display: none; }
   body:not(.nav-open) .side-head { padding: 4px 0 8px; }

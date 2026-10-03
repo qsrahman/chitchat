@@ -12,7 +12,7 @@ import "./backup.js";
 import "./delete.js";
 import "./model-menu.js";
 import "./retry-menu.js";
-import "./appearance.js";
+import "./preferences.js";
 import "./shortcuts.js";
 
 async function openConversation(id) {

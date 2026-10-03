@@ -25,7 +25,7 @@ def test_closed_sidebar_is_an_icon_rail_that_keeps_the_main_actions_in_reach(pag
     expect(page.locator("#new-chat .label")).to_be_hidden()
     assert box(page.locator("#sidebar"))["width"] < RAIL_MAX_WIDTH
     expect(page.get_by_role("button", name="Show conversations")).to_have_attribute("aria-expanded", "false")
-    expect(page.get_by_role("button", name="Custom instructions")).to_be_visible()
+    expect(page.get_by_role("button", name="Settings", exact=True)).to_be_visible()
 
     send(page, "from the rail")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
@@ -33,8 +33,8 @@ def test_closed_sidebar_is_an_icon_rail_that_keeps_the_main_actions_in_reach(pag
     page.get_by_role("button", name="New chat").click()  # no need to open the sidebar first
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
 
-    page.get_by_role("button", name="Custom instructions").click()
-    expect(page.get_by_role("dialog", name="Custom instructions")).to_be_visible()
+    page.get_by_role("button", name="Settings", exact=True).click()
+    expect(page.get_by_role("dialog", name="Settings", exact=True)).to_be_visible()
 
 
 def test_toggle_expands_the_rail_into_the_full_sidebar_and_back(page, app_url):

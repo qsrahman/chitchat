@@ -1,5 +1,5 @@
-// Backup and import: the dialog, and what an import says it did. The exports are plain links (the server builds
-// the files); see docs/backup.md.
+// Importing a backup, and what the import says it did (in the Settings dialog's Data controls; the exports are plain
+// links there, the server builds the files); see docs/backup.md.
 import { $ } from "./core.js";
 import { commitDelete } from "./delete.js";
 import { refreshList } from "./list.js";
@@ -12,11 +12,6 @@ function setBackupStatus(text, failed = false) {
   status.hidden = !text;
   status.classList.toggle("is-error", failed);
 }
-
-$("backup-btn").onclick = () => {
-  setBackupStatus("");
-  $("backup-dialog").showModal();
-};
 
 $("import-file").onchange = async (e) => {
   const [file] = e.target.files;

@@ -2,7 +2,7 @@
 
 ## What you can set
 - **Per conversation** (Chat settings, the sliders button in the top bar): model, system prompt, and either reasoning effort or temperature. Stored as JSON in `conversations.settings`. The button gets a dot when anything differs from the defaults. Settings chosen on an empty "New chat" are sent when the chat is created by the first message.
-- **Global** (Custom instructions, sidebar footer): one text, stored in the `app_settings` key/value table. It is sent with every conversation, before the conversation's own system prompt (joined by a blank line, as the Responses API `instructions`).
+- **Global** (Custom instructions, now in Settings, Personalization): one text, stored in the `app_settings` key/value table. It is sent with every conversation, before the conversation's own system prompt (joined by a blank line, as the Responses API `instructions`).
 - Changes apply from the next message. Regenerate, edit and retry use the current settings.
 
 ## API

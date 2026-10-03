@@ -27,7 +27,7 @@ Streaming uses FastAPI's own SSE support (`fastapi.sse.EventSourceResponse`): ea
 | `delete.js` | deleting a chat with ten seconds to undo it |
 | `nav.js`, `shortcuts.js` | the drawer; the keyboard shortcuts |
 | `backup.js` | the backup dialog and what an import says it did |
-| `appearance.js` | the theme button |
+| `preferences.js` | the Settings dialog: tabs, appearance, shortcuts, custom instructions, the Server tab (`docs/settings-dialog.md`) |
 | `markdown.js` | markdown to sanitized HTML (unchanged) |
 
 **Rules that keep it from tangling again:**

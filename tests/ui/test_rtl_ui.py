@@ -24,6 +24,7 @@ def test_your_own_message_is_aligned_by_its_script(page, app_url):
     open_app(page, app_url)
     send(page, ARABIC)
     expect(page.locator(".msg.assistant .body p").first).to_be_visible()
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()  # done (Enter would stop it)
     body = page.locator(".msg.user .body")
     assert direction(body) == "rtl"
     assert body.evaluate("e => getComputedStyle(e).textAlign") in ("start", "right")

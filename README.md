@@ -7,14 +7,14 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Saved conversations in SQLite, sidebar with new/rename/delete, auto-generated titles, shareable `#<id>` links
 - Stop generation (partial reply kept), regenerate, retry, edit the last message, copy any message (yours or a reply) on its own
 - Reading-focused UI: ChatGPT's system font stack, highlighted code with copy, typeset math (KaTeX), light/dark theme, centered new-chat composer that reflows as you type, icon rail sidebar, mobile drawer, smart autoscroll, drafts that survive a reload
-- Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and global custom instructions
+- Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and a Settings dialog (appearance, shortcuts, custom instructions, export and import, and what the server is set up with: `docs/settings-dialog.md`)
 - Reasoning summaries in a collapsible block
 - Attachments: images, PDFs and text files via the + button, drag and drop or paste
 - Composer controls: web search on/off (globe) and thinking effort (for reasoning models; "None" turns thinking off)
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
 - Tools menu (per chat): a calculator for exact arithmetic, search over your past chats, and a page reader for links (public sites only). See `docs/tools.md`
 - Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`); on a local model the oldest turns are left out of the request instead (`CONTEXT_TOKENS`), with a note
-- Full-text search across all conversations (sidebar; titles and messages, a result opens at the matching message), and export of a chat as Markdown or JSON (chat settings); editing a message or regenerating a reply keeps the old one as a version you can switch back to ("2 / 3"); "try again with another model" on a reply; a Theme button (System, Light, Dark); deleting a chat can be undone for a few seconds; the chat list loads a page at a time; Cmd/Ctrl+K searches and Cmd/Ctrl+Shift+O starts a new chat (`docs/polish-2.md`)
+- Full-text search across all conversations (sidebar; titles and messages, a result opens at the matching message), and export of a chat as Markdown or JSON (chat settings); editing a message or regenerating a reply keeps the old one as a version you can switch back to ("2 / 3"); "try again with another model" on a reply; light, dark or system appearance in Settings; deleting a chat can be undone for a few seconds; the chat list loads a page at a time; Cmd/Ctrl+K searches and Cmd/Ctrl+Shift+O starts a new chat (`docs/polish-2.md`)
 - Backup: export every chat, every version of your messages and your custom instructions as one JSON file, or as a zip that also holds the attachment files (or a zip of Markdown to read), and import it back without overwriting anything; the database is copied before an upgrade and `scripts/restore_db.py` goes back to a copy (`docs/backup.md`, `docs/round-6.md`, `docs/round-8.md`)
 
 ## Requirements

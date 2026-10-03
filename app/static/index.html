@@ -31,17 +31,9 @@
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14v3H3zM4 8v8h12V8M8 11.5h4"/></svg>
       <span class="label">Archived chats</span>
     </button>
-    <button id="backup-btn" type="button" class="side-item" aria-label="Back up and import chats" title="Back up and import chats">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9M6.5 8.5L10 12l3.5-3.5M4 15v1.5h12V15"/></svg>
-      <span class="label">Backup &amp; import</span>
-    </button>
-    <button id="theme-btn" type="button" class="side-item" aria-label="Theme">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d=""/></svg>
-      <span class="label">Theme</span>
-    </button>
-    <button id="instructions-btn" type="button" class="side-item" aria-label="Custom instructions" title="Custom instructions">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3"/><path d="M4 16c.8-3 3-4.5 6-4.5s5.2 1.5 6 4.5"/></svg>
-      <span class="label">Custom instructions</span>
+    <button id="prefs-btn" type="button" class="side-item" aria-haspopup="dialog" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.5"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg>
+      <span class="label">Settings</span>
     </button>
   </div>
 </aside>
@@ -179,39 +171,88 @@
   </form>
 </dialog>
 
-<dialog id="backup-dialog" closedby="any" aria-labelledby="backup-heading">
-  <form method="dialog">
-    <h2 id="backup-heading">Back up and import chats</h2>
-    <p>Save every conversation, with every version of your messages, to keep a copy or to move to another computer.</p>
-    <ul class="backup-links">
-      <li><a href="/api/export?format=full" download>Export with attachments</a> <span>a zip with the chats and their files, to import again</span></li>
-      <li><a href="/api/export?format=json" download>Export all chats</a> <span>one JSON file to import again, without attachments</span></li>
-      <li><a href="/api/export?format=md" download>Export as Markdown</a> <span>a zip with a file per chat, to read</span></li>
-    </ul>
-    <label>Import chats from a file
-      <input id="import-file" type="file" accept=".json,.zip,application/json,application/zip">
-    </label>
-    <p class="field-note">Chats that are already here are left as they are: nothing is overwritten. Your custom instructions are taken only if you have none.</p>
-    <p id="backup-status" role="status" hidden></p>
-    <div class="dialog-actions">
-      <button type="button" class="btn" data-cancel>Close</button>
+<dialog id="prefs-dialog" closedby="any" aria-labelledby="prefs-heading">
+  <header class="prefs-head">
+    <h2 id="prefs-heading">Settings</h2>
+    <button type="button" class="icon-btn" data-cancel aria-label="Close settings" title="Close">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+    </button>
+  </header>
+  <div class="prefs-body">
+    <div class="prefs-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings sections">
+      <button type="button" role="tab" id="tab-general" aria-controls="panel-general" aria-selected="true">General</button>
+      <button type="button" role="tab" id="tab-personalization" aria-controls="panel-personalization" aria-selected="false" tabindex="-1">Personalization</button>
+      <button type="button" role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false" tabindex="-1">Data controls</button>
+      <button type="button" role="tab" id="tab-server" aria-controls="panel-server" aria-selected="false" tabindex="-1">Server</button>
     </div>
-  </form>
-</dialog>
 
-<dialog id="instructions-dialog" closedby="any" aria-labelledby="instructions-heading">
-  <form method="dialog">
-    <h2 id="instructions-heading">Custom instructions</h2>
-    <label>What should the model know about you or how you like answers?
-      <textarea id="set-instructions" dir="auto" rows="6" maxlength="10000"></textarea>
-    </label>
-    <p class="field-note">Sent with every conversation, before its own system prompt.</p>
-    <p class="field-error" role="alert" hidden></p>
-    <div class="dialog-actions">
-      <button type="button" class="btn" data-cancel>Cancel</button>
-      <button type="submit" value="save" class="btn primary">Save</button>
+    <div class="prefs-panels">
+      <section role="tabpanel" id="panel-general" aria-labelledby="tab-general" tabindex="0">
+        <h3>General</h3>
+        <div class="pref-card">
+          <div class="pref-row">
+            <div class="pref-text"><label for="pref-theme">Appearance</label><p id="pref-theme-note">Follow your system, or always light or dark.</p></div>
+            <select id="pref-theme" aria-describedby="pref-theme-note">
+              <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
+            </select>
+          </div>
+        </div>
+        <h3>Keyboard shortcuts</h3>
+        <div class="pref-card" id="shortcut-list"></div>
+        <p class="pref-note">The model, system prompt and temperature are set for one chat at a time: use the sliders button at the top right of a chat.</p>
+      </section>
+
+      <section role="tabpanel" id="panel-personalization" aria-labelledby="tab-personalization" tabindex="0" hidden>
+        <h3>Custom instructions</h3>
+        <div class="pref-card">
+          <div class="pref-stack">
+            <div class="pref-text"><label for="set-instructions">What should the model know about you or how you like answers?</label>
+              <p id="instructions-note">Sent with every conversation, before the chat's own system prompt.</p></div>
+            <textarea id="set-instructions" dir="auto" rows="6" maxlength="10000" aria-describedby="instructions-note"></textarea>
+            <div class="pref-actions">
+              <span id="instructions-status" role="status"></span>
+              <button type="button" id="instructions-save" class="btn primary">Save</button>
+            </div>
+          </div>
+        </div>
+        <h3>Built-in instructions</h3>
+        <div class="pref-card">
+          <details class="pref-stack" id="default-instructions">
+            <summary>What ChitChat always tells the model</summary>
+            <pre id="default-instructions-text" tabindex="0"></pre>
+            <p class="pref-note">Set by <code>DEFAULT_SYSTEM_PROMPT</code> in <code>.env</code>. Your custom instructions and the chat's system prompt come after it.</p>
+          </details>
+        </div>
+      </section>
+
+      <section role="tabpanel" id="panel-data" aria-labelledby="tab-data" tabindex="0" hidden>
+        <h3>Export</h3>
+        <div class="pref-card">
+          <div class="pref-row"><div class="pref-text"><span class="pref-label">Export with attachments</span><p>A zip with every chat, every version of your messages, your custom instructions and the attached files.</p></div>
+            <a class="btn" href="/api/export?format=full" download aria-label="Export with attachments">Export</a></div>
+          <div class="pref-row"><div class="pref-text"><span class="pref-label">Export all chats</span><p>One JSON file to import again, without the attachments.</p></div>
+            <a class="btn" href="/api/export?format=json" download aria-label="Export all chats">Export</a></div>
+          <div class="pref-row"><div class="pref-text"><span class="pref-label">Export as Markdown</span><p>A zip with a file per chat, to read. It cannot be imported.</p></div>
+            <a class="btn" href="/api/export?format=md" download aria-label="Export as Markdown">Export</a></div>
+        </div>
+        <h3>Import</h3>
+        <div class="pref-card">
+          <div class="pref-stack">
+            <div class="pref-text"><label for="import-file">Import chats from a file</label>
+              <p id="import-note">A JSON file or a zip made by Export. Chats that are already here are left as they are: nothing is overwritten. Your custom instructions are taken only if you have none.</p></div>
+            <input id="import-file" type="file" accept=".json,.zip,application/json,application/zip" aria-describedby="import-note">
+            <p id="backup-status" role="status" hidden></p>
+          </div>
+        </div>
+      </section>
+
+      <section role="tabpanel" id="panel-server" aria-labelledby="tab-server" tabindex="0" hidden>
+        <p class="pref-note pref-lead">What this server is set up with. It comes from <code>.env</code>: edit that and restart to change it.</p>
+        <div id="server-config"></div>
+        <p class="field-error" role="alert" hidden id="server-error"></p>
+      </section>
     </div>
-  </form>
+  </div>
 </dialog>
 
 <script src="vendor/marked.umd.js"></script>

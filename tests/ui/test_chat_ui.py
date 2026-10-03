@@ -19,6 +19,18 @@ def open_sidebar(page: Page):
     expect(page.locator("#conversations")).to_be_visible()
 
 
+def open_prefs(page: Page, tab: str = "General"):
+    """Open the Settings dialog (the sidebar's gear, which the icon rail keeps in reach) on a tab; returns it."""
+    gear = page.get_by_role("button", name="Settings", exact=True)
+    if not gear.is_visible():  # on a phone the sidebar is a drawer, closed until asked for
+        open_sidebar(page)
+    gear.click()
+    dialog = page.get_by_role("dialog", name="Settings", exact=True)
+    expect(dialog).to_be_visible()
+    dialog.get_by_role("tab", name=tab).click()
+    return dialog
+
+
 def conv_id(page: Page) -> str:
     return page.url.split("#")[1]
 

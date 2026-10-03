@@ -1,4 +1,4 @@
-// The open conversation's settings (and the model list): saving them, and the chat settings and instructions dialogs.
+// The open conversation's settings (and the model list): saving them, and the chat settings dialog.
 import { $, DEFAULT_SETTINGS, api, bus, state } from "./core.js";
 
 export function setSettings(settings) {
@@ -100,12 +100,3 @@ bindSave($("settings-dialog"), async () => {
     temperature: $("set-temp").value === "" ? null : Number($("set-temp").value),
   });
 });
-
-$("instructions-btn").onclick = async () => {
-  const dlg = $("instructions-dialog");
-  $("set-instructions").value = (await api("/custom-instructions")).text;
-  dlg.querySelector(".field-error").hidden = true;
-  dlg.showModal();
-};
-bindSave($("instructions-dialog"), () =>
-  api("/custom-instructions", { method: "PUT", body: JSON.stringify({ text: $("set-instructions").value }) }));

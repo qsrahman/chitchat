@@ -3,7 +3,7 @@ import json
 
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app, open_sidebar, send
+from tests.ui.test_chat_ui import open_app, open_prefs, open_sidebar, send
 
 CHAT_ID = "ab" * 16
 
@@ -20,11 +20,8 @@ def as_upload(data, name="chats.json"):
 
 
 def open_backup(page):
-    open_sidebar(page)
-    page.get_by_role("button", name="Back up and import chats").click()
-    dialog = page.get_by_role("dialog", name="Back up and import chats")
-    expect(dialog).to_be_visible()
-    return dialog
+    """Settings, Data controls: where the exports and the import are."""
+    return open_prefs(page, "Data controls")
 
 
 def test_the_sidebar_has_a_backup_button_that_opens_the_dialog(page, app_url):
@@ -40,9 +37,9 @@ def test_the_sidebar_has_a_backup_button_that_opens_the_dialog(page, app_url):
     expect(dialog).to_be_hidden()
 
 
-def test_the_button_is_in_the_icon_rail_too(page, app_url):
+def test_settings_is_in_the_icon_rail_too(page, app_url):
     open_app(page, app_url)  # the sidebar starts closed, as a rail of icons
-    expect(page.get_by_role("button", name="Back up and import chats")).to_be_visible()
+    expect(page.get_by_role("button", name="Settings", exact=True)).to_be_visible()
 
 
 def test_exporting_downloads_a_file_with_the_chats_in_it(page, app_url):
@@ -68,6 +65,7 @@ def test_importing_a_file_adds_the_chat_to_the_list_and_it_opens(page, app_url):
     dialog.get_by_label("Import chats from a file").set_input_files(as_upload(chat_file()))
     expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat.")
     dialog.get_by_role("button", name="Close").click()
+    open_sidebar(page)
     page.get_by_role("link", name="Imported wombats").click()
     expect(page.locator(".msg.user .body")).to_have_text("where do wombats sleep?")
     expect(page.locator(".msg.assistant .body")).to_have_text("In burrows, mostly.")
@@ -126,7 +124,7 @@ def test_the_status_clears_when_the_dialog_is_opened_again(page, app_url):
     dialog.get_by_label("Import chats from a file").set_input_files(as_upload(chat_file()))
     expect(dialog.locator("#backup-status")).to_be_visible()
     dialog.get_by_role("button", name="Close").click()
-    page.get_by_role("button", name="Back up and import chats").click()
+    open_backup(page)
     expect(page.locator("#backup-status")).to_be_hidden()
 
 
@@ -171,12 +169,12 @@ def test_a_backup_with_attachments_brings_the_pictures_back(page, app_url):
     assert download.value.suggested_filename.endswith("-with-files.zip")
     zipped = download.value.path()
     dialog.get_by_role("button", name="Close").click()
+    open_sidebar(page)
     page.get_by_role("button", name='Delete "keep this picture"').click()  # gone, files and all
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.get_by_text("Your conversations will show up here.")).to_be_visible()
     finish_delete(page)
-    page.get_by_role("button", name="Back up and import chats").click()
-    dialog = page.get_by_role("dialog", name="Back up and import chats")
+    dialog = open_backup(page)
     dialog.get_by_label("Import chats from a file").set_input_files(
         {"name": "backup.zip", "mimeType": "application/zip", "buffer": open(zipped, "rb").read()})
     expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat with 1 file.")
@@ -199,8 +197,7 @@ def test_importing_a_chat_you_just_deleted_brings_it_back_and_it_stays(page, app
     page.get_by_role("button", name='Delete "tell me about quokkas"').click()
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.locator("#toast")).to_be_visible()
-    page.get_by_role("button", name="Back up and import chats").click()
-    dialog = page.get_by_role("dialog", name="Back up and import chats")
+    dialog = open_backup(page)
     dialog.get_by_label("Import chats from a file").set_input_files(as_upload(backup))
     expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat.")
     dialog.get_by_role("button", name="Close").click()

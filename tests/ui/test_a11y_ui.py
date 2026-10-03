@@ -9,6 +9,7 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.helpers import PNG
+from tests.ui.test_chat_ui import open_prefs
 
 AXE = (Path(__file__).parent / "assets" / "axe.min.js").read_text()
 
@@ -143,10 +144,12 @@ def test_the_drop_overlay(page_with_axe):
 
 @pytest.mark.parametrize("opener, dialog", [
     (lambda p: p.get_by_role("button", name="Chat settings").click(), "Chat settings"),
-    (lambda p: p.get_by_role("button", name="Custom instructions").click(), "Custom instructions"),
+    (lambda p: open_prefs(p, "General"), "Settings"),
+    (lambda p: open_prefs(p, "Personalization"), "Settings"),
+    (lambda p: open_prefs(p, "Data controls"), "Settings"),
+    (lambda p: open_prefs(p, "Server"), "Settings"),
     (lambda p: p.get_by_role("button", name="Rename").first.click(force=True), "Rename conversation"),
     (lambda p: p.get_by_role("button", name="Delete").first.click(force=True), "Delete this conversation?"),
-    (lambda p: p.get_by_role("button", name="Back up and import chats").click(), "Back up and import chats"),
 ])
 def test_each_dialog(page_with_axe, opener, dialog):
     page = page_with_axe
@@ -239,11 +242,12 @@ def test_the_undo_toast(page_with_axe):
 
 
 def test_a_forced_theme_on_either_system_theme(page_with_axe):
-    """Light and Dark chosen with the theme button, against whichever theme the system has (the two params)."""
+    """Light and Dark chosen in Settings, against whichever theme the system has (the two params), with the dialog
+    open: it is the page that changes colour behind it and the dialog itself."""
     page = page_with_axe
-    page.get_by_role("button", name="Show conversations").first.click()
-    for _ in ("Light", "Dark"):
-        page.get_by_role("button", name=re.compile("^Theme: ")).click()
+    dialog = open_prefs(page)
+    for choice in ("light", "dark"):
+        dialog.get_by_label("Appearance").select_option(choice)
         # colors are read mid-fade otherwise
         page.wait_for_function("() => document.getAnimations().every((a) => !(a instanceof CSSTransition))")
         assert violations(page) == []
@@ -282,3 +286,12 @@ def test_pinned_and_archived_lists(page_with_axe):
     page.get_by_role("button", name="Archived chats").click()
     expect(page.get_by_role("button", name=re.compile('^Unarchive "'))).to_be_visible()
     assert violations(page) == []
+
+
+def test_settings_on_a_phone(browser, app_url, scheme):
+    context, page = open_page(browser, app_url, scheme, viewport={"width": 390, "height": 760},
+                              has_touch=True, is_mobile=True)
+    for tab in ("General", "Personalization", "Data controls", "Server"):
+        open_prefs(page, tab) if tab == "General" else page.get_by_role("dialog").get_by_role("tab", name=tab).click()
+        assert violations(page) == []
+    context.close()

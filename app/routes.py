@@ -9,6 +9,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, BinaryIO, Literal
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -217,6 +218,35 @@ async def list_models(request: Request):
 def list_tools(request: Request):
     """The tools that can be switched on for a conversation (those that are configured)."""
     return [{"name": t.name, "label": t.label, "hint": t.hint} for t in request.app.state.tools.values()]
+
+
+@router.get("/config")
+def server_config(request: Request):
+    """What the server is set up with, for the Settings dialog to show (read only: it comes from the environment or
+    `.env`, and changing it means editing that and restarting). No secrets: a key is only reported as set or not,
+    and the endpoint is its scheme and host, without a path or credentials."""
+    s = request.app.state.settings
+    endpoint = urlsplit(s.openai_base_url) if s.openai_base_url else None
+    return {
+        "endpoint": f"{endpoint.scheme}://{endpoint.hostname}{f':{endpoint.port}' if endpoint.port else ''}"
+        if endpoint and endpoint.hostname else ("custom" if endpoint else "OpenAI"),
+        "custom_endpoint": bool(s.openai_base_url),
+        "model": s.openai_model,
+        "title_model": s.title_model_name,
+        "web_search": bool(s.brave_api_key),
+        "tools": [t.label for t in request.app.state.tools.values()],
+        "compaction": s.compaction_enabled,
+        "compact_threshold": s.compact_threshold,
+        "history_tokens": s.history_tokens,
+        "max_tool_calls": s.max_tool_calls,
+        "max_output_tokens": s.openai_max_output_tokens,
+        "pdf_input": s.openai_pdf_input,
+        "reasoning_summaries": s.openai_reasoning_summaries,
+        "log_level": s.log_level.upper(),
+        "database": s.db_path,
+        "attachments": s.attachments_dir,
+        "default_instructions": s.default_system_prompt,
+    }
 
 
 @router.get("/attachments/limits")

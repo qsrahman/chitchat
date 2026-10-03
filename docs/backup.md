@@ -1,6 +1,6 @@
 # Backup: export everything, import it back
 
-**Where:** the sidebar's "Backup & import" button (a download icon in the closed rail) opens a dialog with the two exports and an import file picker.
+**Where:** Settings (the gear at the bottom of the sidebar), **Data controls**: the exports as buttons and the import file picker (`docs/settings-dialog.md`).
 
 ## Export
 - `GET /api/export` (or "Export all chats"): **one JSON file** with every conversation, which can be imported again:

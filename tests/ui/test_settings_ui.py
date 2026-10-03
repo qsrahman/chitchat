@@ -1,6 +1,6 @@
 from playwright.sync_api import Page, expect
 
-from tests.ui.test_chat_ui import conv_id, open_app, open_sidebar, send
+from tests.ui.test_chat_ui import conv_id, open_app, open_prefs, open_sidebar, send
 
 
 def open_settings(page: Page):
@@ -141,19 +141,18 @@ def test_save_failure_is_shown_and_can_be_retried(page, app_url, expected_consol
 
 def test_custom_instructions_apply_to_every_chat_and_persist(page, app_url):
     open_app(page, app_url)
-    open_sidebar(page)
-    page.get_by_role("button", name="Custom instructions").click()
-    dialog = page.get_by_role("dialog", name="Custom instructions")
-    dialog.get_by_role("textbox").fill("Call me Que")
+    dialog = open_prefs(page, "Personalization")
+    dialog.get_by_label("What should the model know about you").fill("Call me Que")
     dialog.get_by_role("button", name="Save").click()
+    expect(dialog.get_by_role("status")).to_have_text("Saved.")
+    page.keyboard.press("Escape")
     expect(dialog).to_be_hidden()
     send(page, "hello")
     expect(page.locator(".msg.assistant .body")).to_contain_text("[instructions=Call me Que]")
 
     page.reload()
-    open_sidebar(page)
-    page.get_by_role("button", name="Custom instructions").click()
-    expect(dialog.get_by_role("textbox")).to_have_value("Call me Que")
+    dialog = open_prefs(page, "Personalization")
+    expect(dialog.get_by_label("What should the model know about you")).to_have_value("Call me Que")
     page.keyboard.press("Escape")
 
     page.get_by_role("button", name="New chat").click()
