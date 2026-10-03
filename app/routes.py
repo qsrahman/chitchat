@@ -53,9 +53,17 @@ class CustomInstructions(BaseModel):
     text: Instructions
 
 
+Model = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+
 class EditRequest(BaseModel):
     content: Content
     message_id: int | None = None  # the user message to rewrite (on the path shown); the last one by default
+    model: Model | None = None  # for this reply only; the conversation's own model is not changed
+
+
+class RegenerateRequest(BaseModel):
+    model: Model | None = None  # for this reply only: "try again with another model"
 
 
 class BranchRequest(BaseModel):
@@ -334,14 +342,14 @@ def chat_turn(cid: str, req: ChatRequest, request: Request, conn: Conn) -> Turn:
     return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"], req.model)
 
 
-def regenerate_turn(cid: str, request: Request, conn: Conn) -> Turn:
+def regenerate_turn(cid: str, request: Request, conn: Conn, req: RegenerateRequest | None = None) -> Turn:
     """A new reply to the last user message. The reply there was (if any) stays, as another version of it."""
     conv = _require(conn, cid)
     user = _last_user(store.list_messages(conn, cid))
     if not user:
         raise HTTPException(409, "no user message to reply to")
     store.set_leaf(conn, cid, user["id"])  # the path now ends at the message being answered
-    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"])
+    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"], req.model if req else None)
 
 
 def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
@@ -360,7 +368,7 @@ def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
     files = target["meta"].get("attachments")
     user = store.add_message(conn, cid, "user", req.content, {"attachments": files} if files else None,
                              parent_id=target["parent_id"])
-    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"])
+    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"], req.model)
 
 
 def _tool_meta(calls: dict[str, dict], interrupted: str | None = None) -> list[dict]:
@@ -403,7 +411,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                 event = {"type": "compaction", "after_reply": event["after_reply"]}
             elif event["type"] == "done":
                 text = "".join(reply)
-                meta = {k: event[k] for k in ("incomplete", "usage") if k in event}
+                meta = {"model": turn.model, **{k: event[k] for k in ("incomplete", "usage") if k in event}}
                 if reasoning:
                     meta["reasoning"] = "".join(reasoning)
                 if tool_calls:
@@ -416,7 +424,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                 finished, outcome, usage = True, "done", event.get("usage") or {}
                 # Where the two messages now stand among their versions, so the page can offer "2 / 3" on them
                 # without loading the conversation again.
-                yield {**event, "branch": {
+                yield {**event, "model": turn.model, "branch": {
                     "user": {"id": turn.reply_to, "siblings": store.siblings_of(conn, cid, turn.reply_to)},
                     "assistant": {"id": saved["id"], "siblings": store.siblings_of(conn, cid, saved["id"])}}}
                 if needs_title:
@@ -434,7 +442,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                     turn.model, len(tool_calls), usage.get("input_tokens", "?"), usage.get("output_tokens", "?"),
                     time.monotonic() - started)
         if not finished and reply:
-            meta = {"stopped": True, **({"reasoning": "".join(reasoning)} if reasoning else {})}
+            meta = {"stopped": True, "model": turn.model, **({"reasoning": "".join(reasoning)} if reasoning else {})}
             if turn.trimmed:
                 meta["trimmed"] = turn.trimmed
             if tool_calls:

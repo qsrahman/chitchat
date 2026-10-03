@@ -8,6 +8,7 @@ import { closeNavIfOverlay, refreshList, setTitle } from "./sidebar.js";
 import { refreshModels, setSettings } from "./settings.js";
 import { loadTools } from "./controls.js";
 import "./model-menu.js";
+import "./retry-menu.js";
 import "./appearance.js";
 
 async function openConversation(id) {

@@ -15,11 +15,13 @@ function syncModelButton() {
   modelBtn.title = name ? `Model: ${name}` : "Model";
 }
 
-function modelRow(id, tags) {
+// One row of a model list: the name and its tags. The picker's rows are radios, one checked; the "try again" menu's
+// are plain items (checked: null).
+export function modelRow(id, tags, checked = id === currentModel()) {
   const row = document.createElement("button");
   row.type = "button";
-  row.setAttribute("role", "menuitemradio");
-  row.setAttribute("aria-checked", String(id === currentModel()));
+  row.setAttribute("role", checked === null ? "menuitem" : "menuitemradio");
+  if (checked !== null) row.setAttribute("aria-checked", String(checked));
   row.className = "menu-item";
   row.innerHTML = `<svg class="check" viewBox="0 0 20 20" aria-hidden="true"><path d="${ICONS.check}"/></svg>` +
     '<span class="menu-name"></span>' + tags.map(() => '<span class="menu-tag"></span>').join("");
@@ -29,10 +31,12 @@ function modelRow(id, tags) {
   return row;
 }
 
+// The tags of a model in the lists: the default one, and those that think.
+export const modelTags = (m) => [m.id === modelInfo.default && "default", m.reasoning && "reasoning"].filter(Boolean);
+
 function renderModelMenu() {
   const saved = state.settings.model;
-  const rows = modelInfo.models.map((m) =>
-    modelRow(m.id, [m.id === modelInfo.default && "default", m.reasoning && "reasoning"].filter(Boolean)));
+  const rows = modelInfo.models.map((m) => modelRow(m.id, modelTags(m)));
   if (saved && !modelInfo.models.some((m) => m.id === saved)) rows.push(modelRow(saved, ["not listed"]));
   $("model-list").replaceChildren(...rows);
 }
@@ -69,15 +73,18 @@ modelMenu.addEventListener("toggle", async (e) => {
   }
 });
 // A menu's keyboard contract: arrows, Home and End move between items; Tab leaves; Escape is the popover's own.
-modelMenu.addEventListener("keydown", (e) => {
-  const items = [...modelMenu.querySelectorAll('[role^="menuitem"]')];
-  const i = items.indexOf(document.activeElement);
-  const target = { ArrowDown: (i + 1) % items.length, ArrowUp: (i - 1 + items.length) % items.length, Home: 0, End: items.length - 1 }[e.key];
-  if (target !== undefined) {
-    e.preventDefault();
-    items[target].focus();
-  } else if (e.key === "Tab") modelMenu.hidePopover();
-});
+export function menuKeys(menu) {
+  menu.addEventListener("keydown", (e) => {
+    const items = [...menu.querySelectorAll('[role^="menuitem"]')];
+    const i = items.indexOf(document.activeElement);
+    const target = { ArrowDown: (i + 1) % items.length, ArrowUp: (i - 1 + items.length) % items.length, Home: 0, End: items.length - 1 }[e.key];
+    if (target !== undefined) {
+      e.preventDefault();
+      items[target].focus();
+    } else if (e.key === "Tab") menu.hidePopover();
+  });
+}
+menuKeys(modelMenu);
 $("more-settings").onclick = () => { modelMenu.hidePopover(); openSettings(); };
 
 bus.addEventListener("settings", syncModelButton);

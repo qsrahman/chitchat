@@ -256,3 +256,13 @@ def test_a_message_with_versions(page_with_axe):
     page.get_by_role("button", name="Previous version").click()
     expect(page.locator(".versions-count")).to_have_text("1 / 2")
     assert violations(page) == []  # with a disabled arrow, too
+
+
+def test_the_try_again_menu(page_with_axe):
+    page = page_with_axe
+    say(page, "hello")
+    expect(page.locator(".model-tag")).to_be_visible()
+    assert violations(page) == []  # the model name next to the buttons
+    page.get_by_role("button", name="Try again with another model").click()
+    expect(page.locator("#retry-menu")).to_be_visible()
+    assert violations(page) == []

@@ -40,6 +40,7 @@ export function addMessage(role, text = "", meta = {}) {
     el.prepend(attachmentTiles(meta.attachments));
   }
   setNote(el, meta);
+  el._model = meta.model; // which model wrote a reply (chat.js shows it)
   if (meta.reasoning) setReasoning(el, meta.reasoning);
   setText(el, text);
   return el;

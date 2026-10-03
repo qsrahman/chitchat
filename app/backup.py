@@ -173,6 +173,8 @@ def _clean_meta(meta: dict) -> tuple[dict, list[str]]:
                 del call["error"]
         if calls:
             kept["tools"] = calls
+    if isinstance(meta.get("model"), str) and meta["model"].strip():
+        kept["model"] = meta["model"].strip()[:200]  # which model wrote the reply
     if meta.get("stopped") is True:
         kept["stopped"] = True
     if isinstance(meta.get("incomplete"), str):

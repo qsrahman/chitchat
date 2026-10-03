@@ -73,7 +73,7 @@ async def test_disconnect_saves_partial_reply_as_stopped(client, llm):
         await task
     msgs = await messages(client, cid)
     assert [(m["role"], m["content"], m["meta"]) for m in msgs] == [
-        ("user", "hi", {}), ("assistant", "partial", {"stopped": True}),
+        ("user", "hi", {}), ("assistant", "partial", {"stopped": True, "model": "test-model"}),
     ]
 
 
@@ -97,13 +97,14 @@ async def test_reasoning_and_usage_are_saved_in_meta(client, llm):
     cid = await new_conv(client)
     r = await chat(client, cid, "hi")
     assert [e["type"] for e in parse_sse(r.text)] == ["reasoning_delta", "reasoning_delta", "delta", "done", "title"]
-    assert (await messages(client, cid))[-1]["meta"] == {"reasoning": "Think hard.", "usage": usage}
+    meta = (await messages(client, cid))[-1]["meta"]
+    assert meta == {"model": "test-model", "reasoning": "Think hard.", "usage": usage}
 
 
 async def test_plain_reply_has_empty_meta(client, llm):
     cid = await new_conv(client)
     await chat(client, cid, "hi")
-    assert (await messages(client, cid))[-1]["meta"] == {}
+    assert (await messages(client, cid))[-1]["meta"] == {"model": "test-model"}
 
 
 async def test_stopped_reply_keeps_its_reasoning(client, llm):
@@ -114,7 +115,7 @@ async def test_stopped_reply_keeps_its_reasoning(client, llm):
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert (await messages(client, cid))[-1]["meta"] == {"stopped": True, "reasoning": "Hmm."}
+    assert (await messages(client, cid))[-1]["meta"] == {"stopped": True, "model": "test-model", "reasoning": "Hmm."}
 
 
 async def test_reasoning_without_an_answer_is_not_saved_when_stopped(client, llm):

@@ -99,7 +99,7 @@ main:not(.is-started) #title { visibility: hidden; }
 .model-btn svg { width: 16px; height: 16px; color: var(--muted); }
 
 /* model menu: a popover under the header button (placed from app.js: CSS anchor positioning is not widely available) */
-#model-menu, #tools-menu { position: fixed; inset: auto; margin: 0; width: min(22rem, 100vw - 16px); padding: 6px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--raised); color: var(--ink); box-shadow: var(--shadow-4); }
+#model-menu, #tools-menu, #retry-menu { position: fixed; inset: auto; margin: 0; width: min(22rem, 100vw - 16px); padding: 6px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--raised); color: var(--ink); box-shadow: var(--shadow-4); }
 #model-list { max-height: min(20rem, 50dvh); overflow-y: auto; }
 .menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: var(--r-sm); text-align: left; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--hover); }
@@ -216,6 +216,7 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 .actions button { padding: 3px 9px; border-radius: var(--r-sm); font-size: var(--text-sm); color: var(--muted); }
 .actions button:hover { background: var(--hover); color: var(--ink); }
 .actions .icon-btn { padding: 5px; }
+.model-tag { align-self: center; margin-inline-start: 6px; font-size: var(--font-size-0); color: var(--muted); }
 .versions { display: inline-flex; align-items: center; margin-inline-end: 4px; }
 .versions-count { min-width: 3.4em; text-align: center; font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .actions .icon-btn:disabled { opacity: .35; pointer-events: none; }
@@ -228,9 +229,9 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 /* Entrances. @starting-style gives a newly shown element its "from" state; closing is instant, so a closing
    popover or dialog never lingers on screen. A message fades in with no movement, so the scroll position
    is never disturbed. */
-#model-menu:popover-open, #tools-menu:popover-open, dialog[open] { transition: opacity .16s var(--ease-out-3), translate .16s var(--ease-out-3); }
+#model-menu:popover-open, #tools-menu:popover-open, #retry-menu:popover-open, dialog[open] { transition: opacity .16s var(--ease-out-3), translate .16s var(--ease-out-3); }
 dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
-@starting-style { #model-menu:popover-open, #tools-menu:popover-open, dialog[open] { opacity: 0; translate: 0 -6px; } dialog[open]::backdrop { opacity: 0; } }
+@starting-style { #model-menu:popover-open, #tools-menu:popover-open, #retry-menu:popover-open, dialog[open] { opacity: 0; translate: 0 -6px; } dialog[open]::backdrop { opacity: 0; } }
 .msg { transition: opacity .25s var(--ease-out-3), background-color 1s, box-shadow 1s; } /* the last two: the highlight of a search hit fading */
 @starting-style { .msg { opacity: 0; } }
 @keyframes pulse { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }

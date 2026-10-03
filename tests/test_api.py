@@ -34,7 +34,7 @@ async def test_chat_streams_saves_and_titles(client, llm):
     user, reply = got["messages"]
     where = {"user": {"id": user["id"], "siblings": [user["id"]]},
              "assistant": {"id": reply["id"], "siblings": [reply["id"]]}}
-    assert parse_sse(r.text) == [*llm.events[:-1], {**llm.events[-1], "branch": where},
+    assert parse_sse(r.text) == [*llm.events[:-1], {**llm.events[-1], "model": "test-model", "branch": where},
                                  {"type": "title", "title": "Fake title"}]
     assert got["title"] == "Fake title"
     assert [(m["role"], m["content"]) for m in got["messages"]] == [("user", "hi"), ("assistant", "Hello world")]
@@ -97,7 +97,7 @@ async def test_incomplete_reply_is_saved_and_flagged(client, llm):
     cid = await new_conv(client)
     await client.post(f"/api/conversations/{cid}/chat", json={"content": "hi"})
     last = (await client.get(f"/api/conversations/{cid}")).json()["messages"][-1]
-    assert (last["content"], last["meta"]) == ("long", {"incomplete": "max_output_tokens"})
+    assert (last["content"], last["meta"]) == ("long", {"model": "test-model", "incomplete": "max_output_tokens"})
 
 
 async def test_the_conversation_list_is_paged_newest_first(client):

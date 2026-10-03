@@ -11,3 +11,12 @@ Branching's migration ran on the real `chitchat.db` the moment the dev server re
 - **To go back:** stop the server, move `chitchat.db` (and `chitchat.db-wal` and `-shm` if present) aside and rename the copy to `chitchat.db`. Older code than the migration is needed to run it: the copy is at the old version, and a newer app would upgrade it again.
 - Not covered: attachment files are not in the copy (they are not touched by a migration).
 Tests: `tests/test_db_backup.py`.
+
+## 2. Try again with another model
+Next to **Regenerate** (and **Retry**, after a failed or stopped reply) there is a small chevron button, **Try again with another model**. It opens a menu of the models the provider lists (the same list as the header's picker, with the same "default" and "reasoning" tags); picking one runs that reply again with it. Because of branching (`docs/branching.md`) the new answer is a new version of the reply, so `‹ 1 / 2 ›` lets you compare the two.
+- **For that reply only.** The conversation's own model (header, settings) does not change, and the next message you send uses it. The server takes an optional `model` on `POST .../regenerate` and `POST .../edit` (like `.../chat` already did); an empty, blank or over-long name is a 422 before anything changes.
+- **Each reply records which model wrote it.** `meta.model` is saved on every assistant message (also a stopped one), sent with the `done` event, and shown as a small grey name next to the buttons under the reply (visible on hover, always on the last reply). That is what makes comparing versions possible, and it also shows which model answered after a model switch mid-chat. Older messages have none and show nothing. The backup keeps it (it is on the whitelist in `backup._clean_meta`, as text up to 200 characters).
+- **Settings still follow the model.** The reasoning effort or temperature sent is the one that fits the model chosen for the reply (`supports_reasoning`), as for any message.
+- The menu is a popover like the header's: arrow keys, Home and End, Tab and Escape, the focus back on its button; it opens below the button or above it when there is no room (the buttons are at the bottom of a reply). Code: `retry-menu.js`; the row and key handling are shared with `model-menu.js`.
+- Not done: a way to run one reply on several models at once, and choosing a model while editing.
+Tests: `tests/test_retry_model.py`, `tests/ui/test_retry_model_ui.py`, `tests/ui/test_a11y_ui.py`.

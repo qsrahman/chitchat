@@ -3,6 +3,7 @@ import { ICONS, actionsOf, api, bodyOf, bus, form, iconButton, input, state, tex
 import { addMessage, finishReasoning, reasoningOf, render, renderFresh, setNote, setReasoning, setText } from "./messages.js";
 import { clearPending, focusComposer, pending, saveDraft, scheduleComposer, syncSend } from "./composer.js";
 import { refreshList } from "./sidebar.js";
+import { openRetryMenu } from "./retry-menu.js";
 import { renderToolCall } from "./tools-ui.js";
 
 function actionButton(label, onclick) {
@@ -39,8 +40,22 @@ export function updateActions() {
       m.classList.add("has-versions");
     }
   }
-  if (last?.classList.contains("assistant")) actionsOf(last).append(iconButton("Regenerate", ICONS.refresh, regenerate));
-  else if (last && lastUser) actionsOf(last).append(iconButton("Retry", ICONS.refresh, () => retry(lastUser)));
+  for (const m of msgs.filter((m) => m._model && m.classList.contains("assistant"))) { // which model wrote it
+    actionsOf(m).append(textEl("span", m._model, "model-tag"));
+  }
+  if (last?.classList.contains("assistant")) {
+    actionsOf(last).append(iconButton("Regenerate", ICONS.refresh, () => regenerate()), anotherModel((model) => regenerate(model)));
+  } else if (last && lastUser) {
+    actionsOf(last).append(iconButton("Retry", ICONS.refresh, () => retry(lastUser)), anotherModel((model) => retry(lastUser, model)));
+  }
+}
+
+// The button after Regenerate / Retry: a menu of models to run that reply again with.
+function anotherModel(run) {
+  const b = iconButton("Try again with another model", ICONS.chevronDown, () => openRetryMenu(b, run));
+  b.setAttribute("aria-haspopup", "menu");
+  b.setAttribute("aria-expanded", "false");
+  return b;
 }
 
 // ---- versions of a message ----
@@ -114,15 +129,15 @@ async function startEdit(m) {
   ta.focus();
 }
 
-function regenerate() {
+function regenerate(model) {
   while (thread.lastElementChild && !thread.lastElementChild.classList.contains("user")) thread.lastElementChild.remove();
-  runTurn("regenerate");
+  runTurn("regenerate", model ? { model } : {});
 }
 
 // Retry differs from Regenerate: after a failed send or edit the server may not have what the page
 // shows, so regenerating would 409 (message never saved) or reply to stale text (edit never saved).
 // Compare the page with what the server stored, and redo the turn the way that makes them agree.
-async function retry(user) {
+async function retry(user, model) {
   const dropAfterUser = () => { while (thread.lastElementChild !== user) thread.lastElementChild.remove(); };
   let saved;
   try {
@@ -134,12 +149,14 @@ async function retry(user) {
   }
   if (saved.length < thread.querySelectorAll(".msg.user").length) { // this message never landed
     dropAfterUser();
-    runTurn("chat", { content: user._text, attachments: (user._attachments ?? []).map((a) => a.id) });
+    runTurn("chat", { content: user._text, attachments: (user._attachments ?? []).map((a) => a.id), ...(model && { model }) });
   } else if (saved.at(-1).content === user._text) { // it landed; any reply (or partial one) is replaced
-    regenerate();
+    regenerate(model);
   } else { // an edit that never landed
     dropAfterUser();
-    runTurn("edit", { content: user._text, ...(user.dataset.id && { message_id: Number(user.dataset.id) }) });
+    runTurn("edit", {
+      content: user._text, ...(user.dataset.id && { message_id: Number(user.dataset.id) }), ...(model && { model }),
+    });
   }
 }
 
@@ -207,6 +224,7 @@ async function runTurn(path, payload = {}) {
       else if (ev.type === "context_trimmed") trimmed = ev.count;
       else if (ev.type === "done") {
         finished = true;
+        el._model = ev.model;
         setNote(el, { ...ev, compaction, trimmed });
         if (ev.branch) { // the reply answers the user message just before it
           markVersions(el.previousElementSibling, ev.branch.user);
