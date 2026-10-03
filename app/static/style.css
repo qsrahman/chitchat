@@ -95,7 +95,7 @@ main:not(.is-started) #title { visibility: hidden; }
 .model-btn svg { width: 16px; height: 16px; color: var(--muted); }
 
 /* model menu: a popover under the header button (placed from app.js: CSS anchor positioning is not widely available) */
-#model-menu { position: fixed; inset: auto; margin: 0; width: min(22rem, 100vw - 16px); padding: 6px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--raised); color: var(--ink); box-shadow: var(--shadow-4); }
+#model-menu, #tools-menu { position: fixed; inset: auto; margin: 0; width: min(22rem, 100vw - 16px); padding: 6px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--raised); color: var(--ink); box-shadow: var(--shadow-4); }
 #model-list { max-height: min(20rem, 50dvh); overflow-y: auto; }
 .menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: var(--r-sm); text-align: left; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--hover); }
@@ -104,6 +104,16 @@ main:not(.is-started) #title { visibility: hidden; }
 .menu-item[aria-checked="true"] .check { visibility: visible; }
 .menu-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-tag { flex: none; font-size: var(--font-size-0); color: var(--muted); }
+#tools-menu { width: min(20rem, 100vw - 16px); }
+.tool-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; }
+.tool-row:hover, .tool-row:has(:focus-visible) { background: var(--hover); }
+.tool-row input { flex: none; width: 1rem; height: 1rem; margin: .2rem 0 0; cursor: pointer; }
+.tool-text { display: grid; min-width: 0; }
+.tool-hint { font-size: var(--font-size-0); color: var(--muted); }
+#tools-btn[data-active] { color: var(--accent); }
+.tool-body p a { color: var(--accent); }
+.tool-call:not(:has(.tool-body > *)) summary { cursor: default; list-style: none; }
+.tool-call:not(:has(.tool-body > *)) summary:hover { color: inherit; }
 .menu-head { margin: 4px 10px 6px; font-size: var(--font-size-0); font-weight: var(--font-weight-6); color: var(--muted); }
 .menu-note { margin: 4px 10px 6px; font-size: var(--font-size-0); color: var(--muted); }
 #more-settings { margin-top: 2px; border-top: 1px solid var(--line); border-radius: 0 0 var(--r-sm) var(--r-sm); padding-top: 10px; }
@@ -207,9 +217,9 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 /* Entrances. @starting-style gives a newly shown element its "from" state; closing is instant, so a closing
    popover or dialog never lingers on screen. A message fades in with no movement, so the scroll position
    is never disturbed. */
-#model-menu:popover-open, dialog[open] { transition: opacity .16s var(--ease-out-3), translate .16s var(--ease-out-3); }
+#model-menu:popover-open, #tools-menu:popover-open, dialog[open] { transition: opacity .16s var(--ease-out-3), translate .16s var(--ease-out-3); }
 dialog[open]::backdrop { transition: opacity .16s var(--ease-out-3); }
-@starting-style { #model-menu:popover-open, dialog[open] { opacity: 0; translate: 0 -6px; } dialog[open]::backdrop { opacity: 0; } }
+@starting-style { #model-menu:popover-open, #tools-menu:popover-open, dialog[open] { opacity: 0; translate: 0 -6px; } dialog[open]::backdrop { opacity: 0; } }
 .msg { transition: opacity .25s var(--ease-out-3); }
 @starting-style { .msg { opacity: 0; } }
 @keyframes pulse { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }

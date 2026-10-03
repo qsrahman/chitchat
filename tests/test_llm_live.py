@@ -88,3 +88,26 @@ async def test_live_compaction_round_trip():
     follow_up = [{"compaction": compaction["item"]}, {"role": "user", "content": "And item 100?"}]
     answer = [e async for e in llm.stream_reply(s.openai_model, follow_up)]
     assert "zeta700" in "".join(e["text"] for e in answer if e["type"] == "delta")
+
+
+@pytest.mark.live
+async def test_live_model_uses_the_calculator_tool():
+    s = Settings()
+    calculator = tools.build(s)["calculator"]
+    events = [e async for e in OpenAILLM(s).stream_reply(
+        s.openai_model,
+        [{"role": "user", "content": "Use the calculator: what is 123456789 * 987654321? Give just the number."}],
+        tools={"calculator": calculator},
+    )]
+    calls = [e for e in events if e["type"] == "tool_call" and e["status"] == "done"]
+    assert calls and calls[0]["display"]["result"] == str(123456789 * 987654321)
+    assert str(123456789 * 987654321) in "".join(e["text"] for e in events if e["type"] == "delta").replace(",", "")
+
+
+@pytest.mark.live
+async def test_live_fetch_url_reads_a_real_page_through_the_pinned_connection():
+    """Real DNS and TLS: the request goes to the resolved address with the name as SNI, and certificates verify."""
+    result = await tools.fetch_url({"url": "https://example.com/"})
+    assert "Example Domain" in result.output and result.display["title"] == "Example Domain"
+    with pytest.raises(tools.ToolError, match="not a public website"):
+        await tools.fetch_url({"url": "http://localhost/"})

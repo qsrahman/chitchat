@@ -23,13 +23,17 @@ def ok(payload=BRAVE_RESULTS):
 
 
 def test_search_is_only_available_with_a_key():
-    assert tools.build(Settings(_env_file=None, brave_api_key="")) == {}
-    assert set(tools.build(Settings(_env_file=None, brave_api_key="k"))) == {"web_search"} <= set(tools.NAMES)
+    assert "web_search" not in tools.build(Settings(_env_file=None, brave_api_key=""))
+    assert "web_search" in tools.build(Settings(_env_file=None, brave_api_key="k"))
 
 
-def test_the_schema_satisfies_strict_mode():
-    schema = tools.build(Settings(_env_file=None, brave_api_key="k"))["web_search"].parameters
-    assert set(schema["required"]) == set(schema["properties"]) and schema["additionalProperties"] is False
+def test_every_tool_is_named_and_the_schemas_satisfy_strict_mode():
+    built = tools.build(Settings(_env_file=None, brave_api_key="k"))
+    assert set(built) == set(tools.NAMES)
+    for tool in built.values():
+        schema = tool.parameters
+        assert set(schema["required"]) == set(schema["properties"]) and schema["additionalProperties"] is False
+        assert tool.guidance and tool.description and tool.label
 
 
 async def test_the_request_to_brave():

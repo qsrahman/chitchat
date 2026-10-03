@@ -271,11 +271,11 @@ def test_the_search_line_and_results_are_text_not_markup(page, app_url):
 
 def test_a_tool_the_page_does_not_know_still_shows_up(page, app_url):
     open_app(page, app_url)
-    unknown = {"type": "tool_call", "id": "x1", "name": "calculator", "arguments": {}}
+    unknown = {"type": "tool_call", "id": "x1", "name": "mystery_tool", "arguments": {}}
     fake_turn(page, {**unknown, "status": "running"}, {**unknown, "status": "done", "display": {}},
               {"type": "delta", "text": "42"}, {"type": "done"})
     send(page, "6 times 7")
-    expect(page.locator(".tool-call summary")).to_have_text("Used calculator")
+    expect(page.locator(".tool-call summary")).to_have_text("Used mystery_tool")
 
 
 def test_on_a_phone_the_toggle_fits_and_names_itself_when_on(page, app_url):

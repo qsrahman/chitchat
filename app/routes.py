@@ -155,7 +155,7 @@ async def list_models(request: Request):
 @router.get("/tools")
 def list_tools(request: Request):
     """The tools that can be switched on for a conversation (those that are configured)."""
-    return [{"name": t.name, "label": t.label} for t in request.app.state.tools.values()]
+    return [{"name": t.name, "label": t.label, "hint": t.hint} for t in request.app.state.tools.values()]
 
 
 @router.get("/attachments/limits")

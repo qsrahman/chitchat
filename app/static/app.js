@@ -134,7 +134,47 @@ function reasoningOf(el) {
 const hostOf = (url) => new URL(url).hostname.replace(/^www\./, "");
 const isWebUrl = (url) => { try { return ["http:", "https:"].includes(new URL(url).protocol); } catch { return false; } };
 
+const safeHost = (url) => { try { return hostOf(url); } catch { return ""; } };
+const textEl = (tag, text, className = "") => Object.assign(document.createElement(tag), { textContent: text, className });
+const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+
 const TOOL_UI = {
+  calculator: {
+    running: (args) => `Calculating ${args.expression ?? ""}…`,
+    done: (args, shown) => `${shown.expression} = ${shown.result}`,
+    failed: (error) => `Calculator: ${error}`,
+    stopped: "Calculation stopped",
+  },
+  search_chats: {
+    running: (args) => `Searching your chats for “${args.query ?? ""}”…`,
+    done: (args, shown) => `Searched your chats for “${shown.query}” · ${shown.results.length ? plural(shown.results.length, "chat") : "no matches"}`,
+    failed: (error) => `Chat search failed: ${error}`,
+    stopped: "Chat search stopped",
+    detail: (shown) => {
+      const list = document.createElement("ol");
+      for (const r of shown.results) {
+        const item = document.createElement("li");
+        const link = Object.assign(textEl("a", r.title), { href: `#${encodeURIComponent(r.id)}` }); // a chat in this app
+        item.append(link, textEl("p", r.snippet));
+        list.append(item);
+      }
+      return list;
+    },
+  },
+  fetch_url: {
+    running: (args) => `Reading ${safeHost(args.url) || "the page"}…`,
+    done: (args, shown) => `Read ${shown.title || safeHost(shown.url) || "a page"}`,
+    failed: (error) => `Couldn't read the page: ${error}`,
+    stopped: "Reading the page stopped",
+    detail: (shown) => {
+      const box = document.createElement("div");
+      if (isWebUrl(shown.url)) { // the URL came from the model: web links only
+        box.append(Object.assign(textEl("a", shown.url), { href: shown.url, target: "_blank", rel: "noopener noreferrer" }));
+      }
+      box.append(textEl("p", `${plural(shown.characters, "character")} read${shown.truncated ? "; the page is longer" : ""}`));
+      return box;
+    },
+  },
   web_search: {
     running: (args) => `Searching the web for “${args.query ?? ""}”…`,
     done: (args, shown) => {
@@ -181,7 +221,8 @@ function renderToolCall(el, call) {
     error: () => ui?.failed(call.error) ?? `${call.name} failed: ${call.error}`,
     stopped: () => ui?.stopped ?? `${call.name} stopped`,
   }[call.status]();
-  row.querySelector(".tool-body").replaceChildren(...(call.status === "done" && ui ? [ui.detail(call.display)] : []));
+  const detail = call.status === "done" ? ui?.detail?.(call.display) : null;
+  row.querySelector(".tool-body").replaceChildren(...(detail ? [detail] : []));
 }
 
 function finishReasoning(el) {
@@ -742,6 +783,7 @@ function setSettings(settings) {
   syncModelButton();
   syncSearchToggle();
   syncEffort();
+  syncToolsMenu();
 }
 
 // Save settings for the open conversation; on the new-chat screen they are held until the first message.
@@ -966,6 +1008,53 @@ function syncSearchToggle() {
     : `${label}: ${searchOn() ? "on" : "off"}`;
 }
 
+// ---- tools menu ----
+// The tools besides web search (which has the globe): a checkbox each, saved per conversation like the search toggle.
+const toolsMenu = $("tools-menu");
+const otherTools = () => state.tools.filter((t) => t.name !== SEARCH);
+
+function syncToolsMenu() {
+  const on = otherTools().filter((t) => state.settings.tools.includes(t.name));
+  const button = $("tools-btn");
+  button.hidden = !otherTools().length;
+  button.toggleAttribute("data-active", on.length > 0);
+  button.title = on.length ? `Tools: ${on.map((t) => t.label).join(", ")}` : "Tools";
+  for (const box of $("tools-list").querySelectorAll("input")) box.checked = state.settings.tools.includes(box.value);
+}
+
+function renderToolsMenu() {
+  $("tools-list").replaceChildren(...otherTools().map((t) => {
+    const row = document.createElement("label");
+    row.className = "tool-row";
+    const box = Object.assign(document.createElement("input"), { type: "checkbox", value: t.name });
+    const text = document.createElement("span");
+    text.className = "tool-text";
+    text.append(textEl("span", t.label, "menu-name"), textEl("span", t.hint, "tool-hint"));
+    box.onchange = async () => {
+      const tools = box.checked ? [...state.settings.tools, t.name] : state.settings.tools.filter((n) => n !== t.name);
+      try {
+        await saveSettings({ ...state.settings, tools });
+      } catch {
+        box.checked = !box.checked;
+        showNote(`Couldn't change ${t.label}. Check your connection and try again.`);
+      }
+    };
+    row.append(box, text);
+    return row;
+  }));
+  syncToolsMenu();
+}
+
+toolsMenu.addEventListener("beforetoggle", (e) => { if (e.newState === "open") renderToolsMenu(); });
+toolsMenu.addEventListener("toggle", (e) => {
+  if (e.newState !== "open") return;
+  const r = $("tools-btn").getBoundingClientRect(); // above the button, as the composer is at the bottom of the page
+  const top = r.top - toolsMenu.offsetHeight - 8;
+  toolsMenu.style.top = `${top >= 8 ? top : r.bottom + 8}px`;
+  toolsMenu.style.left = `${Math.max(8, Math.min(r.left, innerWidth - toolsMenu.offsetWidth - 8))}px`;
+  toolsMenu.querySelector("input")?.focus();
+});
+
 let noteTimer;
 function showNote(text) {
   const note = $("composer-note");
@@ -1040,5 +1129,5 @@ window.addEventListener("hashchange", () => {
 syncSend();
 refreshModels();
 api("/attachments/limits").then((limits) => { maxFiles = limits.max_files; }).catch(() => {});
-api("/tools").then((tools) => { state.tools = tools; syncSearchToggle(); }).catch(() => {});
+api("/tools").then((tools) => { state.tools = tools; syncSearchToggle(); syncToolsMenu(); }).catch(() => {});
 openConversation(location.hash.slice(1) || null);

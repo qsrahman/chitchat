@@ -69,6 +69,9 @@
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.2 2 2.2 12 0 14M10 3c-2.2 2-2.2 12 0 14"/></svg>
           <span class="toggle-label">Search</span>
         </button>
+        <button id="tools-btn" type="button" class="icon-btn" popovertarget="tools-menu" aria-haspopup="true" aria-label="Tools" title="Tools" hidden>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 3a4 4 0 0 0-3.7 5.5L3.6 13.7a1.7 1.7 0 0 0 2.4 2.4l5.2-5.2A4 4 0 0 0 16.7 7.5l-2.4 2.4-2.2-.6-.6-2.2 2.4-2.4A4 4 0 0 0 12.5 3z"/></svg>
+        </button>
       </div>
       <textarea id="input" rows="1" placeholder="Ask anything" aria-label="Message" autofocus></textarea>
       <label id="effort-wrap" class="effort" title="Thinking effort" hidden>
@@ -98,6 +101,12 @@
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
     <span class="menu-name">Chat settings…</span>
   </button>
+</div>
+
+<div id="tools-menu" popover aria-label="Tools">
+  <p class="menu-head" aria-hidden="true">Tools</p>
+  <div id="tools-list"></div>
+  <p class="menu-note">Switched on per chat; applies from your next message.</p>
 </div>
 
 <dialog id="rename-dialog" closedby="any" aria-labelledby="rename-heading">

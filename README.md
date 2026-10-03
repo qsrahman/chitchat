@@ -12,6 +12,7 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Attachments: images, PDFs and text files via the paperclip, drag and drop or paste
 - Composer controls: web search on/off (globe) and thinking effort (for reasoning models; "None" turns thinking off)
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
+- Tools menu (per chat): a calculator for exact arithmetic, search over your past chats, and a page reader for links (public sites only). See `docs/tools.md`
 - Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`)
 - Full-text search across all conversations (sidebar), and export of a chat as Markdown or JSON (chat settings)
 

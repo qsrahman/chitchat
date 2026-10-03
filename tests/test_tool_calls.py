@@ -33,12 +33,14 @@ async def messages(client, cid):
 
 # ---- availability and settings ----
 
-async def test_no_tools_are_listed_without_configuration(client):
-    assert (await client.get("/api/tools")).json() == []
+async def test_tools_that_need_no_key_are_listed_without_configuration(client):
+    listed = (await client.get("/api/tools")).json()
+    assert [t["name"] for t in listed] == ["calculator", "search_chats", "fetch_url"]  # web_search needs a key
+    assert all(t["label"] and t["hint"] for t in listed)
 
 
 async def test_configured_tools_are_listed(client, search_app):
-    assert (await client.get("/api/tools")).json() == [{"name": "web_search", "label": "Web search"}]
+    assert (await client.get("/api/tools")).json() == [{"name": "web_search", "label": "Web search", "hint": ""}]
 
 
 async def test_a_new_conversation_has_no_tools_on(client):
@@ -160,3 +162,32 @@ async def test_later_turns_get_only_the_text_not_the_tool_traffic(client, search
         {"role": "user", "content": "hi"},
         {"role": "assistant", "content": "See [Python](https://python.org)."},
     ]
+
+
+# ---- the other tools through the API ----
+
+async def test_the_new_tools_can_be_switched_on_and_off_per_conversation(client):
+    cid = await create(client, tools=["calculator", "fetch_url"])
+    assert (await client.get(f"/api/conversations/{cid}")).json()["settings"]["tools"] == ["calculator", "fetch_url"]
+
+
+async def test_each_enabled_tool_adds_its_guidance_and_is_given_to_the_model(client, llm):
+    cid = await create(client, tools=["calculator", "search_chats", "fetch_url"])
+    await chat(client, cid)
+    options = llm.calls[-1]["options"]
+    assert list(options["tools"]) == ["calculator", "search_chats", "fetch_url"]
+    for words in ("calculator tool", "search_chats tool", "fetch_url tool"):
+        assert words in options["instructions"]
+
+
+async def test_tools_that_are_off_are_not_offered(client, llm):
+    cid = await create(client, tools=["calculator"])
+    await chat(client, cid)
+    assert list(llm.calls[-1]["options"]["tools"]) == ["calculator"]
+    assert "fetch_url" not in llm.calls[-1]["options"]["instructions"]
+
+
+async def test_the_registered_tools_really_run_through_the_tool_registry(app):
+    t = app.state.tools
+    assert (await t["calculator"].run({"expression": "6*7"})).display["result"] == "42"
+    assert (await t["search_chats"].run({"query": "nothing"})).display["results"] == []

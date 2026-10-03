@@ -132,7 +132,7 @@ def delete_messages_after(conn: sqlite3.Connection, cid: str, message_id: int) -
     conn.commit()
 
 
-def search_conversations(conn: sqlite3.Connection, query: str, limit: int = 20) -> list[dict]:
+def search_conversations(conn: sqlite3.Connection, query: str, limit: int = 20, tokens: int = 12) -> list[dict]:
     """Conversations with a message matching every word of `query` (the last one as a prefix, so results follow
     the typing), best match first. Each has a snippet where the control characters STX and ETX enclose matches."""
     words = re.findall(r"\w+", query)  # only words reach FTS5's query syntax, so no input can break it
@@ -140,11 +140,11 @@ def search_conversations(conn: sqlite3.Connection, query: str, limit: int = 20) 
         return []
     match = " ".join(f'"{w}"' for w in words) + "*"
     rows = conn.execute(
-        """SELECT c.id, c.title, snippet(messages_fts, 0, char(2), char(3), '…', 12) AS snippet
+        """SELECT c.id, c.title, c.updated_at, m.role, snippet(messages_fts, 0, char(2), char(3), '…', ?) AS snippet
            FROM messages_fts JOIN messages m ON m.id = messages_fts.rowid
            JOIN conversations c ON c.id = m.conversation_id
            WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?""",
-        (match, limit * 5),
+        (tokens, match, limit * 5),
     )
     best = {}
     for r in rows:  # in rank order, so the first row of a conversation is its best message

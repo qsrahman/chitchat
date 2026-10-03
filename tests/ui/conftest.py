@@ -7,6 +7,7 @@ import time
 import pytest
 import uvicorn
 
+from app import tools
 from app.config import Settings
 from app.main import create_app
 from app.tools import Tool
@@ -96,6 +97,33 @@ class ScriptedLLM:
                 yield {"type": "delta", "text": "It is **3.14**, per [python.org](https://www.python.org/)."}
             yield {"type": "done"}
             return
+        elif text in ("calcsum", "calcbad"):  # the calculator: "calcbad" fails
+            call = {"type": "tool_call", "id": "call_c", "name": "calculator"}
+            args = {"arguments": {"expression": "17 * 23" if text == "calcsum" else "1 / 0"}}
+            yield {**call, "status": "running", **args}
+            await asyncio.sleep(0.3)
+            if text == "calcbad":
+                yield {**call, "status": "error", **args, "error": "Division by zero."}
+                yield {"type": "delta", "text": "That can't be calculated."}
+            else:
+                yield {**call, "status": "done", **args, "display": {"expression": "17 * 23", "result": "391"}}
+                yield {"type": "delta", "text": "It is **391**."}
+        elif text == "findchats":  # search_chats, with markup in the snippet that must stay text
+            call = {"type": "tool_call", "id": "call_s", "name": "search_chats", "arguments": {"query": "mutex"}}
+            yield {**call, "status": "running"}
+            await asyncio.sleep(0.3)
+            found = [{"id": "abc123", "title": "Threads <i>and</i> locks", "snippet": "use a mutex <b>around</b> it"}]
+            yield {**call, "status": "done", "display": {"query": "mutex", "results": found}}
+            yield {"type": "delta", "text": "You discussed it in Threads."}
+        elif text in ("readpage", "readevil"):  # fetch_url; "readevil" returns a URL and a title that must stay inert
+            url = "https://example.com/post" if text == "readpage" else "javascript:window.__xss=1"
+            call = {"type": "tool_call", "id": "call_f", "name": "fetch_url", "arguments": {"url": url}}
+            yield {**call, "status": "running"}
+            await asyncio.sleep(0.3)
+            title = "Example post" if text == "readpage" else "<img src=x onerror=window.__xss=1>"
+            shown = {"url": url, "title": title, "characters": 1234, "truncated": text == "readpage"}
+            yield {**call, "status": "done", "display": shown}
+            yield {"type": "delta", "text": "The page says hello."}
         elif "compactme" in text:  # the context was compacted during this reply
             yield {"type": "delta", "text": "Done, and compacted."}
             yield {"type": "compaction", "item": {"type": "compaction", "encrypted_content": "x"}, "after_reply": True}
@@ -153,16 +181,21 @@ class ScriptedLLM:
 
 @pytest.fixture
 def app_url(tmp_path):
-    app = create_app(Settings(
+    settings = Settings(
         _env_file=None, db_path=str(tmp_path / "ui.db"), attachments_dir=str(tmp_path / "files"),
         openai_api_key="test", openai_model=ScriptedLLM.default_model, default_system_prompt=""
-    ))
+    )
+    app = create_app(settings)
     app.state.llm = ScriptedLLM()
 
     async def no_network(args):
         raise AssertionError("the scripted LLM never runs tools")
 
-    app.state.tools = {"web_search": Tool("web_search", "Web search", "Search.", {"type": "object"}, no_network)}
+    # The real keyless tools (the scripted model never runs them) and a stand-in for web search, which needs a key.
+    app.state.tools = {
+        "web_search": Tool("web_search", "Web search", "Search.", {"type": "object"}, no_network),
+        **tools.build(settings),
+    }
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
     server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))

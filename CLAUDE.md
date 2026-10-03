@@ -14,7 +14,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - `app/llm.py`: the only module that imports `openai`. It yields our normalized events (`delta`, `done`, `error`, ...).
 - `app/routes.py`: HTTP and SSE endpoints. `app/main.py` is the `create_app()` factory.
 - `app/attachments.py`: upload classification (from bytes), files on disk, PDF text, and `for_model()`, which turns a stored attachment into what `llm.py` sends. `llm.py` builds the API input parts.
-- `app/tools.py`: tools the model can call (schema + async function returning `ToolResult(output, display)`). `llm.stream_reply` runs the tool loop; a new tool is registered in `build()` and named in `NAMES`. See `docs/phase-7.md`.
+- `app/tools.py`: tools the model can call (schema + async function returning `ToolResult(output, display)`). `llm.stream_reply` runs the tool loop; a new tool is registered in `build()` and named in `NAMES`. See `docs/phase-7.md` and `docs/tools.md` (calculator, search_chats, fetch_url and its SSRF rules: any change to `tools._fetch` must keep its tests passing).
 - Context management is OpenAI's server-side compaction, not our own summarizing: `llm.py` asks for it, `routes._history` starts from the latest saved compaction item. See `docs/phase-8.md`.
 - Instructions sent to the model = `DEFAULT_SYSTEM_PROMPT` (config.py) + custom instructions + the conversation's system prompt + tool guidance, built in `routes._model_options`. See `docs/default-prompt.md`. Test `Settings` use `default_system_prompt=""`.
 - `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions.

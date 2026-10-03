@@ -59,5 +59,8 @@ Phases 0 to 3 give a usable ChatGPT-lite. Phases 4 onward can be reordered.
 4. Add `docs/phase-N.md`, update the table above and the README feature list.
 5. Commit.
 
+## Future tools
+Noted in `docs/tools.md` (get_time, Wikipedia/arXiv, weather, run_python, image generation, notes search, MCP, memory).
+
 ## Open items
 - Single local user until phase 9, so there is no auth before then.
