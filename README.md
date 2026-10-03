@@ -14,7 +14,7 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
 - Tools menu (per chat): a calculator for exact arithmetic, search over your past chats, and a page reader for links (public sites only). See `docs/tools.md`
 - Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`); on a local model the oldest turns are left out of the request instead (`CONTEXT_TOKENS`), with a note
-- Full-text search across all conversations (sidebar; titles and messages, a result opens at the matching message), and export of a chat as Markdown or JSON (chat settings); deleting a chat can be undone for a few seconds; the chat list loads a page at a time; Cmd/Ctrl+K searches and Cmd/Ctrl+Shift+O starts a new chat (`docs/polish-2.md`)
+- Full-text search across all conversations (sidebar; titles and messages, a result opens at the matching message), and export of a chat as Markdown or JSON (chat settings); a Theme button (System, Light, Dark); deleting a chat can be undone for a few seconds; the chat list loads a page at a time; Cmd/Ctrl+K searches and Cmd/Ctrl+Shift+O starts a new chat (`docs/polish-2.md`)
 - Backup: export every chat as one JSON file (or a zip of Markdown) and import it back, without overwriting anything (`docs/backup.md`)
 
 ## Requirements

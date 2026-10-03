@@ -29,6 +29,9 @@
   --measure: 62ch; /* the longest line of answer text; code, tables and math may run to the column */
 }
 @media (prefers-color-scheme: dark) { :root { --shadow-color: 30 20% 2%; } }
+/* The theme button's choice (appearance.js) beats the system's; "system" sets no attribute. */
+:root[data-theme="light"] { color-scheme: light; --shadow-color: 30 10% 14%; }
+:root[data-theme="dark"] { color-scheme: dark; --shadow-color: 30 20% 2%; }
 
 * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }

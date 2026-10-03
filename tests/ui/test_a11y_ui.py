@@ -2,6 +2,7 @@
 the dark theme and on a phone, plus keyboard checks for what axe can't judge. Zero violations is the bar: a new one
 means a change made something less accessible. axe finds roughly a third of accessibility problems; the rest
 (reading order, announcements by a screen reader) need a person, see docs/accessibility.md."""
+import re
 from pathlib import Path
 
 import pytest
@@ -231,3 +232,14 @@ def test_the_undo_toast(page_with_axe):
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.locator("#toast")).to_be_visible()
     assert violations(page) == []
+
+
+def test_a_forced_theme_on_either_system_theme(page_with_axe):
+    """Light and Dark chosen with the theme button, against whichever theme the system has (the two params)."""
+    page = page_with_axe
+    page.get_by_role("button", name="Show conversations").first.click()
+    for _ in ("Light", "Dark"):
+        page.get_by_role("button", name=re.compile("^Theme: ")).click()
+        # colors are read mid-fade otherwise
+        page.wait_for_function("() => document.getAnimations().every((a) => !(a instanceof CSSTransition))")
+        assert violations(page) == []
