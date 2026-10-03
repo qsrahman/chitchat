@@ -270,3 +270,29 @@ def test_migration_to_v3_keeps_existing_data(tmp_path):
 async def test_concurrent_uploads_get_distinct_ids(client):
     results = await asyncio.gather(*[upload(client, f"{i}.txt", b"hi") for i in range(5)])
     assert len({r.json()["id"] for r in results}) == 5
+
+
+async def test_only_the_newest_attachments_are_sent_in_full(client, llm):
+    first = (await upload(client, "old.txt", b"old contents")).json()["id"]
+    second = (await upload(client, "new.png", PNG)).json()["id"]
+    cid = await new_conv(client)
+    await chat(client, cid, "one", [first])
+    await chat(client, cid, "two")
+    assert llm.calls[-1]["messages"][0]["attachments"][0]["text"] == "old contents"  # still the newest
+    await chat(client, cid, "three", [second])
+    await chat(client, cid, "four")
+    sent = [m.get("attachments") for m in llm.calls[-1]["messages"]]
+    assert sent[0][0]["kind"] == "text" and "old contents" not in sent[0][0]["text"]
+    assert sent[0][0]["name"] == "old.txt" and "attach it again" in sent[0][0]["text"]
+    assert sent[4][0]["kind"] == "image"  # the newest message's file is sent whole
+    meta = (await messages(client, cid))[0]["meta"]["attachments"][0]
+    assert meta["name"] == "old.txt"  # the chat still shows it
+
+
+async def test_an_older_image_is_not_read_from_disk_again(client, llm, app):
+    first = (await upload(client, "a.png", PNG)).json()["id"]
+    second = (await upload(client, "b.png", PNG)).json()["id"]
+    cid = await new_conv(client)
+    await chat(client, cid, "one", [first])
+    await chat(client, cid, "two", [second])
+    assert [a["kind"] for m in llm.calls[-1]["messages"] for a in m.get("attachments", [])] == ["text", "image"]

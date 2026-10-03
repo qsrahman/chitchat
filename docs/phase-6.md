@@ -5,7 +5,7 @@ Images, PDFs and text files, attached to a user message.
 ## Flow
 1. **Upload on select.** Choosing, dropping or pasting files uploads each one right away (`POST /api/attachments`, multipart). The server stores the bytes under `ATTACHMENTS_DIR/<id>`, records a row in `attachments` and answers `{id, name, mime, kind, size}`. The composer shows a chip per file (thumbnail for images), with a remove button, and Send waits until uploads finish.
 2. **Send by id.** `POST /api/conversations/{id}/chat` takes `{content?, attachments: [ids]}`. The ids are checked before anything is saved (unknown, already sent or duplicated gives 422; at most 5 per message), then linked to the conversation and copied into the user message's `meta.attachments` for display. A message may be attachments only; its title then comes from the file names.
-3. **Every turn re-sends them.** Calls are stateless, so earlier attachments go to the model again with each new turn (context management in phase 8 can trim this). Regenerate and edit keep a message's attachments; edit changes only its text.
+3. **The newest attachments are re-sent every turn.** Calls are stateless, so the files of the latest message that has attachments go to the model again with each turn; older ones become a note (`docs/round-3.md`). Regenerate and edit keep a message's attachments; edit changes only its text.
 
 ## What is accepted
 Decided from the file's bytes (the `filetype` package), never the file name or the client's content type:

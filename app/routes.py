@@ -225,7 +225,8 @@ def delete_conversation(cid: str, request: Request, conn: Conn):
 
 
 def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]:
-    """The conversation as llm.py takes it. Earlier attachments are sent again each turn: calls are stateless."""
+    """The conversation as llm.py takes it. Calls are stateless, so the files of the newest message that has any
+    go again with every turn; those of older messages are replaced by a note (see docs/round-3.md)."""
     settings = request.app.state.settings
     messages = store.list_messages(conn, cid)
     head = []
@@ -236,11 +237,13 @@ def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]
             head, messages = [{"compaction": c["item"]}], messages[i + 1 if c["after_reply"] else i :]
             break
     history = head
-    for m in messages:
+    newest = max((i for i, m in enumerate(messages) if m["meta"].get("attachments")), default=-1)
+    for i, m in enumerate(messages):
         item = {"role": m["role"], "content": m["content"]}
         if m["meta"].get("attachments"):
             item["attachments"] = [
-                attachments.for_model(a, settings.attachments_dir, settings.openai_pdf_input)
+                attachments.for_model(a, settings.attachments_dir, settings.openai_pdf_input) if i == newest
+                else attachments.superseded(a)
                 for a in m["meta"]["attachments"]
             ]
         history.append(item)

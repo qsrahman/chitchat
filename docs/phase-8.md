@@ -27,7 +27,7 @@ A 1,000-token threshold on a ~2,500-token conversation: the stream contained `ou
 - OpenAI only. A server that doesn't implement it (Ollama was tried) accepts and ignores the parameter, so nothing is ever compacted there; set `COMPACT_THRESHOLD=0` to be explicit. Past the model's context window, those servers decide what to do.
 - The item is only valid with the model family that made it, so changing the model in a long conversation after a compaction is untested here.
 - A reply that is stopped or errors doesn't save its compaction; the next turn compacts again if needed.
-- Attachments are still re-sent each turn until the first compaction after them; the compaction item then carries what mattered.
+- Only the newest message's attachments are re-sent each turn (`docs/round-3.md`); the compaction item carries what mattered from the rest.
 
 ## Search
 Full-text search over message text with SQLite FTS5 (migration v4: an external-content index kept in step with `messages` by triggers, so deleting a conversation or editing a message updates it; existing messages are indexed by the migration).

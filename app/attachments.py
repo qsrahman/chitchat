@@ -113,3 +113,9 @@ def for_model(attachment: dict, directory: str, pdf_input: str) -> dict:
                 return {"kind": "text", "name": name, "text": text}
     except (OSError, Rejected):  # file gone from disk, or a PDF that can't be read: say so, don't fail the turn
         return {"kind": "text", "name": name, "text": "[This attachment is no longer available.]"}
+
+
+def superseded(attachment: dict) -> dict:
+    """What an older message's attachment becomes once a newer message has attached files: a note, not the file."""
+    return {"kind": "text", "name": attachment["name"],
+            "text": "[Attached earlier and not sent again. Ask the user to attach it again if you need it.]"}
