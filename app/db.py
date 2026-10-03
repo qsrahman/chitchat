@@ -1,5 +1,9 @@
+import logging
 import sqlite3
 from contextlib import closing
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE conversations (
@@ -104,10 +108,25 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
+def _back_up(conn: sqlite3.Connection, path: str, version: int) -> None:
+    """Copy the database to `<path>.bak-v<version>` (its version) before it is upgraded, so a migration that goes
+    wrong never has the only copy of someone's chats. SQLite's own backup, which is right while the file has a
+    write-ahead log (copying the file alone would miss what is in the log). An existing backup is kept as it is:
+    it is from a first, failed attempt at this upgrade, and the better copy."""
+    target = f"{path}.bak-v{version}"
+    if Path(target).exists():
+        return
+    with closing(sqlite3.connect(target)) as copy:
+        conn.backup(copy)
+    logger.info("backed up the database to %s before upgrading it to version %d", target, len(MIGRATIONS))
+
+
 def init(path: str) -> None:
     with closing(connect(path)) as conn:
         conn.execute("PRAGMA journal_mode = WAL")
         version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if 0 < version < len(MIGRATIONS):  # a database with something in it, about to change
+            _back_up(conn, path, version)
         for i, script in enumerate(MIGRATIONS[version:], start=version + 1):
             conn.executescript(script)
             conn.execute(f"PRAGMA user_version = {i}")
