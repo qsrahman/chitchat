@@ -181,6 +181,18 @@ def test_error_offers_retry(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #2 to please fail")
 
 
+def test_the_retry_action_looks_like_the_other_message_actions(page, app_url):
+    open_app(page, app_url)
+    send(page, "please fail")
+    expect(page.locator(".msg.error")).to_be_visible()
+    retry = page.get_by_role("button", name="Retry")
+    # Copy, Edit and Regenerate are icon buttons named by aria-label, so Retry is one too: it carries a title
+    # and no visible text of its own.
+    expect(retry).to_have_class("icon-btn")
+    expect(retry).to_have_attribute("title", "Retry")
+    expect(retry).to_have_text("")
+
+
 def test_retry_resends_when_the_send_never_reached_the_server(page, app_url, expected_console_errors):
     """The user message is in the DOM only, so regenerate would 409 forever; Retry must resend."""
     open_app(page, app_url)

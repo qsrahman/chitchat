@@ -36,6 +36,16 @@ def test_the_toggle_is_off_by_default_and_turns_on_and_off(page, app_url):
     expect(toggle(page)).to_have_attribute("aria-pressed", "false")
 
 
+def test_the_toggle_is_named_after_the_tool_the_server_offers(page, app_url):
+    # The tool carries its own display name, so the button takes it from /api/tools rather than from the
+    # wording baked into the page.
+    page.route("**/api/tools", lambda route: route.fulfill(json=[{"name": "web_search", "label": "Brave search"}]))
+    open_app(page, app_url)
+    named = page.get_by_role("button", name="Brave search")
+    expect(named).to_be_visible()
+    expect(named).to_have_attribute("title", "Brave search: off")
+
+
 def test_it_is_shown_but_disabled_when_search_is_not_configured(page, app_url):
     page.route("**/api/tools", lambda route: route.fulfill(json=[]))
     open_app(page, app_url)

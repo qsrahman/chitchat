@@ -231,7 +231,7 @@ function updateActions() {
   }
   if (lastUser) actionsOf(lastUser).append(iconButton("Edit", ICONS.pencil, () => startEdit(lastUser)));
   if (last?.classList.contains("assistant")) actionsOf(last).append(iconButton("Regenerate", ICONS.refresh, regenerate));
-  else if (last && lastUser) actionsOf(last).append(actionButton("Retry", () => retry(lastUser)));
+  else if (last && lastUser) actionsOf(last).append(iconButton("Retry", ICONS.refresh, () => retry(lastUser)));
 }
 
 // Briefly show a check mark and "Copied" on an icon button.
@@ -956,11 +956,14 @@ const searchOn = () => state.settings.tools.includes(SEARCH);
 
 function syncSearchToggle() {
   const toggle = $("search-toggle");
-  const available = state.tools.some((t) => t.name === SEARCH);
-  toggle.disabled = !available;
-  toggle.setAttribute("aria-pressed", String(available && searchOn()));
-  toggle.title = !available ? "Web search is unavailable: set BRAVE_API_KEY on the server"
-    : `Web search: ${searchOn() ? "on" : "off"}`;
+  const tool = state.tools.find((t) => t.name === SEARCH);
+  // The tool names itself; the page's own wording stands in until the list arrives (or if it never does).
+  const label = tool?.label ?? toggle.getAttribute("aria-label");
+  toggle.disabled = !tool;
+  toggle.setAttribute("aria-pressed", String(!!tool && searchOn()));
+  toggle.setAttribute("aria-label", label);
+  toggle.title = !tool ? `${label} is unavailable: set BRAVE_API_KEY on the server`
+    : `${label}: ${searchOn() ? "on" : "off"}`;
 }
 
 let noteTimer;
