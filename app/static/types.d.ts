@@ -39,12 +39,20 @@ interface ToolCall {
   [field: string]: unknown;
 }
 
+// Token counts of a reply (all the rounds of its tool calls added up); output includes the reasoning tokens.
+interface Usage {
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens: number;
+}
+
 // What the server keeps in a message's `meta`.
 interface MessageMeta {
   attachments?: Attachment[];
   tools?: ToolCall[];
   reasoning?: string;
   model?: string;
+  usage?: Usage;
   incomplete?: string;
   stopped?: boolean;
   compaction?: boolean;
@@ -77,7 +85,7 @@ type StreamEvent =
   | { type: "context_trimmed"; count: number }
   | { type: "title"; title: string }
   | { type: "error"; message: string }
-  | { type: "done"; model: string; incomplete?: string; branch?: { user: Versions; assistant: Versions } };
+  | { type: "done"; model: string; usage?: Usage; incomplete?: string; branch?: { user: Versions; assistant: Versions } };
 
 interface ModelInfo {
   default: string | null; // the model a chat uses when it picks none: the one chosen in Settings, else the server's
@@ -104,6 +112,7 @@ interface MessageEl extends HTMLDivElement {
   _text?: string;
   _reasoning?: string | null;
   _model?: string;
+  _usage?: Usage;
   _siblings?: number[];
   _attachments?: Attachment[];
   _frame?: number | null;

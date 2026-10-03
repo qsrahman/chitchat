@@ -11,6 +11,8 @@ import {
   state,
   textEl,
   thread,
+  usageLabel,
+  usageTitle,
 } from './core.js'
 import {
   addMessage,
@@ -80,6 +82,12 @@ export function updateActions() {
   )) {
     // which model wrote it
     actionsOf(m).append(textEl('span', m._model, 'model-tag'))
+  }
+  for (const m of msgs.filter((m) => m._usage)) {
+    // what it cost, for endpoints that report it
+    const tag = textEl('span', usageLabel(m._usage), 'model-tag usage-tag')
+    tag.title = usageTitle(m._usage)
+    actionsOf(m).append(tag)
   }
   if (last?.classList.contains('assistant')) {
     actionsOf(last).append(
@@ -320,6 +328,7 @@ async function runTurn(path, payload = {}) {
       else if (ev.type === 'done') {
         finished = true
         el._model = ev.model
+        el._usage = ev.usage
         setNote(el, { ...ev, compaction, trimmed })
         if (ev.branch) {
           // the reply answers the user message just before it

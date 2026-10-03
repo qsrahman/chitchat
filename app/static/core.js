@@ -71,6 +71,21 @@ export async function api(path, opts = {}) {
   return res.status === 204 ? null : res.json()
 }
 
+// Token counts as people read them: "1.2K in · 567 out" in the line under a reply, the exact numbers in its tooltip.
+const compact = new Intl.NumberFormat(undefined, {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+})
+/** @param {Usage} u */
+export const usageLabel = (u) =>
+  `${compact.format(u.input_tokens)} in · ${compact.format(u.output_tokens)} out`
+/** @param {Usage} u */
+export const usageTitle = (u) =>
+  `${u.input_tokens.toLocaleString()} input tokens, ${u.output_tokens.toLocaleString()} output tokens` +
+  (u.reasoning_tokens
+    ? ` (${u.reasoning_tokens.toLocaleString()} of them reasoning)`
+    : '')
+
 /** @type {(el: Element) => HTMLElement & {_blocks?: any}} */
 export const bodyOf = (el) => /** @type {any} */ (el.querySelector('.body'))
 /** @type {(el: Element) => HTMLElement} */

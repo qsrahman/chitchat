@@ -8,7 +8,7 @@
 
 ## Usage
 - `done` carries `usage: {input_tokens, output_tokens, reasoning_tokens}` from the response (`reasoning_tokens` is 0 when the endpoint doesn't report it, as Ollama doesn't). Endpoints that report no usage send none.
-- The UI does not display usage (an earlier version showed `1,234 in, 567 out (300 reasoning)` under each reply); it is still saved in the message's `meta`.
+- The UI does not show usage as a note under the reply (an earlier version did, and it was removed as clutter); it is saved in the message's `meta`, and `docs/token-usage.md` shows it in the line of actions instead.
 - No cost estimate: prices depend on the model and the provider, and the endpoint can be a local server. Token counts are shown instead.
 
 ## Storage

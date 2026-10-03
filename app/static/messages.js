@@ -59,6 +59,7 @@ export function addMessage(role, text = '', meta = {}) {
   }
   setNote(el, meta)
   el._model = meta.model // which model wrote a reply (chat.js shows it)
+  el._usage = meta.usage // and what it cost in tokens
   if (meta.reasoning) setReasoning(el, meta.reasoning)
   setText(el, text)
   return el

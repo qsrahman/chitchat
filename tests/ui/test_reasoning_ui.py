@@ -27,6 +27,40 @@ def test_token_usage_is_not_shown_under_the_reply(page, app_url):
     expect(page.locator(".msg.assistant > .note")).to_be_hidden()
 
 
+def test_token_usage_is_in_the_line_of_actions_and_survives_a_reload(page, app_url):
+    open_app(page, app_url)
+    send(page, "ponder this")
+    tag = page.locator(".msg.assistant .usage-tag")
+    expect(tag).to_have_text("1.2K in · 567 out")
+    expect(tag).to_have_attribute(
+        "title", "1,234 input tokens, 567 output tokens (300 of them reasoning)"
+    )
+    page.reload()
+    expect(tag).to_have_text("1.2K in · 567 out")  # it is saved with the reply
+    expect(page.locator(".msg.user .usage-tag")).to_have_count(0)
+
+
+def test_a_reply_without_a_count_has_no_usage_tag(page, app_url):
+    open_app(page, app_url)
+    send(page, "hello")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
+    expect(page.locator(".usage-tag")).to_have_count(0)
+    page.get_by_role("button", name="Chat settings").click()
+    expect(page.locator("#usage-total")).to_be_hidden()
+
+
+def test_the_chat_settings_add_up_the_replies_shown(page, app_url):
+    open_app(page, app_url)
+    send(page, "ponder this")
+    expect(page.locator(".usage-tag")).to_have_count(1)
+    send(page, "ponder again")
+    expect(page.locator(".usage-tag")).to_have_count(2)
+    page.get_by_role("button", name="Chat settings").click()
+    expect(page.locator("#usage-total")).to_have_text(
+        "Tokens in the replies shown: 2,468 in, 1,134 out."
+    )
+
+
 def test_reasoning_survives_a_reload(page, app_url):
     open_app(page, app_url)
     send(page, "ponder this")

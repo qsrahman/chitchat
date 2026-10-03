@@ -7,6 +7,7 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Saved conversations in SQLite, sidebar with new/rename/delete, auto-generated titles, shareable `#<id>` links
 - Stop generation (partial reply kept), regenerate, retry, edit the last message, copy any message (yours or a reply) on its own
 - Reading-focused UI: ChatGPT's system font stack, highlighted code with copy, typeset math (KaTeX), light/dark theme, centered new-chat composer that reflows as you type, icon rail sidebar, mobile drawer, smart autoscroll, drafts that survive a reload
+- Token counts on each reply and for the chat (`docs/token-usage.md`)
 - Model picker in the header, per-conversation system prompt, reasoning effort or temperature, and a Settings dialog (appearance, defaults for new chats, shortcuts, custom instructions, export and import, and what the server is set up with: `docs/settings-dialog.md`)
 - Reasoning summaries in a collapsible block
 - Attachments: images, PDFs and text files via the + button, drag and drop or paste

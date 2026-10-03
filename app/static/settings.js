@@ -1,5 +1,5 @@
 // The open conversation's settings (and the model list): saving them, and the chat settings dialog.
-import { $, DEFAULT_SETTINGS, api, bus, state } from './core.js'
+import { $, DEFAULT_SETTINGS, api, bus, state, thread } from './core.js'
 
 export function setSettings(settings) {
   state.settings = settings
@@ -128,6 +128,19 @@ function fillModelChoices(model, effort) {
   syncSettingsFields()
 }
 
+// What this chat has used so far, from the token counts on the replies on the page (so: the version being read, not
+// others), for endpoints that report them.
+function showUsageTotal() {
+  const sum = { input_tokens: 0, output_tokens: 0 }
+  for (const el of /** @type {MessageEl[]} */ ([...thread.children])) {
+    sum.input_tokens += el._usage?.input_tokens ?? 0
+    sum.output_tokens += el._usage?.output_tokens ?? 0
+  }
+  const total = $('usage-total')
+  total.hidden = !(sum.input_tokens || sum.output_tokens)
+  total.textContent = `Tokens in the replies shown: ${sum.input_tokens.toLocaleString()} in, ${sum.output_tokens.toLocaleString()} out.`
+}
+
 export function openSettings() {
   const s = state.settings
   const dialog = $('settings-dialog')
@@ -140,6 +153,7 @@ export function openSettings() {
     $('export-md').href = `/api/conversations/${state.id}/export?format=md`
     $('export-json').href = `/api/conversations/${state.id}/export?format=json`
   }
+  showUsageTotal()
   dialog.querySelector('.field-error').hidden = true
   dialog.showModal()
   refreshModels().then(() => {
