@@ -268,7 +268,7 @@ class Turn:
 
     conn: sqlite3.Connection
     llm: Any
-    default_model: str
+    title_model: str
     conv: dict
     history: list[dict]  # ends with the user message being answered
     model: str
@@ -276,10 +276,11 @@ class Turn:
 
 
 def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], model: str | None = None):
-    default_model = request.app.state.settings.openai_model
-    model = model or conv["settings"]["model"] or default_model
+    settings = request.app.state.settings
+    model = model or conv["settings"]["model"] or settings.openai_model
     return Turn(
-        conn, request.app.state.llm, default_model, conv, history, model, _model_options(request, conn, conv, model)
+        conn, request.app.state.llm, settings.title_model_name, conv, history, model,
+        _model_options(request, conn, conv, model),
     )
 
 
@@ -367,7 +368,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                 if needs_title:
                     last = turn.history[-1]
                     asked = last["content"] or ", ".join(a["name"] for a in last.get("attachments", []))
-                    title = await turn.llm.generate_title(turn.default_model, asked, text) or asked[:40]
+                    title = await turn.llm.generate_title(turn.title_model, asked, text) or asked[:40]
                     store.rename_conversation(conn, cid, title)
                     yield {"type": "title", "title": title}
                 return

@@ -13,6 +13,9 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 
 
+OPENAI_TITLE_MODEL = "gpt-5.4-nano"
+
+
 class Settings(BaseSettings):
     """Read from the environment or .env. Names match the OpenAI SDK's own variables."""
 
@@ -31,7 +34,14 @@ class Settings(BaseSettings):
     # with an opaque summary item. 0 turns it off. Servers that don't implement it ignore the parameter.
     compact_threshold: int = 150_000
     default_system_prompt: str = DEFAULT_SYSTEM_PROMPT  # empty = none; {date} becomes today's date
+    title_model: str = ""  # writes the chat titles; empty = a small default, see title_model_name
     brave_api_key: str = ""  # enables the web_search tool (Brave Search API)
     max_tool_calls: int = 4  # per reply: each web search is billed by Brave
     db_path: str = "chitchat.db"
     attachments_dir: str = "attachments"
+
+    @property
+    def title_model_name(self) -> str:
+        """Titles are six words, so a small model does: the TITLE_MODEL setting, else a small OpenAI model, or the
+        main model on a custom endpoint, which wouldn't have OpenAI's model names."""
+        return self.title_model or (self.openai_model if self.openai_base_url else OPENAI_TITLE_MODEL)

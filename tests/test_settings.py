@@ -145,7 +145,7 @@ async def test_regenerate_and_edit_use_the_settings_too(client, llm):
     assert (llm.calls[-1]["model"], llm.calls[-1]["options"]["instructions"]) == ("m", "S")
 
 
-async def test_title_uses_the_default_model_not_the_chosen_one(client, llm):
+async def titled_with(client, llm, **settings):
     seen = []
     original = llm.generate_title
 
@@ -154,7 +154,22 @@ async def test_title_uses_the_default_model_not_the_chosen_one(client, llm):
         return await original(model, user_text, reply_text)
 
     llm.generate_title = spy
-    cid = (await client.post("/api/conversations", json={"settings": {"model": "big-model"}})).json()["id"]
+    cid = (await client.post("/api/conversations", json={"settings": settings})).json()["id"]
     r = await chat(client, cid)
     assert parse_sse(r.text)[-1]["type"] == "title"
-    assert seen == ["test-model"]
+    return seen
+
+
+async def test_titles_use_a_small_openai_model_not_the_one_chosen_for_the_chat(client, llm):
+    assert await titled_with(client, llm, model="big-model") == ["gpt-5.4-nano"]
+
+
+async def test_titles_use_the_main_model_on_a_custom_endpoint(client, llm, app):
+    app.state.settings.openai_base_url = "http://localhost:11434/v1"
+    assert await titled_with(client, llm, model="big-model") == ["test-model"]
+
+
+async def test_the_title_model_can_be_set(client, llm, app):
+    app.state.settings.title_model = "my-title-model"
+    app.state.settings.openai_base_url = "http://localhost:11434/v1"
+    assert await titled_with(client, llm) == ["my-title-model"]
