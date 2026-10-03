@@ -147,7 +147,7 @@ def test_regenerate_replaces_the_reply(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #2 to hello")
 
 
-def test_edit_last_message_only_and_resend(page, app_url):
+def test_edit_the_last_message_and_resend(page, app_url):
     open_app(page, app_url)
     send(page, "first")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
@@ -155,8 +155,8 @@ def test_edit_last_message_only_and_resend(page, app_url):
     send(page, "second")
     expect(page.locator(".msg.assistant").nth(1)).to_contain_text("Reply #2")
     expect(page.locator(".msg.assistant").nth(1).locator(".actions button").first).to_be_visible()  # saved
-    expect(page.get_by_role("button", name="Edit")).to_have_count(1)
-    page.get_by_role("button", name="Edit").click()
+    expect(page.get_by_role("button", name="Edit")).to_have_count(2)  # every message of yours can be edited
+    page.get_by_role("button", name="Edit").nth(1).click()
     page.get_by_label("Edit your message").fill("second, reworded")
     page.get_by_role("button", name="Save").click()
     expect(page.locator(".msg.user").nth(1)).to_have_text("second, reworded")

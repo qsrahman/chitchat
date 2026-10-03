@@ -65,13 +65,13 @@ async def test_export_all_is_one_json_file_with_every_conversation_and_message(c
     disposition = r.headers["content-disposition"]
     assert disposition.startswith('attachment; filename="chitchat-') and disposition.endswith('.json"')
     data = r.json()
-    assert (data["format"], data["version"]) == ("chitchat-backup", 1) and data["exported_at"]
+    assert (data["format"], data["version"]) == ("chitchat-backup", 2) and data["exported_at"]
     assert [c["id"] for c in data["conversations"]] == [a, b]  # oldest first
     first, second_chat = data["conversations"]
     assert first["title"] == "First chat" and [m["content"] for m in first["messages"]] == [
         "hello one", "Noted.", "hello two", "Noted."]
     assert second_chat["settings"]["system_prompt"] == "Be brief" and second_chat["settings"]["tools"] == ["calculator"]
-    assert first["messages"][0].keys() >= {"id", "role", "content", "meta", "created_at"}
+    assert first["messages"][0].keys() >= {"role", "content", "meta", "created_at", "parent"}
 
 
 async def test_an_empty_export_is_valid(client):
@@ -378,3 +378,80 @@ async def test_hostile_text_is_stored_as_text_only(second):
 async def test_migrations_are_current_after_an_import(second):
     app = second._transport.app
     assert db.connect(app.state.settings.db_path).execute("PRAGMA user_version").fetchone()[0] == len(db.MIGRATIONS)
+
+
+# ---- versions of a message (branching) ----
+
+async def branched_chat(client, llm):
+    """q1/a1, q2/a2, then q2 edited to 'q2 b' with the reply 'a2 b', so the path shown is q1 a1 'q2 b' 'a2 b'."""
+    cid = await make_chat(client, llm, "Branched", "q1")
+    llm.events = [{"type": "delta", "text": "a2"}, {"type": "done"}]
+    await say(client, cid, "q2")
+    q2 = (await client.get(f"/api/conversations/{cid}")).json()["messages"][2]
+    llm.events = [{"type": "delta", "text": "a2 b"}, {"type": "done"}]
+    await client.post(f"/api/conversations/{cid}/edit", json={"content": "q2 b", "message_id": q2["id"]})
+    return cid
+
+
+async def test_the_export_has_every_version_with_parents_and_the_leaf(client, llm):
+    await branched_chat(client, llm)
+    chat = (await export_json(client)).json()["conversations"][0]
+    assert [m["content"] for m in chat["messages"]] == ["q1", "Noted.", "q2", "a2", "q2 b", "a2 b"]
+    assert [m["parent"] for m in chat["messages"]] == [None, 0, 1, 2, 1, 4]
+    assert chat["leaf"] == 5 and "leaf_id" not in chat and all("id" not in m for m in chat["messages"])
+
+
+async def test_importing_an_export_with_versions_gives_the_same_tree_and_path(client, llm, second):
+    cid = await branched_chat(client, llm)
+    document = (await export_json(client)).json()
+    r = await import_file(second, document)
+    assert r.json() == {"imported": 1, "skipped": 0, "messages": 6}
+    there = (await second.get(f"/api/conversations/{cid}")).json()["messages"]
+    assert [m["content"] for m in there] == ["q1", "Noted.", "q2 b", "a2 b"]
+    assert len(there[2]["siblings"]) == 2  # the other version came along
+    old = (await second.get(f"/api/conversations/{cid}")).json()["messages"][2]["siblings"][0]
+    shown = await second.post(f"/api/conversations/{cid}/branch", json={"message_id": old})
+    assert [m["content"] for m in shown.json()["messages"]] == ["q1", "Noted.", "q2", "a2"]
+    again = (await export_json(second)).json()["conversations"][0]
+    assert [m["parent"] for m in again["messages"]] == [None, 0, 1, 2, 1, 4]  # and it exports the same
+
+
+async def test_a_version_1_file_imports_as_a_straight_path(second):
+    old = {"format": "chitchat-backup", "version": 1, "conversations": [{
+        "id": "a" * 32, "title": "Old", "messages": [
+            {"role": "user", "content": "q"}, {"role": "assistant", "content": "a"},
+            {"role": "user", "content": "q2"}]}]}
+    assert (await import_file(second, old)).json()["imported"] == 1
+    messages = (await second.get(f"/api/conversations/{'a' * 32}")).json()["messages"]
+    assert [m["content"] for m in messages] == ["q", "a", "q2"] and [len(m["siblings"]) for m in messages] == [1, 1, 1]
+
+
+@pytest.mark.parametrize("parents, leaf, why", [
+    ([None, 1], 1, "follows itself"),
+    ([None, 2, 0], 2, "follows a later one"),
+    ([None, -1], 1, "negative"),
+    ([None, "0"], 1, "not a number"),
+    ([None, 0], 5, "the leaf is not there"),
+])
+async def test_a_file_whose_versions_do_not_make_a_tree_is_refused_and_nothing_is_added(second, parents, leaf, why):
+    messages = [{"role": "user", "content": f"m{i}", "parent": p} for i, p in enumerate(parents)]
+    document = {"conversations": [{"id": "b" * 32, "title": "Bad", "leaf": leaf, "messages": messages}]}
+    r = await import_file(second, document)
+    assert r.status_code == 422, why
+    assert (await second.get("/api/conversations")).json() == []
+
+
+async def test_the_markdown_zip_has_the_path_shown_only(client, llm):
+    await branched_chat(client, llm)
+    archive = zipfile.ZipFile(io.BytesIO((await client.get("/api/export?format=md")).content))
+    text = archive.read(archive.namelist()[0]).decode()
+    assert "q2 b" in text and "a2 b" in text and "\nq2\n" not in text
+
+
+async def test_a_leaf_of_null_means_the_last_message(second):
+    document = {"conversations": [{"id": "c" * 32, "title": "T", "leaf": None, "messages": [
+        {"role": "user", "content": "q", "parent": None}, {"role": "assistant", "content": "a", "parent": 0},
+        {"role": "assistant", "content": "a2", "parent": 0}]}]}
+    await import_file(second, document)
+    messages = (await second.get(f"/api/conversations/{'c' * 32}")).json()["messages"]
+    assert [m["content"] for m in messages] == ["q", "a2"]

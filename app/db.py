@@ -78,8 +78,22 @@ CREATE TRIGGER conversations_fts_update AFTER UPDATE OF title ON conversations B
 END;
 """
 
+# v6: branching. A message points at the message it answers (or, for a user message, follows), so a conversation is
+# a tree and what you see is the path from its root to `leaf_id`. Editing or regenerating adds a sibling instead of
+# deleting what came after. Existing conversations become one straight path: each message's parent is the message
+# before it. (No foreign key: nothing deletes single messages, and a conversation takes all its messages with it.)
+BRANCHING = """
+ALTER TABLE messages ADD COLUMN parent_id INTEGER;
+ALTER TABLE conversations ADD COLUMN leaf_id INTEGER;
+UPDATE messages SET parent_id = (
+    SELECT m2.id FROM messages m2 WHERE m2.conversation_id = messages.conversation_id AND m2.id < messages.id
+    ORDER BY m2.id DESC LIMIT 1);
+UPDATE conversations SET leaf_id = (SELECT MAX(id) FROM messages WHERE conversation_id = conversations.id);
+CREATE INDEX messages_by_parent ON messages(conversation_id, parent_id);
+"""
+
 # Each entry upgrades the schema by one version; PRAGMA user_version records how many ran.
-MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS, SEARCH, TITLE_SEARCH]
+MIGRATIONS = [SCHEMA, SETTINGS, ATTACHMENTS, SEARCH, TITLE_SEARCH, BRANCHING]
 
 
 def connect(path: str) -> sqlite3.Connection:

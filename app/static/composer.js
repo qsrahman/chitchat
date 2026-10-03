@@ -47,6 +47,14 @@ function syncComposer() {
   composer.classList.toggle("is-multiline", multiline);
 }
 
+// Put the cursor in the message box when a reply ends or a chat opens, unless you are typing somewhere else by then
+// (the search box, a dialog's field): focus taken from under someone's typing sends their text to the wrong place.
+export function focusComposer() {
+  const active = document.activeElement;
+  if (active !== input && active?.matches("input, textarea, select, [contenteditable]")) return;
+  input.focus();
+}
+
 // Unsent text is kept per conversation (and for the new-chat screen), so a reload or a switch loses nothing.
 const draftKey = () => `chitchat:draft:${state.id ?? "new"}`;
 export function saveDraft() {

@@ -226,6 +226,7 @@ document.addEventListener("keydown", (e) => {
     searchBox.select();
   } else if (key === "o" && e.shiftKey) {
     e.preventDefault();
+    document.activeElement?.blur(); // so the new chat gets the cursor even if it was in the search box
     $("new-chat").click();
   }
 });

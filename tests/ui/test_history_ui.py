@@ -236,3 +236,23 @@ def test_a_chat_waiting_to_be_deleted_is_not_in_search_results(page, app_url):
     delete_chat(page, "tell me about quokkas")
     search_box(page).fill("quokkas")
     expect(page.get_by_text("No chats match.")).to_be_visible()
+
+
+def test_a_reply_ending_does_not_take_the_focus_from_the_search_box(page, app_url):
+    """Typing into the search while a reply streams: when it ends, the text goes on going into the search box."""
+    open_app(page, app_url)
+    send(page, "a long answer please")  # about 3 seconds
+    open_sidebar(page)
+    search_box(page).fill("abc")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=15_000)  # the reply is done
+    expect(search_box(page)).to_be_focused()
+    page.keyboard.type("def")
+    expect(search_box(page)).to_have_value("abcdef")
+    expect(page.locator("#input")).to_have_value("")
+
+
+def test_a_reply_ending_puts_the_cursor_back_in_the_message_box(page, app_url):
+    open_app(page, app_url)
+    send(page, "hello")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()
+    expect(page.locator("#input")).to_be_focused()

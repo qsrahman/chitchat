@@ -30,8 +30,12 @@ async def test_chat_streams_saves_and_titles(client, llm):
     cid = await new_conv(client)
     r = await client.post(f"/api/conversations/{cid}/chat", json={"content": "hi"})
     assert r.headers["content-type"].startswith("text/event-stream")
-    assert parse_sse(r.text) == llm.events + [{"type": "title", "title": "Fake title"}]
     got = (await client.get(f"/api/conversations/{cid}")).json()
+    user, reply = got["messages"]
+    where = {"user": {"id": user["id"], "siblings": [user["id"]]},
+             "assistant": {"id": reply["id"], "siblings": [reply["id"]]}}
+    assert parse_sse(r.text) == [*llm.events[:-1], {**llm.events[-1], "branch": where},
+                                 {"type": "title", "title": "Fake title"}]
     assert got["title"] == "Fake title"
     assert [(m["role"], m["content"]) for m in got["messages"]] == [("user", "hi"), ("assistant", "Hello world")]
 

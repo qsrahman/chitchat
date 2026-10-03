@@ -1,8 +1,8 @@
 // The entry point: loads the modules (each wires up its own part of the page when it loads), opens a conversation
 // and starts the page. See docs/architecture.md for what is where.
-import { $, DEFAULT_SETTINGS, api, bus, input, main, state, thread } from "./core.js";
+import { $, DEFAULT_SETTINGS, api, bus, main, state, thread } from "./core.js";
 import { addMessage, jumpTo, render, scrollToBottom } from "./messages.js";
-import { clearPending, loadAttachmentLimits, loadDraft, syncSend } from "./composer.js";
+import { clearPending, focusComposer, loadAttachmentLimits, loadDraft, syncSend } from "./composer.js";
 import { updateActions } from "./chat.js";
 import { closeNavIfOverlay, refreshList, setTitle } from "./sidebar.js";
 import { refreshModels, setSettings } from "./settings.js";
@@ -25,10 +25,18 @@ async function openConversation(id) {
   setTitle(null);
   if (id) {
     try {
-      const conv = await api(`/conversations/${id}`);
+      let conv = await api(`/conversations/${id}`);
+      if (target && !conv.messages.some((m) => m.id === target)) { // a search result in a version that is not shown
+        const body = JSON.stringify({ message_id: target });
+        conv = await api(`/conversations/${id}/branch`, { method: "POST", body }).catch(() => conv);
+      }
       setSettings(conv.settings);
       setTitle(conv.title);
-      conv.messages.forEach((m) => { addMessage(m.role, m.content, m.meta).dataset.id = m.id; });
+      conv.messages.forEach((m) => {
+        const el = addMessage(m.role, m.content, m.meta);
+        el.dataset.id = m.id;
+        el._siblings = m.siblings;
+      });
       thread.querySelectorAll(".msg").forEach(render);
     } catch {
       return openConversation(null); // stale link
@@ -38,7 +46,7 @@ async function openConversation(id) {
   if (!jumpTo(target)) scrollToBottom();
   loadDraft();
   await refreshList();
-  input.focus();
+  focusComposer();
 }
 
 bus.addEventListener("open", (e) => openConversation(e.detail));

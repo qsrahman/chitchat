@@ -14,13 +14,13 @@ import zipfile
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
 from app import store, tools
 from app.store import ConversationSettings
 
 FORMAT = "chitchat-backup"
-VERSION = 1
+VERSION = 2  # 2: messages have a `parent` and conversations a `leaf` (versions of a message); 1 files import as a path
 MAX_IMPORT_BYTES = 50_000_000
 MAX_CHATS = 5_000
 MAX_MESSAGES = 20_000  # per conversation
@@ -41,6 +41,11 @@ def public_message(m: dict) -> dict:
     return {**m, "meta": {**m["meta"], "compaction": {"after_reply": c["after_reply"]}}} if c else m
 
 
+def exported(m: dict) -> dict:
+    """A message of the path shown, for the one-conversation export: without the tree bookkeeping."""
+    return {k: v for k, v in public_message(m).items() if k not in ("siblings", "parent_id")}
+
+
 def markdown(conv: dict, messages: list[dict]) -> str:
     parts = [f"# {conv['title']}"]
     for m in messages:
@@ -55,16 +60,30 @@ def file_name(title: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", title).strip("-") or "chat"
 
 
-def _all(conn) -> list[dict]:
-    """Every conversation with its messages, oldest first."""
-    chats = [{**c, "messages": [public_message(m) for m in store.list_messages(conn, c["id"])]}
-             for c in store.list_conversations(conn)]
-    return sorted(chats, key=lambda c: c["created_at"])
+def _tree(conn, c: dict) -> dict:
+    """A conversation with all its messages, every version: each names its `parent` and the conversation its `leaf`,
+    as positions in the list (ids are only meaningful in this database)."""
+    rows = store.all_messages(conn, c["id"])
+    position = {m["id"]: i for i, m in enumerate(rows)}
+    messages = [{"role": m["role"], "content": m["content"], "meta": public_message(m)["meta"],
+                 "created_at": m["created_at"], "parent": position.get(m["parent_id"])} for m in rows]
+    leaf = position.get(c["leaf_id"], len(rows) - 1) if rows else None
+    return {**{k: v for k, v in c.items() if k != "leaf_id"}, "leaf": leaf, "messages": messages}
+
+
+def _path(conn, c: dict) -> dict:
+    """A conversation with the messages of the path shown (what a reader would see)."""
+    return {**c, "messages": [public_message(m) for m in store.list_messages(conn, c["id"])]}
+
+
+def _all(conn, build) -> list[dict]:
+    """Every conversation, built with `_tree` or `_path`, oldest first."""
+    return sorted((build(conn, c) for c in store.list_conversations(conn)), key=lambda c: c["created_at"])
 
 
 def export_json(conn) -> bytes:
     document = {"format": FORMAT, "version": VERSION, "exported_at": datetime.now(UTC).isoformat(),
-                "conversations": _all(conn)}
+                "conversations": _all(conn, _tree)}
     return json.dumps(document, indent=2, ensure_ascii=False).encode()
 
 
@@ -72,7 +91,7 @@ def export_zip(conn) -> bytes:
     """One Markdown file per conversation, named by date, title and the start of its id (so names never repeat)."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for chat in _all(conn):
+        for chat in _all(conn, _path):
             name = f"{chat['created_at'][:10]}-{file_name(chat['title'])[:80]}-{chat['id'][:8]}.md"
             archive.writestr(name, markdown(chat, chat["messages"]))
     return buffer.getvalue()
@@ -86,6 +105,7 @@ class _Message(BaseModel):
     content: str = Field(max_length=MAX_CONTENT)
     meta: dict = Field(default_factory=dict)
     created_at: str | None = None
+    parent: StrictInt | None = None  # position of the message this follows; only read when the chat has a `leaf`
 
 
 class _Chat(BaseModel):
@@ -95,6 +115,7 @@ class _Chat(BaseModel):
     settings: dict = Field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
+    leaf: StrictInt | None = None  # position of the last message of the path shown; its presence means versions
     messages: list[_Message] = Field(max_length=MAX_MESSAGES)
 
 
@@ -174,19 +195,40 @@ def _settings(raw: dict) -> dict:
         return {}
 
 
+def _structure(chat: _Chat) -> tuple[list[int | None], int | None]:
+    """Each message's parent and the leaf, as positions. A file without `leaf` (version 1, or a one-chat export) is a
+    straight path: each message follows the one before it. With `leaf`, the file says, and is checked: a parent
+    must come earlier in the list, which also rules out loops."""
+    count = len(chat.messages)
+    if "leaf" not in chat.model_fields_set:
+        return [None if i == 0 else i - 1 for i in range(count)], (count - 1 if count else None)
+    parents = []
+    for i, m in enumerate(chat.messages):
+        if m.parent is not None and not 0 <= m.parent < i:
+            raise ImportRejected(f"That file has a message ({i + 1} of \"{chat.title[:40]}\") that follows a message "
+                                 "that does not come before it, so it can't be imported.")
+        parents.append(m.parent)
+    leaf = chat.leaf if chat.leaf is not None else (count - 1 if count else None)
+    if leaf is not None and not 0 <= leaf < count:
+        raise ImportRejected(f"That file says the chat \"{chat.title[:40]}\" ends at a message that is not there.")
+    return parents, leaf
+
+
 def _prepare(chat: _Chat, now: str) -> dict:
     created = _when(chat.created_at, now)
+    parents, leaf = _structure(chat)
     messages = []
-    for m in chat.messages:
+    for m, parent in zip(chat.messages, parents, strict=True):
         meta, left_behind = _clean_meta(m.meta)
         content = m.content
         if left_behind:
             note = f"[Attached when this was sent, not included in the import: {', '.join(left_behind)}]"
             content = f"{content}\n\n{note}" if content else note
-        messages.append({"role": m.role, "content": content, "meta": meta, "created_at": _when(m.created_at, created)})
+        messages.append({"role": m.role, "content": content, "meta": meta, "created_at": _when(m.created_at, created),
+                         "parent": parent})
     cid = chat.id if chat.id and re.fullmatch(r"[0-9a-f]{32}", chat.id) else uuid.uuid4().hex
     return {"id": cid, "title": chat.title.strip()[:200] or "Imported chat", "settings": _settings(chat.settings),
-            "created_at": created, "updated_at": _when(chat.updated_at, created), "messages": messages}
+            "created_at": created, "updated_at": _when(chat.updated_at, created), "leaf": leaf, "messages": messages}
 
 
 def import_chats(conn, data: bytes) -> dict:

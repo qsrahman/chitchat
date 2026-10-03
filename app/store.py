@@ -4,7 +4,7 @@ import re
 import sqlite3
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
@@ -101,45 +101,96 @@ def delete_conversation(conn: sqlite3.Connection, cid: str) -> bool:
     return cur.rowcount > 0
 
 
-def add_message(conn: sqlite3.Connection, cid: str, role: str, content: str, meta: dict | None = None) -> dict:
+# ---- messages: a tree, of which one path is shown ----
+# Every message has a parent (None for the first). A conversation's `leaf_id` is the end of the path you see: the
+# messages from the root to it. A message's `siblings` are the messages with the same parent (the versions of an
+# edited message, or of a regenerated reply), oldest first, itself included.
+LEAF = "leaf"  # add_message's default parent: the end of the path shown now
+
+
+def add_message(conn: sqlite3.Connection, cid: str, role: str, content: str, meta: dict | None = None,
+                parent_id: int | None | Literal["leaf"] = LEAF) -> dict:
+    """Add a message after `parent_id` (default: the end of the path shown; None: a new first message) and make it
+    the end of the path."""
     now = _now()
+    if parent_id == LEAF:
+        row = conn.execute("SELECT leaf_id FROM conversations WHERE id = ?", (cid,)).fetchone()
+        parent_id = row["leaf_id"] if row else None
     cur = conn.execute(
-        "INSERT INTO messages (conversation_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)",
-        (cid, role, content, json.dumps(meta or {}), now),
+        "INSERT INTO messages (conversation_id, parent_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (cid, parent_id, role, content, json.dumps(meta or {}), now),
     )
-    conn.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, cid))
+    conn.execute("UPDATE conversations SET updated_at = ?, leaf_id = ? WHERE id = ?", (now, cur.lastrowid, cid))
     conn.commit()
-    return {"id": cur.lastrowid, "role": role, "content": content, "meta": meta or {}, "created_at": now}
+    return {"id": cur.lastrowid, "role": role, "content": content, "meta": meta or {}, "created_at": now,
+            "parent_id": parent_id}
 
 
 def list_messages(conn: sqlite3.Connection, cid: str) -> list[dict]:
+    """The messages of the path shown, first to last, each with its `siblings` (ids) and `parent_id`."""
     rows = conn.execute(
-        "SELECT id, role, content, meta, created_at FROM messages WHERE conversation_id = ? ORDER BY id", (cid,)
+        """WITH RECURSIVE path(id, parent_id, role, content, meta, created_at) AS (
+               SELECT m.id, m.parent_id, m.role, m.content, m.meta, m.created_at
+               FROM messages m JOIN conversations c ON c.leaf_id = m.id WHERE c.id = ?
+               UNION ALL
+               SELECT m.id, m.parent_id, m.role, m.content, m.meta, m.created_at
+               FROM messages m JOIN path ON m.id = path.parent_id)
+           SELECT * FROM path ORDER BY id""",
+        (cid,),
+    ).fetchall()  # a parent is always older than its child, so ordering by id is ordering by depth
+    families: dict[int | None, list[int]] = {}
+    for r in conn.execute("SELECT id, parent_id FROM messages WHERE conversation_id = ? ORDER BY id", (cid,)):
+        families.setdefault(r["parent_id"], []).append(r["id"])
+    return [{**dict(r), "meta": json.loads(r["meta"]), "siblings": families[r["parent_id"]]} for r in rows]
+
+
+def all_messages(conn: sqlite3.Connection, cid: str) -> list[dict]:
+    """Every message of the conversation, on the path shown or not, oldest first (for the backup)."""
+    rows = conn.execute(
+        "SELECT id, parent_id, role, content, meta, created_at FROM messages WHERE conversation_id = ? ORDER BY id",
+        (cid,),
     )
     return [{**dict(r), "meta": json.loads(r["meta"])} for r in rows]
 
 
-def last_user_message(conn: sqlite3.Connection, cid: str) -> dict | None:
+def siblings_of(conn: sqlite3.Connection, cid: str, message_id: int) -> list[int]:
     row = conn.execute(
-        "SELECT id, content FROM messages WHERE conversation_id = ? AND role = 'user' ORDER BY id DESC LIMIT 1", (cid,)
+        "SELECT parent_id FROM messages WHERE id = ? AND conversation_id = ?", (message_id, cid)
     ).fetchone()
-    return dict(row) if row else None
+    if not row:
+        return []
+    ids = conn.execute(
+        "SELECT id FROM messages WHERE conversation_id = ? AND parent_id IS ? ORDER BY id", (cid, row["parent_id"])
+    )
+    return [r["id"] for r in ids]
 
 
-def update_message_content(conn: sqlite3.Connection, message_id: int, content: str) -> None:
-    conn.execute("UPDATE messages SET content = ? WHERE id = ?", (content, message_id))
+def select_branch(conn: sqlite3.Connection, cid: str, message_id: int) -> bool:
+    """Show the path through `message_id`: from it, follow the newest child again and again to the end. False if the
+    message is not in this conversation."""
+    if not conn.execute("SELECT 1 FROM messages WHERE id = ? AND conversation_id = ?", (message_id, cid)).fetchone():
+        return False
+    leaf = message_id
+    while child := conn.execute(
+        "SELECT MAX(id) AS id FROM messages WHERE conversation_id = ? AND parent_id = ?", (cid, leaf)
+    ).fetchone()["id"]:
+        leaf = child
+    conn.execute("UPDATE conversations SET leaf_id = ? WHERE id = ?", (leaf, cid))
     conn.commit()
+    return True
 
 
-def delete_messages_after(conn: sqlite3.Connection, cid: str, message_id: int) -> None:
-    conn.execute("DELETE FROM messages WHERE conversation_id = ? AND id > ?", (cid, message_id))
+def set_leaf(conn: sqlite3.Connection, cid: str, message_id: int) -> None:
+    """Make `message_id` the end of the path shown (a reply is about to be added to it)."""
+    conn.execute("UPDATE conversations SET leaf_id = ? WHERE id = ?", (message_id, cid))
     conn.commit()
 
 
 def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
-    """Insert prepared conversations (id, title, settings, created_at, updated_at, messages with role, content, meta
-    and created_at), all in one transaction: if anything fails, none are added. One whose id is already here, or
-    repeated in `chats`, is skipped. Returns {"imported", "skipped", "messages"}."""
+    """Insert prepared conversations (id, title, settings, created_at, updated_at, leaf, and messages with role,
+    content, meta, created_at and parent), all in one transaction: if anything fails, none are added. `parent` and
+    `leaf` are positions in the list of messages (parent: an earlier one, or None). One whose id is already here,
+    or repeated in `chats`, is skipped. Returns {"imported", "skipped", "messages"}."""
     imported = skipped = messages = 0
     try:
         for c in chats:
@@ -150,10 +201,17 @@ def import_conversations(conn: sqlite3.Connection, chats: list[dict]) -> dict:
                 "INSERT INTO conversations (id, title, created_at, updated_at, settings) VALUES (?, ?, ?, ?, ?)",
                 (c["id"], c["title"], c["created_at"], c["updated_at"], json.dumps(c["settings"])),
             )
-            conn.executemany(
-                "INSERT INTO messages (conversation_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)",
-                [(c["id"], m["role"], m["content"], json.dumps(m["meta"]), m["created_at"]) for m in c["messages"]],
-            )
+            ids: list[int] = []
+            for m in c["messages"]:
+                cur = conn.execute(
+                    "INSERT INTO messages (conversation_id, parent_id, role, content, meta, created_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    (c["id"], None if m["parent"] is None else ids[m["parent"]], m["role"], m["content"],
+                     json.dumps(m["meta"]), m["created_at"]),
+                )
+                ids.append(cur.lastrowid)  # pyright: ignore[reportArgumentType]
+            if ids:
+                conn.execute("UPDATE conversations SET leaf_id = ? WHERE id = ?", (ids[c["leaf"]], c["id"]))
             imported += 1
             messages += len(c["messages"])
         conn.commit()

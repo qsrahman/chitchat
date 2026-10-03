@@ -30,6 +30,8 @@ export const ICONS = {
   trash: "M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10",
   file: "M6 3h6l4 4v10H6zM12 3v4h4",
   close: "M5 5l10 10M15 5L5 15",
+  previous: "M12 5l-5 5 5 5",
+  next: "M8 5l5 5-5 5",
 };
 export const icon = (path) => `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${path}"/></svg>`;
 

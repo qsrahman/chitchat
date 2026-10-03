@@ -1,7 +1,7 @@
 // A turn: streaming a reply into the thread, and the actions on messages (copy, edit, regenerate, retry).
-import { ICONS, actionsOf, api, bodyOf, form, iconButton, input, state, thread } from "./core.js";
+import { ICONS, actionsOf, api, bodyOf, bus, form, iconButton, input, state, textEl, thread } from "./core.js";
 import { addMessage, finishReasoning, reasoningOf, render, renderFresh, setNote, setReasoning, setText } from "./messages.js";
-import { clearPending, pending, saveDraft, scheduleComposer, syncSend } from "./composer.js";
+import { clearPending, focusComposer, pending, saveDraft, scheduleComposer, syncSend } from "./composer.js";
 import { refreshList } from "./sidebar.js";
 import { renderToolCall } from "./tools-ui.js";
 
@@ -13,10 +13,14 @@ function actionButton(label, onclick) {
   return b;
 }
 
-const clearActions = () => thread.querySelectorAll(".actions").forEach((a) => a.replaceChildren());
+const clearActions = () => {
+  thread.querySelectorAll(".actions").forEach((a) => a.replaceChildren());
+  thread.querySelectorAll(".has-versions").forEach((m) => m.classList.remove("has-versions"));
+};
 
-// Copy on every message that has text (yours and the replies), copying only that message; Edit on the last user message; Regenerate on the last reply, or
-// Retry when the conversation ends on a user message or an error. Icon buttons, named by aria-label.
+// Every message that has text gets Copy (copying only that message), and a user message gets Edit; Regenerate on
+// the last reply, or Retry when the conversation ends on a user message or an error. A message that has other
+// versions (an edit, another reply) shows "2 / 3" with arrows to move between them. Icon buttons, named by aria-label.
 export function updateActions() {
   clearActions();
   if (state.busy) return;
@@ -29,10 +33,53 @@ export function updateActions() {
       confirmed(copy);
     });
     actionsOf(m).append(copy);
+    if (m.classList.contains("user")) actionsOf(m).append(iconButton("Edit", ICONS.pencil, () => startEdit(m)));
+    if (m._siblings?.length > 1) {
+      actionsOf(m).prepend(versionSwitcher(m));
+      m.classList.add("has-versions");
+    }
   }
-  if (lastUser) actionsOf(lastUser).append(iconButton("Edit", ICONS.pencil, () => startEdit(lastUser)));
   if (last?.classList.contains("assistant")) actionsOf(last).append(iconButton("Regenerate", ICONS.refresh, regenerate));
   else if (last && lastUser) actionsOf(last).append(iconButton("Retry", ICONS.refresh, () => retry(lastUser)));
+}
+
+// ---- versions of a message ----
+// A message's id and the ids of its versions (`_siblings`, oldest first, itself included) come from the server: with
+// the conversation when it is opened, and with the "done" event of a turn. A message that stopped or failed has
+// neither, so syncIds() asks (when an edit needs the id).
+const markVersions = (el, { id, siblings }) => {
+  if (!el) return;
+  el.dataset.id = id;
+  el._siblings = siblings;
+};
+
+async function syncIds() {
+  const { messages } = await api(`/conversations/${state.id}`);
+  const els = [...thread.children].filter((e) => e.classList.contains("user") || e.classList.contains("assistant"));
+  messages.forEach((m, i) => els[i] && markVersions(els[i], m));
+  return messages;
+}
+
+function versionSwitcher(m) {
+  const ids = m._siblings;
+  const at = ids.indexOf(Number(m.dataset.id));
+  const box = document.createElement("span");
+  box.className = "versions";
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-label", "Versions of this message");
+  const previous = iconButton("Previous version", ICONS.previous, () => showVersion(ids[at - 1]));
+  const next = iconButton("Next version", ICONS.next, () => showVersion(ids[at + 1]));
+  previous.disabled = at <= 0;
+  next.disabled = at >= ids.length - 1;
+  box.append(previous, textEl("span", `${at + 1} / ${ids.length}`, "versions-count"), next);
+  return box;
+}
+
+// The server switches the path; the conversation is then opened again, at that message (app.js).
+async function showVersion(id) {
+  await api(`/conversations/${state.id}/branch`, { method: "POST", body: JSON.stringify({ message_id: id }) });
+  state.jumpTo = id;
+  bus.dispatchEvent(new CustomEvent("open", { detail: state.id }));
 }
 
 // Briefly show a check mark and "Copied" on an icon button.
@@ -45,8 +92,9 @@ function confirmed(btn) {
   setTimeout(() => { path.setAttribute("d", d); btn.setAttribute("aria-label", label); btn.title = label; }, 1200);
 }
 
-function startEdit(m) {
+async function startEdit(m) {
   clearActions();
+  if (!m.dataset.id) await syncIds().catch(() => {}); // a message that has no id yet: the server will take the last one
   const ta = document.createElement("textarea");
   ta.className = "edit";
   ta.dir = "auto";
@@ -59,7 +107,7 @@ function startEdit(m) {
       if (!text) return;
       while (m.nextElementSibling) m.nextElementSibling.remove();
       setText(m, text);
-      runTurn("edit", { content: text });
+      runTurn("edit", { content: text, ...(m.dataset.id && { message_id: Number(m.dataset.id) }) });
     }),
     actionButton("Cancel", () => { render(m); updateActions(); }),
   );
@@ -78,7 +126,7 @@ async function retry(user) {
   const dropAfterUser = () => { while (thread.lastElementChild !== user) thread.lastElementChild.remove(); };
   let saved;
   try {
-    saved = state.id ? (await api(`/conversations/${state.id}`)).messages.filter((m) => m.role === "user") : [];
+    saved = state.id ? (await syncIds()).filter((m) => m.role === "user") : [];
   } catch {
     dropAfterUser();
     addMessage("error", "Couldn't reach the server. Check your connection and retry.");
@@ -91,7 +139,7 @@ async function retry(user) {
     regenerate();
   } else { // an edit that never landed
     dropAfterUser();
-    runTurn("edit", { content: user._text });
+    runTurn("edit", { content: user._text, ...(user.dataset.id && { message_id: Number(user.dataset.id) }) });
   }
 }
 
@@ -157,7 +205,14 @@ async function runTurn(path, payload = {}) {
         render(el);
       } else if (ev.type === "compaction") compaction = true;
       else if (ev.type === "context_trimmed") trimmed = ev.count;
-      else if (ev.type === "done") { finished = true; setNote(el, { ...ev, compaction, trimmed }); }
+      else if (ev.type === "done") {
+        finished = true;
+        setNote(el, { ...ev, compaction, trimmed });
+        if (ev.branch) { // the reply answers the user message just before it
+          markVersions(el.previousElementSibling, ev.branch.user);
+          markVersions(el, ev.branch.assistant);
+        }
+      }
       else if (ev.type === "error") throw new Error(ev.message);
     }
     if (!finished) throw new Error("The connection closed before the reply finished.");
@@ -183,7 +238,7 @@ async function runTurn(path, payload = {}) {
       thread.removeAttribute("aria-busy");
       syncSend();
       updateActions();
-      input.focus();
+      focusComposer();
     }
   }
   refreshList(); // picks up the new title and recency order

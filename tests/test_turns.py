@@ -18,7 +18,8 @@ async def test_regenerate_replaces_last_reply(client, llm):
     await chat(client, cid, "hi")
     llm.events = [{"type": "delta", "text": "second try"}, {"type": "done"}]
     r = await client.post(f"/api/conversations/{cid}/regenerate")
-    assert parse_sse(r.text)[:2] == llm.events
+    events = parse_sse(r.text)
+    assert events[0] == llm.events[0] and events[1]["type"] == "done"
     got = [(m["role"], m["content"]) for m in await messages(client, cid)]
     assert got == [("user", "hi"), ("assistant", "second try")]
     assert llm.calls[-1]["messages"] == [{"role": "user", "content": "hi"}]

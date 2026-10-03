@@ -244,3 +244,15 @@ def test_a_forced_theme_on_either_system_theme(page_with_axe):
         # colors are read mid-fade otherwise
         page.wait_for_function("() => document.getAnimations().every((a) => !(a instanceof CSSTransition))")
         assert violations(page) == []
+
+
+def test_a_message_with_versions(page_with_axe):
+    page = page_with_axe
+    say(page, "hello")
+    page.get_by_role("button", name="Regenerate").click()
+    expect(page.locator(".versions")).to_be_visible()
+    expect(page.locator(".versions-count")).to_have_text("2 / 2")
+    assert violations(page) == []
+    page.get_by_role("button", name="Previous version").click()
+    expect(page.locator(".versions-count")).to_have_text("1 / 2")
+    assert violations(page) == []  # with a disabled arrow, too

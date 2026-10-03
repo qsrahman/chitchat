@@ -55,6 +55,11 @@ class CustomInstructions(BaseModel):
 
 class EditRequest(BaseModel):
     content: Content
+    message_id: int | None = None  # the user message to rewrite (on the path shown); the last one by default
+
+
+class BranchRequest(BaseModel):
+    message_id: int  # show the path through this message, one of a message's versions
 
 
 class ChatRequest(BaseModel):
@@ -94,6 +99,16 @@ def get_conversation(cid: str, conn: Conn):
     return {**conv, "messages": [backup.public_message(m) for m in store.list_messages(conn, cid)]}
 
 
+@router.post("/conversations/{cid}/branch")
+def choose_branch(cid: str, body: BranchRequest, conn: Conn):
+    """Switch to another version of a message: the conversation as it reads through that message, then on to the
+    newest reply after it. Returns the conversation like GET does."""
+    _require(conn, cid)
+    if not store.select_branch(conn, cid, body.message_id):
+        raise HTTPException(404, "message not found")
+    return get_conversation(cid, conn)
+
+
 @router.get("/search")
 def search(q: Annotated[str, Query(min_length=1, max_length=200)], conn: Conn):
     """Conversations whose messages match; `snippet` marks the matched words with STX/ETX characters."""
@@ -104,7 +119,7 @@ def search(q: Annotated[str, Query(min_length=1, max_length=200)], conn: Conn):
 def export_conversation(cid: str, conn: Conn, format: Literal["md", "json"] = "md"):
     """The conversation as a Markdown or JSON download. Attachments are listed by name, not included."""
     conv = _require(conn, cid)
-    messages = [backup.public_message(m) for m in store.list_messages(conn, cid)]
+    messages = [backup.exported(m) for m in store.list_messages(conn, cid)]  # the path shown, not other versions
     if format == "md":
         body, media_type = backup.markdown(conv, messages), "text/markdown"
     else:
@@ -284,12 +299,14 @@ class Turn:
     title_model: str
     conv: dict
     history: list[dict]  # ends with the user message being answered
+    reply_to: int  # that message's id: the reply is saved as its child
     model: str
     options: dict
     trimmed: int = 0  # how many older messages were left out to fit the model's context, see context.py
 
 
-def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], model: str | None = None):
+def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], reply_to: int,
+               model: str | None = None):
     settings = request.app.state.settings
     chosen: str = model or conv["settings"]["model"] or settings.openai_model
     options = _model_options(request, conn, conv, chosen)
@@ -298,21 +315,12 @@ def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: 
         instructions = context.estimate({"content": options.get("instructions")})
         reserve = instructions + (settings.openai_max_output_tokens or 2_000)
         history, trimmed = context.fit(history, settings.history_tokens - reserve)
-    return Turn(conn, request.app.state.llm, settings.title_model_name, conv, history, chosen, options, trimmed)
+    return Turn(conn, request.app.state.llm, settings.title_model_name, conv, history, reply_to, chosen, options,
+                trimmed)
 
 
-def _redo_last_user_turn(
-    request: Request, conn: sqlite3.Connection, cid: str, content: str | None = None
-) -> tuple[dict, list[dict]]:
-    """Drop everything after the last user message (optionally rewriting it); return (conv, history)."""
-    conv = _require(conn, cid)
-    last = store.last_user_message(conn, cid)
-    if not last:
-        raise HTTPException(409, "no user message to reply to")
-    if content is not None:
-        store.update_message_content(conn, last["id"], content)
-    store.delete_messages_after(conn, cid, last["id"])
-    return conv, _history(request, conn, cid)
+def _last_user(path: list[dict]) -> dict | None:
+    return next((m for m in reversed(path) if m["role"] == "user"), None)
 
 
 def chat_turn(cid: str, req: ChatRequest, request: Request, conn: Conn) -> Turn:
@@ -321,19 +329,38 @@ def chat_turn(cid: str, req: ChatRequest, request: Request, conn: Conn) -> Turn:
     if len(files) != len(req.attachments):
         raise HTTPException(422, "An attachment is unknown or was already sent. Attach the file again.")
     meta = {"attachments": [{k: f[k] for k in store.ATTACHMENT_FIELDS} for f in files]} if files else None
-    store.add_message(conn, cid, "user", req.content, meta)
+    user = store.add_message(conn, cid, "user", req.content, meta)
     store.link_attachments(conn, cid, req.attachments)
-    return _make_turn(request, conn, conv, _history(request, conn, cid), req.model)
+    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"], req.model)
 
 
 def regenerate_turn(cid: str, request: Request, conn: Conn) -> Turn:
-    conv, history = _redo_last_user_turn(request, conn, cid)
-    return _make_turn(request, conn, conv, history)
+    """A new reply to the last user message. The reply there was (if any) stays, as another version of it."""
+    conv = _require(conn, cid)
+    user = _last_user(store.list_messages(conn, cid))
+    if not user:
+        raise HTTPException(409, "no user message to reply to")
+    store.set_leaf(conn, cid, user["id"])  # the path now ends at the message being answered
+    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"])
 
 
 def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
-    conv, history = _redo_last_user_turn(request, conn, cid, req.content)
-    return _make_turn(request, conn, conv, history)
+    """Rewrite a user message as a new version of it (same place, same attachments) and reply to that. What came
+    after the old version stays with it."""
+    conv = _require(conn, cid)
+    path = store.list_messages(conn, cid)
+    if req.message_id is None:
+        target = _last_user(path)
+        if not target:
+            raise HTTPException(409, "no user message to reply to")
+    else:
+        target = next((m for m in path if m["id"] == req.message_id and m["role"] == "user"), None)
+        if not target:
+            raise HTTPException(404, "that is not a user message of this conversation")
+    files = target["meta"].get("attachments")
+    user = store.add_message(conn, cid, "user", req.content, {"attachments": files} if files else None,
+                             parent_id=target["parent_id"])
+    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"])
 
 
 def _tool_meta(calls: dict[str, dict], interrupted: str | None = None) -> list[dict]:
@@ -353,8 +380,9 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
 
     Yields the events from llm.py, plus {"type": "title", "title": ...} after "done" when the
     conversation still has its default title. A reply that errors is not saved; a reply cut
-    short (client disconnect = Stop) is saved with meta {"stopped": true}. The message's meta also
-    keeps the reasoning summary and token usage when there are any.
+    short (client disconnect = Stop) is saved with meta {"stopped": true}. The message's meta also keeps the
+    reasoning summary and token usage when there are any. A reply is saved as a child of the user message it answers
+    (`turn.reply_to`), which is how an edit or a regeneration becomes another version.
     """
     cid, conn = turn.conv["id"], turn.conn
     needs_title = turn.conv["title"] == store.DEFAULT_TITLE
@@ -384,9 +412,13 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                     meta["trimmed"] = turn.trimmed
                 if compaction:
                     meta["compaction"] = {"item": compaction["item"], "after_reply": compaction["after_reply"]}
-                store.add_message(conn, cid, "assistant", text, meta)
+                saved = store.add_message(conn, cid, "assistant", text, meta, parent_id=turn.reply_to)
                 finished, outcome, usage = True, "done", event.get("usage") or {}
-                yield event
+                # Where the two messages now stand among their versions, so the page can offer "2 / 3" on them
+                # without loading the conversation again.
+                yield {**event, "branch": {
+                    "user": {"id": turn.reply_to, "siblings": store.siblings_of(conn, cid, turn.reply_to)},
+                    "assistant": {"id": saved["id"], "siblings": store.siblings_of(conn, cid, saved["id"])}}}
                 if needs_title:
                     last = turn.history[-1]
                     asked = last["content"] or ", ".join(a["name"] for a in last.get("attachments", []))
@@ -407,7 +439,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                 meta["trimmed"] = turn.trimmed
             if tool_calls:
                 meta["tools"] = _tool_meta(tool_calls, interrupted="stopped")
-            store.add_message(conn, cid, "assistant", "".join(reply), meta)
+            store.add_message(conn, cid, "assistant", "".join(reply), meta, parent_id=turn.reply_to)
 
 
 # Server-sent events over POST: FastAPI frames each yielded dict as `data: {json}` and adds keepalive pings.

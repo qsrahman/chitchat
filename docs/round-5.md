@@ -20,3 +20,12 @@ Three changes: a sweep for flaky tests, a render time budget, and branching. Eac
 Measured with `scripts/bench_render.py`: the time the main thread is blocked while a huge block streams drops by 55 to 60 percent (28.5 s to 11.5 s for a 20,000-line code block; table in `docs/rendering.md`), and ordinary replies are unchanged. The longest single freeze is not shortened, and the stream finishes up to 15 percent later (the stream itself is not delayed, only what is drawn).
 
 Tests (`tests/ui/test_incremental_render_ui.py`): with every render made to cost 40 ms, a 1.5 s stream renders about 12 times, not 35 (33 renders when the budget was switched off, checked), and the last line of the block is on the page; and an 80-paragraph reply still renders about once per paragraph.
+
+## 3. Branching
+Editing or regenerating no longer deletes what came after: the old text stays as a version, with `‹ 2 / 3 ›` on the message to move between versions. Any user message can be edited now, not only the last. Design, endpoints, the page and limits are in `docs/branching.md`. In short:
+- **Storage:** `messages.parent_id` and `conversations.leaf_id` (migration v6, existing chats become one straight path); the path shown is a recursive query from the leaf.
+- **API:** `edit` takes an optional `message_id`; new `POST /conversations/{id}/branch`; the turn's `done` event carries the ids and versions of the two messages it saved.
+- **Backup:** format version 2 holds every version (`parent`, `leaf`), is checked on import, and still reads version 1.
+- **Page:** switcher, Edit on every user message, a search result in a hidden version switches to it.
+
+**A real bug the work found:** `test_no_match_says_so` still failed about once in 60 runs after the round's first fix, and the cause was in the app, not the test. When a reply finished, `runTurn` always gave the message box the focus, so someone typing in the sidebar search while a reply streamed had their next keystrokes land in the message box. `focusComposer()` (in `composer.js`) now leaves the focus alone if a different text field has it, and the page's start-up uses it too. Two tests cover it (typing in the search box while a reply ends; the cursor returning to the message box when nothing else has it). Mod+Shift+O blurs the search box first so a new chat still gets the cursor. 70 parallel copies of the search tests then passed.
