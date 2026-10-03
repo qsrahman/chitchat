@@ -138,7 +138,7 @@ def test_message_actions_are_icon_buttons_with_tooltips_and_copy_confirms(page, 
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
     for name in ("Copy", "Edit", "Regenerate"):
-        button = page.locator(".actions").get_by_role("button", name=name, exact=True)
+        button = page.locator(".actions").get_by_role("button", name=name, exact=True).first
         expect(button).to_have_attribute("title", name)
         expect(button).to_have_text("")
     copy = page.locator(".msg.assistant .actions").get_by_role("button", name="Copy", exact=True)

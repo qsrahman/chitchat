@@ -214,7 +214,7 @@ function actionButton(label, onclick) {
 
 const clearActions = () => thread.querySelectorAll(".actions").forEach((a) => a.replaceChildren());
 
-// Copy on every reply; Edit on the last user message; Regenerate on the last reply, or
+// Copy on every message that has text (yours and the replies), copying only that message; Edit on the last user message; Regenerate on the last reply, or
 // Retry when the conversation ends on a user message or an error. Icon buttons, named by aria-label.
 function updateActions() {
   clearActions();
@@ -222,7 +222,7 @@ function updateActions() {
   const msgs = [...thread.children];
   const last = msgs.at(-1);
   const lastUser = msgs.findLast((m) => m.classList.contains("user"));
-  for (const m of msgs.filter((m) => m.classList.contains("assistant"))) {
+  for (const m of msgs.filter((m) => m._text && (m.classList.contains("assistant") || m.classList.contains("user")))) {
     const copy = iconButton("Copy", ICONS.copy, async () => {
       await navigator.clipboard.writeText(m._text);
       confirmed(copy);

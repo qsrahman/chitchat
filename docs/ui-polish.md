@@ -98,3 +98,6 @@ Brief: ChitChat is a personal workbench for a developer who reads long answers, 
 - **Quiet elsewhere:** nothing decorative was added; sidebar, menus and dialogs keep the one radius scale and the elevation tokens. Strong text is weight 600 and links get a thin, offset underline.
 Not done, on purpose: a second typeface (the system stack was requested), and tinting math blocks (the code block is already the one tinted surface).
 Tests: `tests/ui/test_identity_ui.py`.
+
+## Copy on every message
+Every message with text, yours and the replies, has its own Copy icon next to Edit and Regenerate. It copies only that message, exactly as it was written (a reply's raw Markdown, your text with its line breaks), and shows the same check mark and "Copied" for a moment. Code blocks keep their own Copy button. A message that is only an attachment has no text, so no Copy. Not covered: the reasoning block and tool-call details, which are progress information. Tests: `tests/ui/test_copy_ui.py`.
