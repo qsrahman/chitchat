@@ -70,10 +70,28 @@ def test_export_links_in_settings_download_the_chat(page, app_url):
     page.get_by_role("button", name="Chat settings").click()
     expect(page.locator("#export-row")).to_be_visible()
     with page.expect_download() as download:
-        page.get_by_role("link", name="Markdown").click()
+        page.get_by_role("link", name="Markdown", exact=True).click()
     assert download.value.suggested_filename.endswith(".md")
     text = open(download.value.path()).read()
     assert "## You\n\nhello export" in text
+
+
+def test_the_header_has_a_download_button_once_the_chat_exists(page, app_url):
+    open_app(page, app_url)
+    button = page.get_by_role("link", name="Download as Markdown")
+    expect(button).to_be_hidden()  # nothing to download in a new chat
+    send(page, "to keep")
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
+    expect(button).to_be_visible()
+    with page.expect_download() as download:
+        button.click()
+    assert download.value.suggested_filename.endswith(".md")
+    assert "## You\n\nto keep" in open(download.value.path()).read()
+    page.get_by_role("button", name="New chat").click()
+    expect(button).to_be_hidden()
+    page.get_by_role("button", name="Show conversations").click()
+    page.get_by_role("link", name="to keep").click()
+    expect(button).to_be_visible()
 
 
 def test_the_note_says_when_the_context_was_compacted(page, app_url):

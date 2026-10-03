@@ -38,7 +38,7 @@ Full-text search over message text with SQLite FTS5 (migration v4: an external-c
 - Titles are searched too, and a result opens the chat at the matching message: see "Search, later" below.
 
 ## Export
-`GET /api/conversations/{id}/export?format=md|json` downloads the chat. Markdown has the title, then `## You` / `## Assistant` sections (attachments listed by name). JSON is the conversation with its messages, metadata included (reasoning, usage, tool calls) minus the encrypted compaction item. Attachment files are not included. The links are in the chat settings dialog.
+`GET /api/conversations/{id}/export?format=md|json` downloads the chat. Markdown has the title, then `## You` / `## Assistant (model)` sections (attachments listed by name; the tools the model used, with the sources it found: `docs/round-9.md`). JSON is the conversation with its messages, metadata included (reasoning, usage, tool calls) minus the encrypted compaction item. Attachment files are not included. The links are in the chat settings dialog, and a Download button in the header gets the Markdown.
 
 ## Tests
 `tests/test_phase8.py` (compaction bookkeeping and history, search, export, the v4 migration), `tests/test_llm.py` (the request parameter, compaction events, the item sent as-is), `tests/ui/test_history_ui.py`. Live: `test_live_compaction_round_trip`.

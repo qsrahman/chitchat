@@ -131,7 +131,7 @@ async def test_markdown_export(client, llm):
     r = await client.get(f"/api/conversations/{cid}/export")
     assert r.headers["content-type"].startswith("text/markdown")
     assert r.headers["content-disposition"] == 'attachment; filename="My-chat-1.md"'
-    assert r.text == "# My chat / 1\n\n## You\n\nhi\n\n## Assistant\n\nHello **there**\n"
+    assert r.text == "# My chat / 1\n\n## You\n\nhi\n\n## Assistant (test-model)\n\nHello **there**\n"  # who answered
 
 
 async def test_json_export_has_messages_and_no_encrypted_item(client, llm):
@@ -178,3 +178,32 @@ def test_migration_to_v4_indexes_existing_messages(tmp_path):
     conn = db.connect(path)
     assert [r["id"] for r in store.search_conversations(conn, "quokka")] == ["c1"]
     conn.close()
+
+
+async def test_markdown_export_says_what_the_tools_found(client, llm):
+    llm.events = [
+        {"type": "tool_call", "id": "a", "name": "web_search", "status": "done", "arguments": {"query": "rust"},
+         "display": {"query": "rust\n# not a heading", "results": [
+             {"title": "Rust [lang]\n- injected", "url": "https://www.rust-lang.org/", "description": "d"},
+             {"title": "Bad link", "url": "javascript:alert(1)", "description": "d"},
+             {"title": "Spaces", "url": "https://a.example/x y", "description": "d"}]}},
+        {"type": "tool_call", "id": "b", "name": "fetch_url", "status": "done", "arguments": {},
+         "display": {"url": "https://example.com/page", "title": "A page", "characters": 10}},
+        {"type": "tool_call", "id": "c", "name": "calculator", "status": "done", "arguments": {},
+         "display": {"expression": "2*3", "result": "6"}},
+        {"type": "tool_call", "id": "d", "name": "search_chats", "status": "error", "arguments": {}, "error": "boom"},
+        {"type": "tool_call", "id": "e", "name": "fetch_url", "status": "done", "arguments": {}, "display": "odd"},
+        {"type": "delta", "text": "Answer"}, {"type": "done"},
+    ]
+    cid = await titled(client, llm, "Tools", "go")
+    text = (await client.get(f"/api/conversations/{cid}/export")).text
+    assert text == (
+        "# Tools\n\n## You\n\ngo\n\n## Assistant (test-model)\n\n"
+        "*Searched the web for* “rust # not a heading”\n"
+        "- [Rust (lang) - injected](https://www.rust-lang.org/)\n"  # one line; the brackets cannot end the link
+        "- Bad link\n"  # not a web address: the title, no link
+        "- Spaces\n\n"
+        "*Read* [A page](https://example.com/page)\n\n"
+        "*Calculated* `2*3 = 6`\n\n"  # an outcome that failed, or whose details are not as expected, adds nothing
+        "Answer\n"
+    )

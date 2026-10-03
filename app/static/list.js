@@ -16,7 +16,15 @@ const PAGE = 50;
 let more = false; // the last request came back full, so there may be older chats
 let showArchived = false; // the list is the archived chats (the "Archived chats" button in the footer)
 
+// The header's Download button: a link to this chat as Markdown, there once the chat exists.
+function syncExport() {
+  const link = $("export-btn");
+  link.hidden = !state.id;
+  if (state.id) link.href = `/api/conversations/${state.id}/export?format=md`;
+}
+
 export async function refreshList() {
+  syncExport();
   const limit = Math.min(500, Math.max(PAGE, state.convs.length));
   state.convs = await api(`/conversations?limit=${limit}&archived=${showArchived}`);
   more = state.convs.length === limit;

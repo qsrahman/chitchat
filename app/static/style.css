@@ -125,8 +125,8 @@ main:not(.is-started) #title { visibility: hidden; }
 #more-settings { margin-top: 2px; border-top: 1px solid var(--line); border-radius: 0 0 var(--r-sm) var(--r-sm); padding-top: 10px; }
 #model-menu .field-error { margin: 4px 10px; }
 
-#settings-btn { position: relative; color: var(--muted); }
-#settings-btn:hover { color: var(--ink); }
+#settings-btn, #export-btn { position: relative; color: var(--muted); }
+#settings-btn:hover, #export-btn:hover { color: var(--ink); }
 #settings-btn[data-active] { color: var(--accent); }
 #settings-btn[data-active]::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 

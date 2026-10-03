@@ -85,7 +85,7 @@ async def test_export_as_markdown_is_a_zip_with_one_file_per_chat(client, llm):
         assert len(names) == 3 and len(set(names)) == 3  # same title, different names
         assert all(n.endswith(".md") and "/" not in n and n.isascii() for n in names)
         body = archive.read(names[0]).decode()
-    assert body.startswith("# Chat / one\n\n## You\n\nfirst question\n\n## Assistant\n\nFirst **answer**")
+    assert body.startswith("# Chat / one\n\n## You\n\nfirst question\n\n## Assistant (test-model)\n\nFirst **answer**")
 
 
 async def test_the_export_format_is_validated(client):

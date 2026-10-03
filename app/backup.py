@@ -17,7 +17,7 @@ import tempfile
 import uuid
 import zipfile
 from datetime import UTC, datetime
-from typing import BinaryIO, Literal
+from typing import Any, BinaryIO, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
@@ -56,12 +56,56 @@ def exported(m: dict) -> dict:
     return {k: v for k, v in public_message(m).items() if k not in ("siblings", "parent_id")}
 
 
+def _line(text) -> str:
+    """Text from the web or a model on one line, so it can't start a new block of the document."""
+    return " ".join(str(text).split())
+
+
+def _link(title, url) -> str:
+    """A Markdown link, for web addresses only: a title or URL that came from the web is not to become anything else."""
+    title, url = _line(title).replace("[", "(").replace("]", ")"), str(url)
+    if not url.startswith(("http://", "https://")) or any(c in url for c in " ()<>\n"):
+        return title
+    return f"[{title}]({url})"
+
+
+def _tool_notes(call: dict) -> list[str]:
+    """What a tool the model used reads like in the export: the line the page shows, and the sources it found. Saved
+    calls can come from an older version or an imported file, so a shape that is not as expected gives nothing."""
+    if call.get("status") != "done":
+        return []
+    shown: Any = call.get("display")
+    try:
+        match call["name"]:
+            case "web_search":
+                lines = [f"*Searched the web for* “{_line(shown['query'])}”"]
+                lines += [f"- {_link(r['title'], r['url'])}" for r in shown["results"]]
+                return lines
+            case "fetch_url":
+                return [f"*Read* {_link(shown.get('title') or shown['url'], shown['url'])}"]
+            case "search_chats":
+                return [f"*Searched your chats for* “{_line(shown['query'])}”"]
+            case "calculator":
+                # as code, so the * and _ of a sum stay as typed
+                worked = _line(f"{shown['expression']} = {shown['result']}").replace("`", "")
+                return [f"*Calculated* `{worked}`"]
+    except (KeyError, TypeError, AttributeError):
+        pass
+    return []
+
+
 def markdown(conv: dict, messages: list[dict]) -> str:
+    """The conversation to read: who said what, the model that answered, the files attached, and the tools used."""
     parts = [f"# {conv['title']}"]
     for m in messages:
-        parts.append("## " + ("You" if m["role"] == "user" else "Assistant"))
-        if files := m["meta"].get("attachments"):
+        meta = m["meta"]
+        who = "You" if m["role"] == "user" else f"Assistant ({meta['model']})" if meta.get("model") else "Assistant"
+        parts.append(f"## {who}")
+        if files := meta.get("attachments"):
             parts.append("*Attached: " + ", ".join(a["name"] for a in files) + "*")
+        for call in meta.get("tools") or []:
+            if notes := _tool_notes(call):
+                parts.append("\n".join(notes))
         parts.append(m["content"])
     return "\n\n".join(parts) + "\n"
 
