@@ -6,7 +6,7 @@ export function setNavOpen(open) {
   document.body.classList.toggle("nav-open", open);
   $("scrim").hidden = !open;
   const label = open ? "Hide conversations" : "Show conversations";
-  for (const toggle of document.querySelectorAll(".nav-toggle")) {
+  for (const toggle of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".nav-toggle"))) {
     toggle.setAttribute("aria-expanded", String(open));
     toggle.setAttribute("aria-label", label);
     toggle.title = label;
@@ -15,7 +15,7 @@ export function setNavOpen(open) {
 export function closeNavIfOverlay() {
   if (matchMedia("(max-width: 760px)").matches) setNavOpen(false);
 }
-document.querySelectorAll(".nav-toggle").forEach((b) => {
+document.querySelectorAll(".nav-toggle").forEach((/** @type {HTMLElement} */ b) => {
   b.onclick = () => setNavOpen(!document.body.classList.contains("nav-open"));
 });
 $("scrim").onclick = () => setNavOpen(false);

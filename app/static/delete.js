@@ -6,7 +6,8 @@ import { hideChat, refreshList, renderList } from "./list.js";
 // A deleted chat is hidden at once but only deleted on the server after UNDO_MS, so "Undo" is just un-hiding it.
 // Deleting another chat, or leaving the page, makes a waiting delete final straight away.
 const UNDO_MS = 10_000;
-let pending = null; // { conv, wasOpen, timer }
+/** @type {{conv: Conversation, wasOpen: boolean, timer: ReturnType<typeof setTimeout>} | null} */
+let pending = null;
 
 async function deleteChat(c) {
   $("delete-name").textContent = c.title;
@@ -53,4 +54,4 @@ window.addEventListener("pagehide", () => {
   hideChat(null, false);
   $("toast").hidden = true;
 });
-bus.addEventListener("delete-chat", (e) => deleteChat(e.detail)); // from the row's Delete button (list.js)
+bus.addEventListener("delete-chat", (e) => deleteChat(/** @type {CustomEvent} */ (e).detail)); // from the row's Delete button (list.js)

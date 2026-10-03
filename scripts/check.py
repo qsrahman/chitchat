@@ -3,9 +3,9 @@
     uv run python scripts/check.py
 
 It runs the Python lint (ruff), the type checker (pyright, on `app/`), the JavaScript lint (eslint, when Node is
-installed: a missing import in the UI only shows when that line runs, and nothing else here would find it) and the
-whole test suite, in parallel. Stops at the first step that fails. The network is not needed once eslint has
-been fetched once. See docs/development.md.
+installed: a missing import in the UI only shows when that line runs, and nothing else here would find it), tsc
+(the UI's types, from JSDoc) and the whole test suite, in parallel. Stops at the first step that fails. The network
+is not needed once eslint and tsc have been fetched once. See docs/development.md.
 """
 import shutil
 import subprocess
@@ -16,6 +16,7 @@ STEPS = [
     ("ruff", ["uv", "run", "ruff", "check", "."]),
     ("pyright", ["uv", "run", "pyright"]),
     ("eslint", ["npx", "--yes", "eslint@10", "app/static"]),
+    ("tsc", ["npx", "--yes", "-p", "typescript@7", "tsc", "-p", "jsconfig.json"]),
     ("tests", ["uv", "run", "pytest", "-q"]),
 ]
 

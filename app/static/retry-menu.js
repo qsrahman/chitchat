@@ -5,7 +5,9 @@ import { modelRow, modelTags, menuKeys } from "./model-menu.js";
 import { modelInfo, refreshModels } from "./settings.js";
 
 const menu = $("retry-menu");
+/** @type {HTMLElement | null} */
 let anchor = null;
+/** @type {((model: string) => void) | null} */
 let onPick = null;
 
 function render() {
@@ -13,7 +15,7 @@ function render() {
     const row = modelRow(m.id, modelTags(m), null);
     row.onclick = () => {
       menu.hidePopover(); // the browser returns the focus to the button
-      onPick(m.id);
+      onPick?.(m.id);
     };
     return row;
   }));
@@ -26,6 +28,7 @@ function render() {
 
 // Under the button, or above it when there is no room below (the buttons are at the bottom of a reply).
 function place() {
+  if (!anchor) return;
   const r = anchor.getBoundingClientRect();
   const below = innerHeight - r.bottom;
   menu.style.top = `${below >= menu.offsetHeight + 12 ? r.bottom + 6 : Math.max(8, r.top - menu.offsetHeight - 6)}px`;

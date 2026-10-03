@@ -17,6 +17,7 @@ function syncModelButton() {
 
 // One row of a model list: the name and its tags. The picker's rows are radios, one checked; the "try again" menu's
 // are plain items (checked: null).
+/** @param {string} id @param {string[]} tags @param {boolean | null} [checked] */
 export function modelRow(id, tags, checked = id === currentModel()) {
   const row = document.createElement("button");
   row.type = "button";
@@ -25,7 +26,7 @@ export function modelRow(id, tags, checked = id === currentModel()) {
   row.className = "menu-item";
   row.innerHTML = `<svg class="check" viewBox="0 0 20 20" aria-hidden="true"><path d="${ICONS.check}"/></svg>` +
     '<span class="menu-name"></span>' + tags.map(() => '<span class="menu-tag"></span>').join("");
-  row.querySelector(".menu-name").textContent = id;
+  /** @type {HTMLElement} */ (row.querySelector(".menu-name")).textContent = id;
   row.querySelectorAll(".menu-tag").forEach((el, i) => (el.textContent = tags[i]));
   row.onclick = () => chooseModel(id);
   return row;

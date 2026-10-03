@@ -163,7 +163,9 @@ async function retry(user, model) {
 // ---- sse ----
 // Yields parsed `data: {json}` SSE events. Hand-written because EventSource is GET-only, and these turns
 // are POSTs; TextDecoderStream does the decoding. Comment frames (keepalive pings) are skipped.
+/** @param {Response} response @returns {AsyncGenerator<StreamEvent>} */
 async function* readSSE(response) {
+  if (!response.body) return; // runTurn then reports that the connection closed early
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = "";
   for (;;) {
@@ -244,7 +246,7 @@ async function runTurn(path, payload = {}) {
       setText(el, `Couldn't get a reply. ${err.message}`);
     }
   } finally {
-    for (const row of el.querySelectorAll('.tool-call[data-status="running"]')) { // a stopped search stays "running" otherwise
+    for (const row of /** @type {NodeListOf<HTMLElement>} */ (el.querySelectorAll('.tool-call[data-status="running"]'))) { // a stopped search stays "running" otherwise
       renderToolCall(el, { id: row.dataset.id, name: row.dataset.name, status: "stopped" });
     }
     finishReasoning(el);

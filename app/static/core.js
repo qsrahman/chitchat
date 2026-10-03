@@ -1,14 +1,17 @@
 // Shared basics for the UI modules: DOM handles, the one shared state object, the API helper, icons, a few small
 // builders, and a bus for "something changed" notices. Nothing here depends on another module of the app.
 
+// The ids are in index.html and the element types differ (input, button, dialog...), so this is untyped: a wrong id
+// shows only when that line runs.
+/** @type {(id: string) => any} */
 export const $ = (id) => document.getElementById(id);
-export const main = document.querySelector("main");
+export const main = /** @type {HTMLElement} */ (document.querySelector("main"));
 export const messagesEl = $("messages");
 export const thread = $("thread");
 export const input = $("input");
 export const sendBtn = $("send");
 export const form = $("form");
-export const composer = document.querySelector(".composer");
+export const composer = /** @type {HTMLElement} */ (document.querySelector(".composer"));
 
 // Notices between modules that shouldn't import each other: "settings" (the open conversation's settings changed),
 // "models" (the model list was refreshed) and "open" (open the conversation in event.detail, null for a new chat).
@@ -18,7 +21,10 @@ export const bus = new EventTarget();
 // stick: keep the view pinned to the bottom unless the reader scrolled up.
 // jumpTo: id of a message to scroll to when the next conversation opens (set by a search result).
 // settings: the current conversation's settings (kept client-side until a new chat's first send creates it).
+/** @type {ConversationSettings} */
 export const DEFAULT_SETTINGS = { model: null, system_prompt: "", reasoning_effort: null, temperature: null, tools: [] };
+/** @type {{id: string | null, jumpTo: number | null, busy: boolean, abort: AbortController | null, stick: boolean,
+ *   convs: Conversation[], settings: ConversationSettings, tools: ToolInfo[]}} */
 export const state = { id: null, jumpTo: null, busy: false, abort: null, stick: true, convs: [], settings: { ...DEFAULT_SETTINGS }, tools: [] };
 
 // 20x20 stroke icons (see iconButton).
@@ -44,9 +50,12 @@ export async function api(path, opts = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-export const bodyOf = (el) => el.querySelector(".body");
-export const noteOf = (el) => el.querySelector(".note");
-export const actionsOf = (el) => el.querySelector(".actions");
+/** @type {(el: Element) => HTMLElement & {_blocks?: any}} */
+export const bodyOf = (el) => /** @type {any} */ (el.querySelector(".body"));
+/** @type {(el: Element) => HTMLElement} */
+export const noteOf = (el) => /** @type {HTMLElement} */ (el.querySelector(".note"));
+/** @type {(el: Element) => HTMLElement} */
+export const actionsOf = (el) => /** @type {HTMLElement} */ (el.querySelector(".actions"));
 
 export const textEl = (tag, text, className = "") => Object.assign(document.createElement(tag), { textContent: text, className, dir: "auto" });
 
@@ -69,4 +78,4 @@ export function showDialog(dlg) {
     dlg.showModal();
   });
 }
-document.querySelectorAll("dialog [data-cancel]").forEach((b) => (b.onclick = () => b.closest("dialog").close("cancel")));
+document.querySelectorAll("dialog [data-cancel]").forEach((/** @type {HTMLElement} */ b) => (b.onclick = () => b.closest("dialog")?.close("cancel")));

@@ -5,7 +5,7 @@ ChitChat: a ChatGPT-style web chat app on the OpenAI Responses API. Built in pha
 ## Commands
 ```
 uv run uvicorn app.main:create_app --factory --reload   # dev server on :8000
-uv run python scripts/check.py        # ruff + pyright + eslint + all tests, ~20s: run before committing (docs/development.md)
+uv run python scripts/check.py        # ruff + pyright + eslint + tsc + all tests, ~20s: run before committing (docs/development.md)
 uv run pytest                          # API + Playwright UI tests, no network, in parallel (-n 0 for one process)
 uv run pytest tests/ui                 # UI tests only (needs: uv run playwright install chromium)
 uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
@@ -22,6 +22,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - `app/backup.py`: export all (JSON, or a zip with the attachment files) / import (validated, all-or-nothing, never overwrites; files from a zip are re-checked from their bytes; `docs/backup.md`). A change to what a message's `meta` holds must update its whitelist there.
 - `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions. Messages are a tree (`parent_id`, `conversations.leaf_id`): `store.list_messages` is the path to the leaf, editing or regenerating adds a sibling, and nothing deletes single messages (`docs/branching.md`).
 - `app/static/`: vanilla JS UI as ES modules, no build step: `app.js` (entry) plus one module per part of the page, listed in `docs/architecture.md`. `tests/test_static_modules.py` checks that every import resolves, is used, and that there are no cycles. Libraries are vendored in `static/vendor/` (including the Open Props design tokens used by `style.css`: radii, shadows, type, easing); libraries are listed and checked in `scripts/vendor.toml` / `docs/vendor.md` (add one there, update with `scripts/vendor.py`); don't add CDN links, inline `<script>` or `onclick=` (a Content-Security-Policy in `main.py` blocks them; `docs/small-improvements.md`). Rendering rules (math, reasoning text, sanitizing) are in `docs/rendering.md`.
+- The UI is type-checked with `tsc` from JSDoc (`jsconfig.json`, `app/static/types.d.ts`, `docs/typescript-check.md`): a change to a response or SSE event is changed in `types.d.ts` too. There are no `.ts` files and no build step.
 - Accessibility: `tests/ui/test_a11y_ui.py` runs axe over every state and must stay at zero violations. New overlays/menus go inside `<main>`, anything that scrolls needs `tabindex="0"`, colors need 4.5:1 (`docs/accessibility.md`).
 - `tests/ui/`: Playwright tests against the real app with a `ScriptedLLM` (`tests/ui/conftest.py`).
 

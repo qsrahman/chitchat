@@ -27,8 +27,9 @@ export function jumpTo(id) {
   return true;
 }
 
+/** @param {string} role @param {string} [text] @param {MessageMeta} [meta] @returns {MessageEl} */
 export function addMessage(role, text = "", meta = {}) {
-  const el = document.createElement("div");
+  const el = /** @type {MessageEl} */ (document.createElement("div"));
   el.className = `msg ${role}`;
   for (const cls of ["body", "note", "actions"]) el.append(Object.assign(document.createElement("div"), { className: cls }));
   if (role !== "assistant") bodyOf(el).dir = "auto"; // plain text; a reply's blocks get theirs when rendered (markdown.js)

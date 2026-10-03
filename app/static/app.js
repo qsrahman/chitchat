@@ -56,7 +56,7 @@ async function openConversation(id) {
   focusComposer();
 }
 
-bus.addEventListener("open", (e) => openConversation(e.detail));
+bus.addEventListener("open", (e) => openConversation(/** @type {CustomEvent} */ (e).detail));
 $("new-chat").onclick = () => openConversation(null);
 window.addEventListener("hashchange", () => {
   const id = location.hash.slice(1) || null;

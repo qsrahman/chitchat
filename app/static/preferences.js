@@ -55,6 +55,7 @@ theme.onchange = () => {
 
 // ---- General: shortcuts ----
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+/** @type {[string, string[]][]} */
 const SHORTCUTS = [
   ["Search chats", [`${mod}K`]],
   ["New chat", [`${mod}Shift+O`]],
@@ -108,6 +109,7 @@ instructions.addEventListener("input", () => {
 
 // ---- Server: what it is set up with (read only) ----
 const tokens = (n) => `${n.toLocaleString()} tokens`;
+/** @param {ServerConfig} config */
 function rows(config) {
   const context = config.compaction
     ? `OpenAI compacts the conversation once it passes ${tokens(config.compact_threshold)}`

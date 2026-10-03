@@ -7,7 +7,7 @@ import { closeNavIfOverlay } from "./nav.js";
 const DAY = 864e5;
 function groupOf(iso) {
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const days = Math.round((startOfDay(new Date()) - startOfDay(new Date(iso))) / DAY);
+  const days = Math.round((startOfDay(new Date()).getTime() - startOfDay(new Date(iso)).getTime()) / DAY);
   return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days <= 7 ? "Previous 7 days" : "Older";
 }
 

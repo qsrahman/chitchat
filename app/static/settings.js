@@ -36,6 +36,7 @@ function bindSave(dlg, save) {
 
 // ---- the model list ----
 // From GET /api/models; the picker, the settings dialog and the thinking select all read it.
+/** @type {ModelInfo} */
 export let modelInfo = { default: null, models: [] };
 
 export const currentModel = () => state.settings.model ?? modelInfo.default;
@@ -45,6 +46,7 @@ export async function refreshModels() {
   bus.dispatchEvent(new Event("models"));
 }
 
+/** @type {Map<string, boolean | undefined>} */
 let reasoningModels = new Map(); // model id -> takes reasoning effort (otherwise temperature)
 function syncSettingsFields() {
   const reasoning = reasoningModels.get($("set-model").value); // "" = the default model
@@ -61,7 +63,7 @@ function fillModelChoices(model, effort) {
   // below ask for the default by id rather than trusting the order /api/models happens to use.
   reasoningModels = new Map([
     ["", models.find((m) => m.id === fallback)?.reasoning],
-    ...models.map((m) => [m.id, m.reasoning]),
+    ...models.map((m) => /** @type {[string, boolean | undefined]} */ ([m.id, m.reasoning])),
   ]);
   const options = models.filter((m) => m.id !== fallback).map((m) => new Option(m.id, m.id));
   if (model && !reasoningModels.has(model)) options.push(new Option(model, model)); // no longer listed

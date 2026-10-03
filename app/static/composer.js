@@ -83,6 +83,7 @@ const bytes = (n) => {
 // them all on every status change would drop keyboard focus and re-create the preview images. They are only
 // ever appended and removed, so the DOM order already matches `pending`.
 function buildChip(p) {
+  /** @type {HTMLDivElement & {_note?: HTMLElement}} */
   const chip = Object.assign(document.createElement("div"), { className: "chip" });
   if (p.preview) {
     chip.classList.add("chip-image");
@@ -193,7 +194,7 @@ document.addEventListener("drop", (e) => {
   e.preventDefault();
   dragDepth = 0;
   $("drop").hidden = true;
-  addFiles([...e.dataTransfer.files]);
+  addFiles([...(e.dataTransfer?.files ?? [])]);
 });
 
 let noteTimer;

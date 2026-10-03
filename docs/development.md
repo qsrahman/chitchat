@@ -4,7 +4,7 @@
 ```
 uv run python scripts/check.py
 ```
-Runs, and stops at the first failure: `ruff` (Python lint), `pyright` (types, `app/` only, config in `pyproject.toml`), `eslint` (the JavaScript in `app/static`, when Node is installed), and the whole test suite. About 30 seconds. The JavaScript lint is there because a missing import in the UI only shows when that line runs, and nothing else would find it (config: `eslint.config.mjs`; `tests/test_static_modules.py` checks import names without Node).
+Runs, and stops at the first failure: `ruff` (Python lint), `pyright` (types, `app/` only, config in `pyproject.toml`), `eslint` (the JavaScript in `app/static`, when Node is installed), `tsc` (the same files, type-checked from their JSDoc; `docs/typescript-check.md`), and the whole test suite. About 30 seconds. The JavaScript lint is there because a missing import in the UI only shows when that line runs, and nothing else would find it (config: `eslint.config.mjs`; `tests/test_static_modules.py` checks import names without Node).
 
 To run it before every commit, once per clone:
 ```
