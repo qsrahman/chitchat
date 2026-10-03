@@ -29,7 +29,7 @@ Not covered: pages that need JavaScript to show their content (you get what the 
 `tests/test_tools_local.py` (about 130 cases: the calculator's accepted and refused expressions and limits; chat search; fetch_url's address checks for 20+ non-public addresses, redirects into private places, ports, schemes, content types, size and time limits, pinning, malformed HTML), `tests/test_tool_calls.py` (listing, per-conversation switching, guidance), `tests/ui/test_tools_ui.py` (the menu and how each call reads). Live (`-m live`): the real model using the calculator, and a real fetch of `example.com` through the pinned connection.
 
 ## Future tools (noted, not built)
-Roughly in order of value. Each is a function in `tools.py` plus a `TOOL_UI` entry, except where it says otherwise.
+Roughly in order of value. Each is a function in `tools.py` plus a `TOOL_UI` entry in `static/tools-ui.js`, except where it says otherwise.
 - **`get_time`**: current date and time in any timezone (`zoneinfo`). The default prompt already gives the date, so this adds timezones and the time of day.
 - **`lookup_wikipedia` / `search_arxiv`**: short citable reference lookups from free APIs without keys.
 - **`weather`**: a forecast for a place (Open-Meteo needs no key); a good template for a small read-only API tool.

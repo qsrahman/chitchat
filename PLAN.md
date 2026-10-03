@@ -19,7 +19,7 @@ app/
   tools.py     tools the model can call (web_search via Brave): schema + async function + UI display
   llm.py       the ONLY module importing openai; emits normalized events
   routes.py    /api/* + SSE
-  static/      index.html, app.js, markdown.js, style.css, vendor/ (marked, DOMPurify, highlight.js)
+  static/      index.html, app.js + one JS module per part of the page (see docs/architecture.md), markdown.js, style.css, vendor/
 tests/         pytest + httpx ASGI client + FakeLLM
 docs/          architecture.md, phase-N.md
 ```

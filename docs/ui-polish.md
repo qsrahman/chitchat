@@ -16,7 +16,7 @@ Reading-first. Replies have no bubbles, so long answers read like a document (th
 - **Keys:** Enter sends, Shift+Enter adds a line, Esc stops a reply.
 - **Accessibility:** `role="log"`, `aria-busy` while streaming (no per-token announcements), labelled icon buttons, visible focus, reduced-motion respected.
 - **Offline:** `marked`, `DOMPurify` and `highlight.js` are vendored in `app/static/vendor/` (no CDN). Source versions: marked 16.4.2, DOMPurify 3.4.16, highlight.js 11.11.1.
-- **Code layout:** `static/markdown.js` (render + sanitize + code blocks) and `static/app.js` (everything else), loaded as ES modules without a build step.
+- **Code layout:** `static/markdown.js` (render + sanitize + code blocks) and the app itself, loaded as ES modules without a build step (it was one `app.js`; now split, see `docs/architecture.md`).
 
 ## Tests
 `tests/ui/` drives the real app in Chromium with Playwright (`pytest-playwright`). `tests/ui/conftest.py` serves the app with uvicorn on a free port and a `ScriptedLLM` whose reply depends on a keyword in the prompt (`slow`, `long`, `code`, `xss`, `fail`, `cutoff`). Any JS or console error fails the test.
@@ -47,7 +47,7 @@ The header shows the model the conversation uses ("gemma4:cloud ⌄") and opens 
 - **Behavior:** choosing a model saves it to the conversation's settings and applies from the next message. On the new-chat screen it is held until the first message creates the chat. Choosing the default row stores `null`, so the chat keeps following the default. Each conversation keeps its own model; a new chat starts on the default.
 - **Menu:** the configured default first (tagged "default"), then what the endpoint lists (reasoning models tagged "reasoning"), then "Chat settings…". A saved model that is no longer listed is still shown, checked and tagged "not listed". The list is fetched when the page loads and again each time the menu opens.
 - **Failures:** a failed save shows "Couldn't switch model…" in the menu and keeps the old model. If `/api/models` can't be reached the button reads "Model" until the menu is opened and the list loads.
-- **Implementation:** the Popover API (`popover` + `popovertarget`, light dismiss, Escape, focus returns to the button) and a real `role="menu"` with the keyboard contract (arrows, Home, End, Tab leaves). The menu is placed under the button from `app.js`, because CSS anchor positioning is not widely available yet. It is kept inside the viewport on phones.
+- **Implementation:** the Popover API (`popover` + `popovertarget`, light dismiss, Escape, focus returns to the button) and a real `role="menu"` with the keyboard contract (arrows, Home, End, Tab leaves). The menu is placed under the button from `model-menu.js`, because CSS anchor positioning is not widely available yet. It is kept inside the viewport on phones.
 - **Header:** the conversation title now sits after the model button in a quieter weight, and is hidden on the new-chat screen. A long model name is truncated so the settings button stays on screen.
 - The settings button's dot now means "something other than the model is customized", since the model has its own button. The settings dialog and the picker share one model list and stay in sync.
 
