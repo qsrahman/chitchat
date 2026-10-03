@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.sse import EventSourceResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app import attachments, db, store
+from app import attachments, context, db, store
 from app.llm import REASONING_EFFORTS, supports_reasoning
 from app.store import ConversationSettings, Instructions
 
@@ -226,7 +226,7 @@ def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]
     # The latest compaction stands for the turns before it (see docs/phase-8.md); the messages stay in the
     # database and the UI, but they are no longer sent. `after_reply`: it also covers the message it is saved on.
     for i, m in reversed(list(enumerate(messages))):
-        if c := m["meta"].get("compaction"):
+        if (c := m["meta"].get("compaction")) and settings.compaction_enabled:
             head, messages = [{"compaction": c["item"]}], messages[i + 1 if c["after_reply"] else i :]
             break
     history = head
@@ -273,15 +273,19 @@ class Turn:
     history: list[dict]  # ends with the user message being answered
     model: str
     options: dict
+    trimmed: int = 0  # how many older messages were left out to fit the model's context, see context.py
 
 
 def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], model: str | None = None):
     settings = request.app.state.settings
     model = model or conv["settings"]["model"] or settings.openai_model
-    return Turn(
-        conn, request.app.state.llm, settings.title_model_name, conv, history, model,
-        _model_options(request, conn, conv, model),
-    )
+    options = _model_options(request, conn, conv, model)
+    trimmed = 0
+    if settings.history_tokens:  # room for the instructions and the reply, then as much history as fits
+        instructions = context.estimate({"content": options.get("instructions")})
+        reserve = instructions + (settings.openai_max_output_tokens or 2_000)
+        history, trimmed = context.fit(history, settings.history_tokens - reserve)
+    return Turn(conn, request.app.state.llm, settings.title_model_name, conv, history, model, options, trimmed)
 
 
 def _redo_last_user_turn(
@@ -343,6 +347,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     needs_title = turn.conv["title"] == store.DEFAULT_TITLE
     reply, reasoning, tool_calls, compaction, finished = [], [], {}, None, False
     try:
+        if turn.trimmed:
+            yield {"type": "context_trimmed", "count": turn.trimmed}
         async for event in turn.llm.stream_reply(turn.model, turn.history, **turn.options):
             if event["type"] == "delta":
                 reply.append(event["text"])
@@ -360,6 +366,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
                     meta["reasoning"] = "".join(reasoning)
                 if tool_calls:
                     meta["tools"] = _tool_meta(tool_calls)
+                if turn.trimmed:
+                    meta["trimmed"] = turn.trimmed
                 if compaction:
                     meta["compaction"] = {"item": compaction["item"], "after_reply": compaction["after_reply"]}
                 store.add_message(conn, cid, "assistant", text, meta)
@@ -378,6 +386,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     finally:
         if not finished and reply:
             meta = {"stopped": True, **({"reasoning": "".join(reasoning)} if reasoning else {})}
+            if turn.trimmed:
+                meta["trimmed"] = turn.trimmed
             if tool_calls:
                 meta["tools"] = _tool_meta(tool_calls, interrupted="stopped")
             store.add_message(conn, cid, "assistant", "".join(reply), meta)

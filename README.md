@@ -13,7 +13,7 @@ A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platfor
 - Composer controls: web search on/off (globe) and thinking effort (for reasoning models; "None" turns thinking off)
 - Web search (Brave) the model can use while answering, shown with its results; a small tool registry for more
 - Tools menu (per chat): a calculator for exact arithmetic, search over your past chats, and a page reader for links (public sites only). See `docs/tools.md`
-- Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`)
+- Long chats keep working: past a token threshold OpenAI compacts the older turns server-side (`COMPACT_THRESHOLD`); on a local model the oldest turns are left out of the request instead (`CONTEXT_TOKENS`), with a note
 - Full-text search across all conversations (sidebar), and export of a chat as Markdown or JSON (chat settings)
 
 ## Requirements
@@ -41,7 +41,8 @@ Environment variables or `.env`:
 | `ATTACHMENTS_DIR` | `attachments` | Where uploaded files are stored |
 | `TITLE_MODEL` | small OpenAI model, or `OPENAI_MODEL` on a custom endpoint | Model that writes chat titles |
 | `DEFAULT_SYSTEM_PROMPT` | built-in (date, display format) | Prompt sent before custom instructions; empty sends none; `{date}` is today. See `docs/default-prompt.md` |
-| `COMPACT_THRESHOLD` | `150000` | Tokens after which OpenAI compacts the older turns of a conversation; `0` turns it off |
+| `COMPACT_THRESHOLD` | `150000` | Tokens after which OpenAI compacts the older turns of a conversation (OpenAI only); `0` turns it off |
+| `CONTEXT_TOKENS` | `32000` on a custom endpoint, none on OpenAI | Most history to send without compaction; older messages are left out (not deleted) and a note says so. `0` = no limit. See `docs/context-window.md` |
 | `BRAVE_API_KEY` | none | Enables web search (Brave Search API). Without it the globe button in the composer is disabled |
 | `MAX_TOOL_CALLS` | `4` | Most tool calls (searches) in one reply |
 | `DB_PATH` | `chitchat.db` | SQLite file |

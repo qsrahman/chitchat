@@ -66,6 +66,7 @@ export function setNote(el, meta) {
     meta.stopped && "Stopped.",
     meta.incomplete && "Reply cut off: output limit reached.",
     meta.compaction && "Earlier messages were compacted to save context.",
+    meta.trimmed && `${meta.trimmed} earlier message${meta.trimmed === 1 ? " was" : "s were"} left out to fit the model's context.`,
   ].filter(Boolean).join(" ");
   note.hidden = !note.textContent;
 }

@@ -542,6 +542,14 @@ async def test_compaction_is_requested_when_a_threshold_is_set():
     assert requests[0]["store"] is False
 
 
+async def test_compaction_is_not_requested_from_a_custom_endpoint():
+    requests = []
+    llm = make_llm(streaming(delta("a"), completed(), requests=requests), compact_threshold=1000,
+                   openai_base_url="http://localhost:11434/v1")
+    await collect(llm)
+    assert "context_management" not in requests[0]  # it is OpenAI's feature; a local server can't act on it
+
+
 async def test_compaction_is_not_requested_when_the_threshold_is_zero():
     requests = []
     await collect(make_llm(streaming(delta("a"), completed(), requests=requests), compact_threshold=0))

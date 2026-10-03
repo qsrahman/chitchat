@@ -227,7 +227,7 @@ class OpenAILLM:
             extra["tools"] = [_tool_spec(t) for t in tools.values()]
             if supports_reasoning(model):  # calls are stateless, so reasoning items travel back to the model
                 extra["include"] = ["reasoning.encrypted_content"]
-        if self.settings.compact_threshold:
+        if self.settings.compaction_enabled:
             extra["context_management"] = [{"type": "compaction", "compact_threshold": self.settings.compact_threshold}]
         try:
             items = await asyncio.to_thread(_inputs, messages)  # reads attachment files

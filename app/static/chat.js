@@ -127,6 +127,7 @@ async function runTurn(path, payload = {}) {
   let reply = "";
   let finished = false;
   let compaction = false;
+  let trimmed = 0;
   try {
     if (!state.id) {
       state.id = (await api("/conversations", { method: "POST", body: JSON.stringify({ settings: state.settings }) })).id;
@@ -155,12 +156,13 @@ async function runTurn(path, payload = {}) {
         renderToolCall(el, ev);
         render(el);
       } else if (ev.type === "compaction") compaction = true;
-      else if (ev.type === "done") { finished = true; setNote(el, { ...ev, compaction }); }
+      else if (ev.type === "context_trimmed") trimmed = ev.count;
+      else if (ev.type === "done") { finished = true; setNote(el, { ...ev, compaction, trimmed }); }
       else if (ev.type === "error") throw new Error(ev.message);
     }
     if (!finished) throw new Error("The connection closed before the reply finished.");
   } catch (err) {
-    if (err.name === "AbortError") setNote(el, { stopped: true });
+    if (err.name === "AbortError") setNote(el, { stopped: true, trimmed });
     else {
       el.className = "msg error";
       el.querySelector(".reasoning")?.remove();

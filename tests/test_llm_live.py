@@ -74,7 +74,7 @@ async def test_live_brave_search():
 async def test_live_compaction_round_trip():
     """A tiny threshold forces compaction; the compaction item then stands in for the earlier turns and the
     model still knows what they said."""
-    s = Settings(compact_threshold=1000)
+    s = Settings(compact_threshold=1000, openai_base_url=None)  # compaction is OpenAI's, whatever .env points at
     llm = OpenAILLM(s)
     facts = " ".join(f"Fact {i}: the code word for item {i} is zeta{i * 7}." for i in range(150))
     history = [
