@@ -97,6 +97,24 @@ class ScriptedLLM:
                 yield {"type": "delta", "text": "It is **3.14**, per [python.org](https://www.python.org/)."}
             yield {"type": "done"}
             return
+        elif "richreply" in text:  # one of everything the markdown renderer produces
+            yield {"type": "delta", "text": (
+                "# A heading\n\nA paragraph with **bold**, *italic*, `inline code` and a [link](https://example.com).\n\n"
+                "## Second level\n\n- first item\n- second item\n\n1. one\n2. two\n\n"
+                "> A quote that is muted\n\n| Name | Value |\n|---|---|\n| alpha | 1 |\n| beta | 2 |\n\n"
+                "```python\n# every kind of token\ndef greet(name: str, times=3):\n    for i in range(times):\n"
+                "        print(\"hello \" + name, 42, i)\n    return None\n```\n\n"
+                "Math: \\(x^2 + y^2 = z^2\\)\n\n"
+                "$$\n\\int_0^1 x\\,dx = \\tfrac12\n$$")}
+        elif "widereply" in text:  # long reasoning, and code, a table and a formula wider than the column
+            for i in range(30):
+                yield {"type": "reasoning_delta", "text": f"Thinking step {i} of a long chain of thought.\n\n"}
+            columns = " | ".join(f"col{c}" for c in range(40))  # cells wrap anywhere, so only many columns overflow
+            cells = " | ".join(f"v{c}" for c in range(40))
+            yield {"type": "delta", "text": (
+                "```python\n" + "result = " + " + ".join(f"value_{i}" for i in range(40)) + "\n```\n\n"
+                f"| {columns} |\n|{'---|' * 40}\n| {cells} |\n\n"
+                "$$" + " + ".join(f"x_{{{i}}}^{{2}}" for i in range(40)) + "$$")}
         elif "urdu" in text:  # an Arabic-script paragraph, an English one, a list and code, in one reply
             yield {"type": "delta", "text": "السلام عليكم، هذه فقرة عربية.\n\nThis paragraph is English.\n\n"
                    "- بند أول\n- بند ثان\n\n```python\nprint('hi')\n```\n\n> اقتباس"}

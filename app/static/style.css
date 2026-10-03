@@ -127,7 +127,7 @@ main:not(.is-started) #title { visibility: hidden; }
 #messages { overflow-y: auto; scroll-behavior: auto; overscroll-behavior: contain; }
 #thread, #empty { width: min(var(--col), 100% - 32px); margin-inline: auto; }
 #thread { padding: 28px 0 24px; }
-#empty h2 { margin: 0; font: var(--font-weight-4) var(--font-size-4)/var(--font-lineheight-2) var(--sans); letter-spacing: -.01em; text-align: center; text-wrap: balance; }
+#empty h1 { margin: 0; font: var(--font-weight-4) var(--font-size-4)/var(--font-lineheight-2) var(--sans); letter-spacing: -.01em; text-align: center; text-wrap: balance; }
 main.is-started #empty { display: none; }
 
 /* A new chat is a hero: heading, composer and suggestions as one group in the middle of the page. The
@@ -198,7 +198,7 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 .code pre { margin: 0; padding: 12px 14px; overflow-x: auto; }
 .code code { font: .875rem/1.55 var(--mono); background: none; }
 .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in { color: light-dark(#8f3fbf, #c9a2ff); }
-.hljs-string, .hljs-regexp, .hljs-addition { color: light-dark(#1a7f4b, #7fd8a6); }
+.hljs-string, .hljs-regexp, .hljs-addition { color: light-dark(#177043, #7fd8a6); } /* 5.4:1 on the code background; the old #1a7f4b was 4.46 */
 .hljs-number, .hljs-attr, .hljs-attribute, .hljs-symbol { color: light-dark(#a15c00, #f0b866); }
 .hljs-title, .hljs-section, .hljs-function .hljs-title { color: light-dark(#2457d6, #8db4ff); }
 .hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }

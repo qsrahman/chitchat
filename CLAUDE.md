@@ -20,6 +20,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - Context: OpenAI compacts (`docs/phase-8.md`); on a custom `OPENAI_BASE_URL` the oldest turns are left out of the request past `CONTEXT_TOKENS` (`app/context.py`, `docs/context-window.md`). Compaction items are only ever sent to OpenAI.
 - `app/db.py`: SQLite connection and migrations (append to `MIGRATIONS`). `app/store.py`: plain CRUD functions.
 - `app/static/`: vanilla JS UI as ES modules, no build step: `app.js` (entry) plus one module per part of the page, listed in `docs/architecture.md`. `tests/test_static_modules.py` checks that every import resolves, is used, and that there are no cycles. Libraries are vendored in `static/vendor/` (including the Open Props design tokens used by `style.css`: radii, shadows, type, easing); libraries are listed and checked in `scripts/vendor.toml` / `docs/vendor.md` (add one there, update with `scripts/vendor.py`); don't add CDN links, inline `<script>` or `onclick=` (a Content-Security-Policy in `main.py` blocks them; `docs/small-improvements.md`). Rendering rules (math, reasoning text, sanitizing) are in `docs/rendering.md`.
+- Accessibility: `tests/ui/test_a11y_ui.py` runs axe over every state and must stay at zero violations. New overlays/menus go inside `<main>`, anything that scrolls needs `tabindex="0"`, colors need 4.5:1 (`docs/accessibility.md`).
 - `tests/ui/`: Playwright tests against the real app with a `ScriptedLLM` (`tests/ui/conftest.py`).
 
 ## Conventions

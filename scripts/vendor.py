@@ -18,8 +18,9 @@ from urllib.parse import quote
 
 import httpx
 
+ROOT = Path(__file__).parent.parent
 MANIFEST = Path(__file__).with_name("vendor.toml")
-VENDOR = Path(__file__).parent.parent / "app" / "static" / "vendor"
+VENDOR = ROOT / "app" / "static" / "vendor"  # where files go unless an entry names another `root`
 REGISTRY = "https://registry.npmjs.org"
 IGNORED = {".DS_Store"}
 
@@ -71,14 +72,21 @@ def expected(entry: dict, files: dict[str, bytes]) -> dict[str, bytes]:
     return out
 
 
+def _root(entry: dict, vendor: Path) -> Path:
+    """Where an entry's files live: `vendor`, or its own `root` (relative to the repository) for test-only assets."""
+    return ROOT / entry["root"] if "root" in entry else vendor
+
+
 def check(manifest: dict, http: httpx.Client, vendor: Path = VENDOR, out=print) -> int:
     """Print a line per library. Returns 1 if a file differs from the official one, is missing, or isn't in the
     manifest (that needs a look), 0 otherwise; a newer release is only information."""
     bad, known = 0, set()
     for name, entry in manifest.items():
         want = expected(entry, package_files(http, entry["package"], entry["version"]))
-        known |= set(want)
-        differs = [t for t, data in want.items() if not (vendor / t).is_file() or (vendor / t).read_bytes() != data]
+        root = _root(entry, vendor)
+        if root == vendor:
+            known |= set(want)
+        differs = [t for t, data in want.items() if not (root / t).is_file() or (root / t).read_bytes() != data]
         latest = latest_version(http, entry["package"])
         files = f"{len(want)} files match the official package" if not differs else f"CHANGED: {', '.join(differs)}"
         news = "up to date" if latest == entry["version"] else f"newer release: {latest}"
@@ -100,9 +108,10 @@ def update(manifest_path: Path, name: str, version: str | None, http: httpx.Clie
     version = version or latest_version(http, entry["package"])
     old = expected(entry, package_files(http, entry["package"], entry["version"]))
     new = expected(entry, package_files(http, entry["package"], version))
+    root = _root(entry, vendor)
     for target, data in new.items():
-        path = (vendor / target).resolve()
-        if not path.is_relative_to(vendor.resolve()):
+        path = (root / target).resolve()
+        if not path.is_relative_to(root.resolve()):
             raise SystemExit(f"refusing to write outside the vendor directory: {target}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)

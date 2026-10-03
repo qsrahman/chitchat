@@ -91,7 +91,7 @@ export function reasoningOf(el) {
   if (!details) {
     details = document.createElement("details");
     details.className = "reasoning";
-    details.innerHTML = '<summary>Reasoning</summary><div class="reasoning-body"></div>';
+    details.innerHTML = '<summary>Reasoning</summary><div class="reasoning-body" tabindex="0"></div>'; // scrolls when long
     el.prepend(details);
   }
   return details;

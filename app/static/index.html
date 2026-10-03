@@ -51,7 +51,7 @@
 
   <div id="messages" role="log" aria-label="Messages" tabindex="-1">
     <div id="empty">
-      <h2>What are you working on?</h2>
+      <h1>What are you working on?</h1>
     </div>
     <div id="thread"></div>
   </div>
@@ -85,28 +85,28 @@
     <p id="composer-note" class="composer-note" role="alert" hidden></p>
     <input id="file-input" type="file" multiple hidden>
   </form>
+
+  <div id="drop" hidden>
+    <p>Drop files to attach them</p>
+  </div>
+
+  <div id="model-menu" popover role="menu" aria-label="Choose a model">
+    <p class="menu-head" aria-hidden="true">Model</p>
+    <div id="model-list"></div>
+    <p class="menu-note">Applies from your next message.</p>
+    <p class="field-error" role="alert" hidden></p>
+    <button id="more-settings" type="button" role="menuitem" class="menu-item">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
+      <span class="menu-name">Chat settings…</span>
+    </button>
+  </div>
+
+  <div id="tools-menu" popover aria-label="Tools">
+    <p class="menu-head" aria-hidden="true">Tools</p>
+    <div id="tools-list"></div>
+    <p class="menu-note">Switched on per chat; applies from your next message.</p>
+  </div>
 </main>
-
-<div id="drop" hidden>
-  <p>Drop files to attach them</p>
-</div>
-
-<div id="model-menu" popover role="menu" aria-label="Choose a model">
-  <p class="menu-head" aria-hidden="true">Model</p>
-  <div id="model-list"></div>
-  <p class="menu-note">Applies from your next message.</p>
-  <p class="field-error" role="alert" hidden></p>
-  <button id="more-settings" type="button" role="menuitem" class="menu-item">
-    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
-    <span class="menu-name">Chat settings…</span>
-  </button>
-</div>
-
-<div id="tools-menu" popover aria-label="Tools">
-  <p class="menu-head" aria-hidden="true">Tools</p>
-  <div id="tools-list"></div>
-  <p class="menu-note">Switched on per chat; applies from your next message.</p>
-</div>
 
 <dialog id="rename-dialog" closedby="any" aria-labelledby="rename-heading">
   <form method="dialog">

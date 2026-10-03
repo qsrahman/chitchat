@@ -9,6 +9,7 @@ The third-party code the page runs is copied into `app/static/vendor/`: no CDN (
 | [highlight.js](https://highlightjs.org) | 11.11.1 | Syntax highlighting (the "common languages" build) | `@highlightjs/cdn-assets`: `highlight.min.js` |
 | [KaTeX](https://katex.org) | 0.19.0 | Math | `dist/katex.min.js`, `dist/katex.min.css`, `dist/fonts/*.woff2` |
 | [Open Props](https://open-props.style) | 1.7.23 | Design tokens (CSS variables) | six files from the package root, see the manifest |
+| [axe-core](https://github.com/dequelabs/axe-core) | 4.13.0 | **Tests only**: the accessibility checker (`docs/accessibility.md`), kept in `tests/ui/assets/`, never served | `axe.min.js`, `LICENSE` |
 
 All of these were verified byte for byte against the official npm packages, with **one deliberate edit**: KaTeX's stylesheet lists woff2, woff and ttf for every font, and the woff and ttf fallbacks were removed (and not shipped), since every current browser takes woff2. The edit is a named transform in `vendor.py`, so `check` and `update` reproduce it exactly.
 

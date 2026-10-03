@@ -48,3 +48,14 @@ purpose = "Design tokens (CSS variables): sizes, shadows, easings, type, layers"
 "open-props/fonts.min.css" = "fonts.min.css"
 "open-props/zindex.min.css" = "zindex.min.css"
 "open-props/LICENSE" = "LICENSE"
+
+# Not shipped to browsers: the accessibility checker the UI tests inject (tests/ui/test_a11y_ui.py).
+[axe-core]
+package = "axe-core"
+version = "4.13.0"
+purpose = "Accessibility checker used by the UI tests only"
+root = "tests/ui/assets"
+[axe-core.files]
+"axe.min.js" = "axe.min.js"
+"LICENSE" = "LICENSE"
+

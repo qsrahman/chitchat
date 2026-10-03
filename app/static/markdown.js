@@ -23,7 +23,7 @@ const math = {
         const m = /^(?:\\\[([\s\S]+?)\\\]|\$\$([\s\S]+?)\$\$)[ \t]*(?:\n|$)/.exec(src);
         if (m) return { type: "blockMath", raw: m[0], tex: (m[1] ?? m[2]).trim() };
       },
-      renderer: (token) => `<div class="math-block">${renderMath(token.tex, true)}</div>`,
+      renderer: (token) => `<div class="math-block" tabindex="0">${renderMath(token.tex, true)}</div>`, // tabindex: see TEXT_BLOCKS
     },
     {
       name: "inlineMath",
@@ -47,7 +47,7 @@ marked.use({
       const html = known ? hljs.highlight(text, { language: name }).value : escapeHtml(text);
       return `<div class="code" dir="ltr"><div class="code-bar"><span>${escapeHtml(name || "text")}</span>` +
         `<button type="button" class="code-copy">Copy</button></div>` +
-        `<pre><code class="hljs">${html}</code></pre></div>`;
+        `<pre tabindex="0"><code class="hljs">${html}</code></pre></div>`;
     },
   },
 }, math);
@@ -76,6 +76,9 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
     node.setAttribute("rel", "noopener noreferrer");
   }
   if (node.matches?.(TEXT_BLOCKS) && !node.parentElement?.closest(TEXT_BLOCKS)) node.setAttribute("dir", "auto");
+  // A table, a code block or a formula wider than the column scrolls sideways. A keyboard can only scroll a
+  // region it can focus, so those are focusable (set where they are made: the code and math renderers above).
+  if (node.tagName === "TABLE") node.setAttribute("tabindex", "0");
 });
 
 // No <img>: a remote image URL in model output would make the page send requests (and whatever the

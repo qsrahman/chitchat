@@ -213,6 +213,7 @@ BANNERS = {  # how a library's own file says which version it is
     "highlightjs": ("highlight.min.js", r"Highlight\.js v([\d.]+)"),
     "katex": ("katex/katex.min.js", r'version:"([\d.]+)"'),
 }
+TEST_ASSETS = ROOT / "tests" / "ui" / "assets"
 
 
 @pytest.mark.parametrize("name", BANNERS)
@@ -222,9 +223,14 @@ def test_the_version_in_the_manifest_is_the_version_the_file_declares(name):
     assert found and found[1] == MANIFEST[name]["version"], f"{file} says {found and found[1]}"
 
 
+def test_the_test_only_accessibility_checker_declares_its_manifest_version():
+    found = re.search(r"axe v([\d.]+)", (TEST_ASSETS / "axe.min.js").read_text()[:400])
+    assert found and found[1] == MANIFEST["axe-core"]["version"]
+
+
 def test_every_manifest_file_exists_and_every_vendored_file_is_in_the_manifest():
     listed = set()
-    for entry in MANIFEST.values():
+    for entry in (e for e in MANIFEST.values() if "root" not in e):  # test-only assets have a root of their own
         for target in entry["files"]:
             if target.endswith("/"):
                 listed |= {p.relative_to(VENDOR).as_posix() for p in (VENDOR / target).glob("*.woff2")}
@@ -233,6 +239,14 @@ def test_every_manifest_file_exists_and_every_vendored_file_is_in_the_manifest()
                 listed.add(target)
     on_disk = {p.relative_to(VENDOR).as_posix() for p in VENDOR.rglob("*") if p.is_file() and p.name != ".DS_Store"}
     assert on_disk == listed
+
+
+def test_test_only_assets_are_never_served_to_browsers():
+    for name, entry in MANIFEST.items():
+        if "root" in entry:
+            assert entry["root"].startswith("tests/"), name
+            assert not (ROOT / "app" / "static" / Path(entry["root"]).name).exists()
+    assert "axe" not in (ROOT / "app" / "static" / "index.html").read_text()
 
 
 def test_every_library_has_a_purpose_and_a_pinned_version():
