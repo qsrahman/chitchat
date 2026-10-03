@@ -35,3 +35,16 @@ One file of 296 lines held the chat list, search, delete with undo, pin and arch
 | `backup.js` | 42 | the backup dialog and the import status |
 
 No behavior changed; the moved code is the same text. (The old file is gone.) Two seams needed a decision, because `delete.js` needs the list and the list's rows have a Delete button: the row button dispatches a `delete-chat` event on the shared `bus` (as `open` already works) and `delete.js` listens, so `list.js` never imports it; and the list hides the chat being deleted through `hideChat(id)`, which `delete.js` calls, instead of reading the delete's private `pending` state. The module-graph test (no cycles, every import used, everything reachable from `app.js`) and ESLint pass, and so does the whole browser suite; the docs-path test caught the stale names of the old file in `docs/architecture.md` and `docs/polish-2.md`, which are updated.
+
+## 3. A command to restore a database copy
+The recovery steps for the copies made before an upgrade (`docs/round-6.md`) were a paragraph of "stop the server, move three files, rename one". `scripts/restore_db.py` does it:
+```
+uv run python scripts/restore_db.py                      # lists the copies next to the database, with what is in each
+uv run python scripts/restore_db.py chitchat.db.bak-v6   # restores that one, after asking
+```
+It reads `DB_PATH` from `.env` (or `--db`), and shows for the database and the copy the schema version, the number of chats and messages and the size, read without changing anything. Stop the server first (it does not try to detect one). Restoring:
+- **never deletes**: the database as it is now, with its `-wal` and `-shm` files, is moved to `<db>.before-restore-<date-time>`;
+- **checks the copy first** (`PRAGMA integrity_check`, and that it has the tables): a file that is not a database, an empty file, a damaged one, or the database itself is refused with nothing changed;
+- copies the backup into place with SQLite's backup, so the result is one clean file;
+- leaves the copy where it was. The restored database is at its old schema version, and the app upgrades it again on the next start (making a fresh copy first).
+`--yes` skips the question. Tried against your real database folder in listing mode only (it showed `chitchat.db` at version 7 and `chitchat.db.bak-v6` at version 6, with the same 2 chats and 22 messages): I did not restore anything of yours. Tests (`tests/test_restore_db.py`) cover the listing, restoring and keeping the old database (including what only its write-ahead log held), the app upgrading the restored copy again, refusing bad, empty, damaged and self copies, and the prompt.
