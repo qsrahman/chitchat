@@ -1,6 +1,6 @@
 # More tools: calculator, search_chats, fetch_url
 
-Three tools were added to the registry from phase 7 (`app/tools.py`). They need no API key. Like web search they are off by default and switched on per conversation: web search keeps its globe in the composer, and the others are in the **Tools** menu (wrench icon, left of the text box), a checkbox each with a one-line hint. `GET /api/tools` lists every usable tool as `{name, label, hint}`. The loop, the per-reply call cap (`MAX_TOOL_CALLS`), the guidance added to the instructions while a tool is on, and the UI line per call all work as described in `docs/phase-7.md`.
+Three tools were added to the registry from phase 7 (`app/tools/`). They need no API key. Like web search they are off by default and switched on per conversation: web search keeps its globe in the composer, and the others are in the **Tools** menu (wrench icon, left of the text box), a checkbox each with a one-line hint. `GET /api/tools` lists every usable tool as `{name, label, hint}`. The loop, the per-reply call cap (`MAX_TOOL_CALLS`), the guidance added to the instructions while a tool is on, and the UI line per call all work as described in `docs/phase-7.md`.
 
 ## calculator
 Exact arithmetic: models are unreliable at long multiplication, percentages and compound interest, and the answer shows in the reply as `17 * 23 = 391`.
@@ -18,7 +18,7 @@ Reads one web page or PDF: the readable text, 12,000 characters at a time (about
 
 **PDFs** (`application/pdf`) are read as text with the same `pypdf` code the attachments use (`attachments.pdf_to_text`), the first 100 pages, in a worker thread. A PDF may be up to 10 MB (a PDF is much bigger than the text in it) and is refused, not read half, above that; a pages limit, a scan with no text, a password-protected or malformed file each give a clear error. The title shown is the file name. pypdf parses untrusted files here, bounded by the size, page and time limits, which is the same exposure an uploaded PDF already is.
 
-It is the one tool that makes this server connect to an address a model chose, so it is built defensively (all in `tools._fetch`):
+It is the one tool that makes this server connect to an address a model chose, so it is built defensively (all in `_fetch`, `app/tools/fetch.py`):
 - **Public sites only.** Scheme must be `http`/`https`, no `user:pass@`, ports 80 and 443 only. The host is resolved, and **every** address it resolves to must be public (`ipaddress.is_global`, not multicast; IPv4-mapped IPv6 is unwrapped). That refuses loopback, private ranges, link-local (including cloud metadata at `169.254.169.254`), CGNAT, reserved and unspecified addresses, in IPv4 and IPv6. One private answer among public ones is a refusal.
 - **The check is the connection.** The request goes to the checked IP with the real name as `Host` and TLS SNI (`extensions={"sni_hostname": ...}`), so DNS can't answer differently between the check and the connect (DNS rebinding), and certificates still verify against the real name (confirmed live against `example.com`).
 - **Redirects are followed by hand** (at most 3), each hop going through the same checks, so a public page can't bounce the server to `127.0.0.1`.
@@ -33,7 +33,7 @@ Not covered: pages that need JavaScript to show their content (you get what the 
 `tests/test_tools_local.py` (about 130 cases: the calculator's accepted and refused expressions and limits; chat search; fetch_url's address checks for 20+ non-public addresses, redirects into private places, ports, schemes, content types, size and time limits, pinning, malformed HTML), `tests/test_tool_calls.py` (listing, per-conversation switching, guidance), `tests/ui/test_tools_ui.py` (the menu and how each call reads). Live (`-m live`): the real model using the calculator, and a real fetch of `example.com` through the pinned connection.
 
 ## Future tools (noted, not built)
-Roughly in order of value. Each is a function in `tools.py` plus a `TOOL_UI` entry in `static/tools-ui.js`, except where it says otherwise.
+Roughly in order of value. Each is a module in `app/tools/` plus its UI line in `static/tools-ui.js`, except where it says otherwise.
 - **`get_time`**: current date and time in any timezone (`zoneinfo`). The default prompt already gives the date, so this adds timezones and the time of day.
 - **`lookup_wikipedia` / `search_arxiv`**: short citable reference lookups from free APIs without keys.
 - **`weather`**: a forecast for a place (Open-Meteo needs no key); a good template for a small read-only API tool.

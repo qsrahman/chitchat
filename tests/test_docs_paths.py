@@ -11,8 +11,8 @@ EXTENSIONS = (".py", ".js", ".mjs", ".css", ".html", ".md", ".toml", ".json", ".
 # Placeholders, a library's name, and paths inside npm packages (docs/vendor.md lists those) are not files here.
 NOT_FILES = {"phase-N.md", "docs/phase-N.md", "date-title-idprefix.md", "highlight.js", "marked.min.js",
              "dist/katex.min.css", "dist/katex.min.js", "dist/purify.min.js", "lib/marked.umd.js"}
-LOCATIONS = ("", "app/", "app/static/", "app/static/vendor/", "app/static/vendor/katex/", "docs/", "tests/",
-             "tests/ui/", "tests/ui/assets/", "scripts/", ".githooks/")
+LOCATIONS = ("", "app/", "app/tools/", "app/static/", "app/static/vendor/", "app/static/vendor/katex/", "docs/",
+             "tests/", "tests/ui/", "tests/ui/assets/", "scripts/", ".githooks/")
 
 
 def names(doc):

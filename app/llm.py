@@ -3,7 +3,7 @@
     {"type": "delta", "text": str}
     {"type": "reasoning_delta", "text": str}          # streamed reasoning summary
     {"type": "tool_call", "id", "name", "arguments", "status": "running" | "done" | "error",
-        "display": {...} | "error": str}              # a tool the model called, see tools.py
+        "display": {...} | "error": str}              # a tool the model called, see app/tools/
     {"type": "compaction", "item": {...}, "after_reply": bool}   # just before "done": OpenAI compacted the context,
                        # see docs/phase-8.md. `after_reply`: the item also covers this reply's text.
     {"type": "done"}   # plus "incomplete": reason (hit a limit) and "usage": {input_tokens, output_tokens,

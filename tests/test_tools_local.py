@@ -148,7 +148,7 @@ async def test_search_chats_is_bounded(tmp_path):
         cid = store.create_conversation(conn, f"Chat {i}")["id"]
         store.add_message(conn, cid, "user", "common words here")
     conn.close()
-    assert len((await tools.search_chats({"query": "common"}, db_path=path)).display["results"]) == tools.RESULTS
+    assert len((await tools.search_chats({"query": "common"}, db_path=path)).display["results"]) == tools.brave.RESULTS
 
 
 # ---- fetch_url ----
@@ -352,11 +352,11 @@ async def test_the_declared_charset_is_used():
 async def test_long_pages_come_in_parts_and_say_how_to_read_on():
     body = b"<p>" + b"word " * 10_000 + b"</p>"
     result = await fetch("https://example.com/", lambda r: html(body))
-    assert result.display["characters"] == tools.FETCH_CHARS and result.display["truncated"] is True
+    assert result.display["characters"] == tools.fetch.FETCH_CHARS and result.display["truncated"] is True
     assert result.display["offset"] == 0 and result.display["total"] == 49_999
-    assert f"call fetch_url again with offset={tools.FETCH_CHARS}" in result.output
-    assert f"{49_999 - tools.FETCH_CHARS:,} more characters" in result.output
-    assert f"(characters 0 to {tools.FETCH_CHARS:,} of 49,999)" in result.output
+    assert f"call fetch_url again with offset={tools.fetch.FETCH_CHARS}" in result.output
+    assert f"{49_999 - tools.fetch.FETCH_CHARS:,} more characters" in result.output
+    assert f"(characters 0 to {tools.fetch.FETCH_CHARS:,} of 49,999)" in result.output
 
 
 async def test_huge_downloads_stop_at_the_byte_cap():
@@ -388,7 +388,7 @@ async def test_network_failures_are_one_clear_error():
 async def test_a_slow_server_times_out(monkeypatch):
     import asyncio
 
-    monkeypatch.setattr(tools, "FETCH_SECONDS", 0.2)
+    monkeypatch.setattr(tools.fetch, "FETCH_SECONDS", 0.2)
 
     async def handler(request):
         await asyncio.sleep(5)
@@ -407,7 +407,7 @@ async def test_malformed_html_does_not_hang_or_crash():
 
 @pytest.fixture
 def small_parts(monkeypatch):
-    monkeypatch.setattr(tools, "FETCH_CHARS", 100)
+    monkeypatch.setattr(tools.fetch, "FETCH_CHARS", 100)
 
 
 def numbered_page():
@@ -433,7 +433,7 @@ async def test_reading_on_by_offset_gives_every_character_once_and_in_order(smal
             break
         offset += result.display["characters"]
         assert f"offset={offset}" in result.output  # the note names exactly where to go on
-    parser = tools._PageText()
+    parser = tools.fetch._PageText()
     parser.feed(numbered_page().decode())
     assert whole == parser.text()  # nothing lost, nothing repeated
     assert len(parts) == 8 and parts[-1].display["offset"] == 700
@@ -471,7 +471,7 @@ async def test_an_offset_that_is_not_a_number_is_an_error(offset):
 
 
 async def test_a_page_cut_at_the_download_limit_says_so_and_cannot_be_read_further(monkeypatch):
-    monkeypatch.setattr(tools, "FETCH_BYTES", 400)
+    monkeypatch.setattr(tools.fetch, "FETCH_BYTES", 400)
     result = await read({"url": "https://example.com/", "offset": 0})
     assert result.display["truncated"] is True and "Only the first megabyte" in result.output
     assert "continues" not in result.output  # reading on within what was downloaded is a different note
@@ -520,7 +520,7 @@ async def test_the_pdf_content_types(ctype):
 
 
 async def test_a_long_pdf_reads_only_its_first_pages_and_says_so(monkeypatch):
-    monkeypatch.setattr(tools, "FETCH_PDF_PAGES", 2)
+    monkeypatch.setattr(tools.fetch, "FETCH_PDF_PAGES", 2)
     result = await fetch("https://example.com/a.pdf", served_pdf(pdf(pages=5)))
     assert "Page 2." in result.output and "Page 3." not in result.output
     assert "[Only the first 2 of 5 pages were read.]" in result.output
@@ -555,13 +555,13 @@ async def test_a_file_that_says_it_is_a_pdf_but_is_not_is_one_clear_error():
 
 
 async def test_a_pdf_over_the_size_limit_is_refused_not_half_read(monkeypatch):
-    monkeypatch.setattr(tools, "FETCH_PDF_BYTES", 500)
+    monkeypatch.setattr(tools.fetch, "FETCH_PDF_BYTES", 500)
     with pytest.raises(ToolError, match="larger than 0 MB|larger than"):
         await fetch("https://example.com/big.pdf", served_pdf(pdf(pages=3)))
 
 
 async def test_a_pdf_may_be_bigger_than_a_page_is_allowed_to_be(monkeypatch):
-    monkeypatch.setattr(tools, "FETCH_BYTES", 300)  # far smaller than this PDF, which is still fine
+    monkeypatch.setattr(tools.fetch, "FETCH_BYTES", 300)  # far smaller than this PDF, which is still fine
     data = pdf()
     assert len(data) > 300
     assert "launch date" in (await fetch("https://example.com/a.pdf", served_pdf(data))).output

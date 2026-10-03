@@ -63,7 +63,7 @@ app/routes.py   HTTP + SSE endpoints
 app/db.py       SQLite connection + migrations
 app/store.py    conversation/message CRUD
 app/attachments.py  upload validation, file storage, PDF text
-app/tools.py    tools the model can call (web search)
+app/tools/      tools the model can call, one module each (web search, calculator, search_chats, fetch_url)
 app/static/     vanilla JS UI, ES modules, vendored libs (no build step)
 tests/ui/       Playwright browser tests
 tests/          pytest suite

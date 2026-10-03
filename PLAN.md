@@ -16,7 +16,7 @@ app/
   db.py        sqlite connection + schema (PRAGMA user_version)
   store.py     plain functions: conversations + messages CRUD
   attachments.py  upload checks, files on disk, what the model gets per file
-  tools.py     tools the model can call (web_search via Brave): schema + async function + UI display
+  tools/       tools the model can call, one module each (web_search via Brave, calculator, search_chats, fetch_url)
   llm.py       the ONLY module importing openai; emits normalized events
   routes.py    /api/* + SSE
   static/      index.html, app.js + one JS module per part of the page (see docs/architecture.md), markdown.js, style.css, vendor/
@@ -41,7 +41,7 @@ Seams that keep features additive:
 | 4 | done | Model picker, per-conversation system prompt, global custom instructions, temperature/reasoning effort |
 | 5 | done | Reasoning summaries (collapsible), token usage recorded (not displayed) |
 | 6 | done | Attachments: images (`input_image`), files/PDF (`input_file`) |
-| 7 | done | Tools: built-in web search with citations, then a function-calling loop with a small registry (`tools.py`) |
+| 7 | done | Tools: built-in web search with citations, then a function-calling loop with a small registry (`app/tools/`) |
 | 8 | done | Context management (OpenAI server-side compaction), FTS5 search, export (Markdown/JSON) |
 | 9 | | Optional: auth, multi-user, rate limits, Dockerfile |
 
