@@ -27,14 +27,15 @@ def runs(monkeypatch):
 def test_all_steps_run_in_order_and_pass(runs, capsys):
     ran, _ = runs
     assert check.main() == 0
-    assert ran == ["ruff", "pyright", "npx", "npx", "pytest"]
+    assert ran == ["ruff", "pyright", "npx", "npx", "npx", "pytest"]
     assert "all checks passed" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("failing_step, expected_ran", [("ruff", ["ruff"]), ("pyright", ["ruff", "pyright"]),
-                                                        ("eslint", ["ruff", "pyright", "npx"]),
-                                                        ("tsc", ["ruff", "pyright", "npx", "npx"]),
-                                                        ("tests", ["ruff", "pyright", "npx", "npx", "pytest"])])
+                                                        ("prettier", ["ruff", "pyright", "npx"]),
+                                                        ("eslint", ["ruff", "pyright", "npx", "npx"]),
+                                                        ("tsc", ["ruff", "pyright", "npx", "npx", "npx"]),
+                                                        ("tests", ["ruff", "pyright", "npx", "npx", "npx", "pytest"])])
 def test_it_stops_at_the_first_failure_and_says_which(runs, capsys, failing_step, expected_ran):
     ran, failing = runs
     failing.add(failing_step)
@@ -49,10 +50,10 @@ def test_without_node_the_javascript_checks_are_skipped_not_failed(runs, monkeyp
     assert check.main() == 0
     assert ran == ["ruff", "pyright", "pytest"]
     out = capsys.readouterr().out
-    assert "eslint: skipped" in out and "tsc: skipped" in out
+    assert all(f"{step}: skipped" in out for step in ("prettier", "eslint", "tsc"))
 
 
 def test_the_steps_are_what_the_docs_say():
-    assert [n for n, _ in check.STEPS] == ["ruff", "pyright", "eslint", "tsc", "tests"]
+    assert [n for n, _ in check.STEPS] == ["ruff", "pyright", "prettier", "eslint", "tsc", "tests"]
     hook = (Path(__file__).parent.parent / ".githooks" / "pre-commit").read_text()
     assert "scripts/check.py" in hook

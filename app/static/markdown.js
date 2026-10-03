@@ -1,6 +1,7 @@
 // Markdown -> sanitized HTML. marked, DOMPurify, highlight.js and KaTeX are loaded as globals (vendor/).
 // highlight.js's "plaintext" language is its HTML escaper: no highlighting, entity-escaped output.
-const escapeHtml = (text) => hljs.highlight(text, { language: "plaintext" }).value;
+const escapeHtml = (text) =>
+  hljs.highlight(text, { language: 'plaintext' }).value
 
 // Math as models write it: \( inline \), $inline$, \[ block \] and $$ either $$. marked would otherwise read
 // "\(" as an escaped paren and drop the backslash, and marked-katex-extension has no \( \), so this is ours.
@@ -9,87 +10,115 @@ const escapeHtml = (text) => hljs.highlight(text, { language: "plaintext" }).val
 // not math; "$x$" and "$1 / \ln(x)$" are. \$ is a literal dollar sign (marked's own escape).
 // An unfinished formula stays literal until its closing delimiter streams in. Code spans and fences are
 // consumed by marked before these rules see them.
-const renderMath = (tex, displayMode) => katex.renderToString(tex, {
-  displayMode, throwOnError: false, strict: "ignore", maxSize: 20, // trust stays false: no \href / \url
-});
+const renderMath = (tex, displayMode) =>
+  katex.renderToString(tex, {
+    displayMode,
+    throwOnError: false,
+    strict: 'ignore',
+    maxSize: 20, // trust stays false: no \href / \url
+  })
 
 const math = {
   extensions: [
     {
-      name: "blockMath",
-      level: "block",
+      name: 'blockMath',
+      level: 'block',
       start: (src) => src.match(/^(?:\\\[|\$\$)/m)?.index,
       tokenizer(src) {
-        const m = /^(?:\\\[([\s\S]+?)\\\]|\$\$([\s\S]+?)\$\$)[ \t]*(?:\n|$)/.exec(src);
-        if (m) return { type: "blockMath", raw: m[0], tex: (m[1] ?? m[2]).trim() };
+        const m =
+          /^(?:\\\[([\s\S]+?)\\\]|\$\$([\s\S]+?)\$\$)[ \t]*(?:\n|$)/.exec(src)
+        if (m)
+          return { type: 'blockMath', raw: m[0], tex: (m[1] ?? m[2]).trim() }
       },
-      renderer: (token) => `<div class="math-block" tabindex="0">${renderMath(token.tex, true)}</div>`, // tabindex: see TEXT_BLOCKS
+      renderer: (token) =>
+        `<div class="math-block" tabindex="0">${renderMath(token.tex, true)}</div>`, // tabindex: see TEXT_BLOCKS
     },
     {
-      name: "inlineMath",
-      level: "inline",
+      name: 'inlineMath',
+      level: 'inline',
       start: (src) => src.match(/\\\(|(?<!\\)\$/)?.index, // an escaped \$ does not start math
       tokenizer(src) {
-        const m = /^(?:\\\(([\s\S]+?)\\\)|\$\$([\s\S]+?)\$\$|\$(?!\s)((?:\\.|[^$\\])+?)(?<!\s)\$(?!\d))/.exec(src);
-        if (m) return { type: "inlineMath", raw: m[0], tex: (m[1] ?? m[2] ?? m[3]).trim(), display: m[2] !== undefined };
+        const m =
+          /^(?:\\\(([\s\S]+?)\\\)|\$\$([\s\S]+?)\$\$|\$(?!\s)((?:\\.|[^$\\])+?)(?<!\s)\$(?!\d))/.exec(
+            src,
+          )
+        if (m)
+          return {
+            type: 'inlineMath',
+            raw: m[0],
+            tex: (m[1] ?? m[2] ?? m[3]).trim(),
+            display: m[2] !== undefined,
+          }
       },
       renderer: (token) => renderMath(token.tex, token.display),
     },
   ],
-};
+}
 
 // Answers: code blocks get a header (language, Copy) and highlighting.
-marked.use({
-  renderer: {
-    code({ text, lang }) {
-      const name = (lang || "").split(/\s/)[0];
-      const known = name && hljs.getLanguage(name);
-      const html = known ? hljs.highlight(text, { language: name }).value : escapeHtml(text);
-      return `<div class="code" dir="ltr"><div class="code-bar"><span>${escapeHtml(name || "text")}</span>` +
-        `<button type="button" class="code-copy">Copy</button></div>` +
-        `<pre tabindex="0"><code class="hljs">${html}</code></pre></div>`;
+marked.use(
+  {
+    renderer: {
+      code({ text, lang }) {
+        const name = (lang || '').split(/\s/)[0]
+        const known = name && hljs.getLanguage(name)
+        const html = known
+          ? hljs.highlight(text, { language: name }).value
+          : escapeHtml(text)
+        return (
+          `<div class="code" dir="ltr"><div class="code-bar"><span>${escapeHtml(name || 'text')}</span>` +
+          `<button type="button" class="code-copy">Copy</button></div>` +
+          `<pre tabindex="0"><code class="hljs">${html}</code></pre></div>`
+        )
+      },
     },
   },
-}, math);
+  math,
+)
 
 // Reasoning: some models (gpt-oss) stream their raw thinking as the "summary", where "17*23 ... 17*20" is
 // arithmetic, not emphasis. Refuse single-delimiter emphasis (*x*, _x_) and keep **bold**, lists and code.
-const baseTokenizer = new marked.Tokenizer();
+const baseTokenizer = new marked.Tokenizer()
 const reasoningMarked = new marked.Marked(math, {
   tokenizer: {
     emStrong(...args) {
-      const token = baseTokenizer.emStrong.apply(this, args);
-      return token?.type === "em" ? undefined : token;
+      const token = baseTokenizer.emStrong.apply(this, args)
+      return token?.type === 'em' ? undefined : token
     },
   },
-});
+})
 
 // Links in model output open in a new tab and never get window.opener. Text blocks pick their own direction
 // from their first strong character, so Arabic or Urdu runs right to left while an English paragraph, or code
 // (always left to right, see the code renderer), in the same reply does not. Only the outermost block gets
 // dir="auto": the browser skips descendants that have their own dir when it looks for that character, so a list
 // whose items each had one would find no text and stay left to right.
-const TEXT_BLOCKS = "p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, table";
-DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-  if (node.tagName === "A") {
-    node.setAttribute("target", "_blank");
-    node.setAttribute("rel", "noopener noreferrer");
+const TEXT_BLOCKS = 'p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, table'
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    node.setAttribute('target', '_blank')
+    node.setAttribute('rel', 'noopener noreferrer')
   }
-  if (node.matches?.(TEXT_BLOCKS) && !node.parentElement?.closest(TEXT_BLOCKS)) node.setAttribute("dir", "auto");
+  if (node.matches?.(TEXT_BLOCKS) && !node.parentElement?.closest(TEXT_BLOCKS))
+    node.setAttribute('dir', 'auto')
   // A table, a code block or a formula wider than the column scrolls sideways. A keyboard can only scroll a
   // region it can focus, so those are focusable (set where they are made: the code and math renderers above).
-  if (node.tagName === "TABLE") node.setAttribute("tabindex", "0");
-});
+  if (node.tagName === 'TABLE') node.setAttribute('tabindex', '0')
+})
 
 // No <img>: a remote image URL in model output would make the page send requests (and whatever the
 // URL encodes) to a third party. Revisit when image output is a feature.
 // KaTeX's accessible MathML wraps the formula in <semantics> with the TeX in an <annotation>; DOMPurify
 // drops both by default, which would leave that TeX source as stray text.
-const SANITIZE = { FORBID_TAGS: ["img"], ADD_TAGS: ["semantics", "annotation"], ADD_ATTR: ["encoding"] };
-const sanitize = (html) => DOMPurify.sanitize(html, SANITIZE);
+const SANITIZE = {
+  FORBID_TAGS: ['img'],
+  ADD_TAGS: ['semantics', 'annotation'],
+  ADD_ATTR: ['encoding'],
+}
+const sanitize = (html) => DOMPurify.sanitize(html, SANITIZE)
 
-export const renderMarkdown = (text) => sanitize(marked.parse(text));
-export const renderReasoning = (text) => sanitize(reasoningMarked.parse(text));
+export const renderMarkdown = (text) => sanitize(marked.parse(text))
+export const renderReasoning = (text) => sanitize(reasoningMarked.parse(text))
 
 // Rendering a reply that is still streaming. Rendering all of it again for every frame costs more the longer it
 // gets (150 ms a frame at 100,000 characters, nearly all of it sanitizing and replacing the DOM), so the page
@@ -100,22 +129,33 @@ export const renderReasoning = (text) => sanitize(reasoningMarked.parse(text));
 // that replaces its content must set that to null. A reference-style link definition arriving later changes how
 // earlier paragraphs read without changing their text, so a change in the known definitions starts afresh.
 function renderBlocks(instance, container, text) {
-  const tokens = instance.lexer(text);
-  const links = JSON.stringify(tokens.links);
+  const tokens = instance.lexer(text)
+  const links = JSON.stringify(tokens.links)
   if (container._blocks?.links !== links) {
-    container.replaceChildren();
-    container._blocks = { links, list: [] };
+    container.replaceChildren()
+    container._blocks = { links, list: [] }
   }
-  const { list } = container._blocks;
-  let same = 0;
-  while (same < tokens.length && same < list.length && list[same].raw === tokens[same].raw) same++;
-  for (const block of list.splice(same)) block.nodes.forEach((node) => node.remove());
+  const { list } = container._blocks
+  let same = 0
+  while (
+    same < tokens.length &&
+    same < list.length &&
+    list[same].raw === tokens[same].raw
+  )
+    same++
+  for (const block of list.splice(same))
+    block.nodes.forEach((node) => node.remove())
   for (const token of tokens.slice(same)) {
-    const fragment = DOMPurify.sanitize(instance.parser([token]), { ...SANITIZE, RETURN_DOM_FRAGMENT: true });
-    list.push({ raw: token.raw, nodes: [...fragment.childNodes] });
-    container.append(fragment);
+    const fragment = DOMPurify.sanitize(instance.parser([token]), {
+      ...SANITIZE,
+      RETURN_DOM_FRAGMENT: true,
+    })
+    list.push({ raw: token.raw, nodes: [...fragment.childNodes] })
+    container.append(fragment)
   }
 }
 
-export const renderMarkdownInto = (container, text) => renderBlocks(marked, container, text);
-export const renderReasoningInto = (container, text) => renderBlocks(reasoningMarked, container, text);
+export const renderMarkdownInto = (container, text) =>
+  renderBlocks(marked, container, text)
+export const renderReasoningInto = (container, text) =>
+  renderBlocks(reasoningMarked, container, text)

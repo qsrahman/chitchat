@@ -6,7 +6,7 @@ from pathlib import Path
 
 STATIC = Path(__file__).parent.parent / "app" / "static"
 MODULES = {p.stem: p.read_text() for p in STATIC.glob("*.js")}
-IMPORT = re.compile(r'import\s*(?:\{([^}]*)\}\s*from\s*)?"\./([\w-]+)\.js";')
+IMPORT = re.compile(r"""import\s*(?:\{([^}]*)\}\s*from\s*)?["']\./([\w-]+)\.js["'];?""")
 EXPORT = re.compile(r"^export\s+(?:async\s+)?(?:const|let|function|class)\s+([\w$]+)", re.M)
 
 
