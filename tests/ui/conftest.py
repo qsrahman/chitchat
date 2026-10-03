@@ -71,6 +71,12 @@ class ScriptedLLM:
             for i in range(60):
                 await asyncio.sleep(0.1)
                 yield {"type": "delta", "text": f"word{i} "}
+        elif "bigblock" in text:  # one code block that grows for 1.5 s, in 150 pieces
+            yield {"type": "delta", "text": "```python\n"}
+            for i in range(150):
+                await asyncio.sleep(0.01)
+                yield {"type": "delta", "text": "".join(f"value_{i}_{j} = compute({j})\n" for j in range(20))}
+            yield {"type": "delta", "text": "```\n"}
         elif "long" in text:
             for i in range(80):
                 await asyncio.sleep(0.04)
@@ -244,7 +250,9 @@ def expected_console_errors():
 
 def wait_until_ready(page):
     """The page's HTML is visible before its module scripts have run (they are deferred), and under load the gap is
-    long enough for a fill or an Enter to land on a page that cannot react yet. app.js marks the body when done."""
+    long enough for a fill or an Enter to land on a page that cannot react yet; and the app moves the focus to the
+    message box when it has loaded, which would take it from a field a test had just filled. app.js marks the body
+    when it has loaded the first conversation and done that."""
     page.locator("body[data-ready]").wait_for(state="attached")
 
 

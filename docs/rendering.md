@@ -43,4 +43,17 @@ Where the time went (one render of 100,000 characters): sanitizing 137 ms, repla
 
 So: up to about 1,000 lines (65,000 characters, roughly 20,000 tokens, which is a very long answer) a single block is fine. A code block stays tolerable for a long way (the page is sluggish, not frozen: the longest task at 20,000 lines is half a second). A single enormous **list item** is the bad case, 35 s in one freeze at 20,000 lines, and gets worse faster than linearly, which I did not investigate (likely the browser's layout of one very tall item, not our code). The cost of one render of a code block is linear in its size: at 5,000 lines it is 83 ms, of which sanitizing is 64, highlighting 21 (the lexing is nothing), so each frame costs that much again as the block grows.
 
-**What it means:** replies of that size need about 100,000 output tokens, which few models produce, and none of the models this app is aimed at do by default (`OPENAI_MAX_OUTPUT_TOKENS` is unset, so the model's own limit applies). I judged it not worth fixing now. If it ever is, the general fix is to cap the share of the main thread that rendering may take (after a render that took t ms, skip frames for the next 2t ms), which helps every shape at once and needs no knowledge of block types; stopping highlighting a code block past a size while it streams would only help code.
+**The render time budget (round 5) halves most of that.** A render over 16 ms now makes the next one wait twice as long as it took (`schedule` in `messages.js`), so rendering uses at most about a third of the main thread however big the block is; renders under 16 ms (ordinary replies, every row of the first table) never wait. Same benchmark, main thread blocked while streaming, before to after:
+
+| One block of | Blocked, before | after | Longest freeze, before | after |
+|---|---|---|---|---|
+| code, 5,000 lines | 4.5 s | 1.8 s | 115 ms | 120 ms |
+| code, 20,000 lines | 28.5 s | 11.5 s | 482 ms | 468 ms |
+| one paragraph, 5,000 lines | 7.5 s | 3.0 s | 262 ms | 272 ms |
+| one paragraph, 20,000 lines | 41.4 s | 19.2 s | 2.8 s | 3.0 s |
+| one list item, 5,000 lines | 12.4 s | 6.6 s | 2.1 s | 2.3 s |
+| mixed, 100,000 characters | 0.5 s | 0.6 s | 505 ms | 563 ms |
+
+The longest single freeze does not change: it is one render of the whole block, which a wait cannot shorten (only not rendering a block that big while it streams would). The stream takes a little longer to appear in full (7.8 s to 9.0 s for 5,000 lines of code) because the last pieces wait for their turn; the end of the stream always renders at once. The one-list-item case at 20,000 lines was not measured again (it took 80 s before).
+
+**What it means:** replies of that size need about 100,000 output tokens, which few models produce, and none of the models this app is aimed at do by default (`OPENAI_MAX_OUTPUT_TOKENS` is unset, so the model's own limit applies). I judged it not worth fixing now. The general fix, capping the share of the main thread rendering may take, is done (below); what is left is the single longest freeze, which only stopping the work on a block that big while it streams (plain text until the end) would shorten.

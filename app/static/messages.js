@@ -83,9 +83,17 @@ export function setNote(el, meta) {
   note.hidden = !note.textContent;
 }
 
-// Re-rendering markdown on every delta is wasteful; coalesce to one render per frame.
+// Re-rendering markdown on every delta is wasteful; coalesce to one render per frame. And a render that takes long
+// (one enormous block, which the block reuse in markdown.js cannot help) makes the next ones wait: rendering may
+// take about a third of the main thread, so scrolling and Stop stay usable. Renders under SLOW_MS never wait.
+const SLOW_MS = 16;
+const WAIT_FACTOR = 2; // wait this many times as long as the last render took
 function schedule(el) {
-  el._frame ??= requestAnimationFrame(() => render(el));
+  if (el._frame || el._timer) return;
+  const wait = (el._resumeAt ?? 0) - performance.now();
+  const frame = () => { el._frame = requestAnimationFrame(() => render(el)); };
+  if (wait > 0) el._timer = setTimeout(() => { el._timer = null; frame(); }, wait);
+  else frame();
 }
 export function setText(el, text) {
   el._text = text;
@@ -118,7 +126,9 @@ export function finishReasoning(el) {
 
 export function render(el) {
   cancelAnimationFrame(el._frame);
-  el._frame = null;
+  clearTimeout(el._timer);
+  el._frame = el._timer = null;
+  const started = performance.now();
   const body = bodyOf(el);
   if (el._reasoning) renderReasoningInto(reasoningOf(el).querySelector(".reasoning-body"), el._reasoning);
   if (el.classList.contains("assistant") && el._text) renderMarkdownInto(body, el._text); // reuses what has not changed
@@ -129,6 +139,8 @@ export function render(el) {
     else body.innerHTML = '<span class="dots" role="status" aria-label="Thinking"><i></i><i></i><i></i></span>';
   }
   if (state.stick) scrollToBottom();
+  const took = performance.now() - started;
+  el._resumeAt = took > SLOW_MS ? performance.now() + WAIT_FACTOR * took : 0;
 }
 
 // One full render with nothing reused: at the end of a stream, so a saved reply is exactly what a reload shows.

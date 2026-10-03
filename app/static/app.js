@@ -52,5 +52,6 @@ syncSend();
 refreshModels();
 loadAttachmentLimits();
 loadTools();
-openConversation(location.hash.slice(1) || null);
-document.body.dataset.ready = ""; // every handler is attached: the UI tests wait for this before they type or click
+// The first conversation is open and the message box has the focus (that comes last): the UI tests wait for this
+// before they type or click, or the focus would move from under them.
+openConversation(location.hash.slice(1) || null).then(() => { document.body.dataset.ready = ""; });

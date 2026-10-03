@@ -173,3 +173,39 @@ def test_when_a_reply_ends_it_is_rendered_once_in_full_and_equals_a_reload(page,
     page.reload()
     expect(page.locator(".msg.assistant .body .katex").first).to_be_visible()
     assert page.locator(".msg.assistant .body").inner_html() == streamed
+
+
+SLOW_SANITIZE = """() => {  // every render costs 40 ms, as one enormous block would on a slow machine
+    const sanitize = DOMPurify.sanitize.bind(DOMPurify);
+    window.__renders = 0;
+    DOMPurify.sanitize = (...args) => {
+        window.__renders++;
+        const end = performance.now() + 40;
+        while (performance.now() < end);
+        return sanitize(...args);
+    };
+}"""
+
+
+def test_a_slow_render_makes_the_next_ones_wait_but_the_final_text_is_complete(page, app_url):
+    """The reply is one block that grows for 1.5 s. Rendering whenever a frame is free would render every 40 ms
+    (about 35 times); with the budget each render is followed by a wait twice as long, so about 12."""
+    open_app(page, app_url)
+    page.evaluate(SLOW_SANITIZE)
+    send(page, "bigblock")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=20_000)
+    renders = page.evaluate("window.__renders")
+    assert 4 <= renders <= 20, renders
+    last = page.locator(".msg.assistant code").inner_text()
+    assert "value_149_19 = compute(19)" in last  # the end of the stream was rendered, whatever was skipped
+    assert page.locator(".msg.assistant .code").count() == 1
+
+
+def test_fast_renders_are_never_delayed(page, app_url):
+    """The budget only applies to renders over 16 ms: an ordinary reply renders at every frame."""
+    open_app(page, app_url)
+    page.evaluate("() => { const s = DOMPurify.sanitize.bind(DOMPurify); window.__renders = 0;"
+                  " DOMPurify.sanitize = (...a) => { window.__renders++; return s(...a); }; }")
+    send(page, "long answer")  # 80 paragraphs, one every 40 ms
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=20_000)
+    assert page.evaluate("window.__renders") >= 60  # about one per paragraph, as before
