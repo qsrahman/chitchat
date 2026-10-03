@@ -9,7 +9,7 @@ Exact arithmetic: models are unreliable at long multiplication, percentages and 
 - `^` is XOR in Python, so it is refused with a message to write `**`. Floats are shown to 15 significant digits (`0.1 + 0.2` is `0.3`).
 
 ## search_chats
-The model searches your saved conversations (`store.search_conversations`, the phase 8 FTS5 index) when you refer to something said before ("what did we decide about X?"). It returns the best match from each matching conversation with its title, date, who wrote it and a longer snippet (up to 6). In the UI the matches are links to those chats. Past messages can contain pasted web pages, so the result is labelled as information, not instructions. It searches all conversations, including the current one.
+The model searches your saved conversations (`store.search_conversations`, the phase 8 FTS5 index) when you refer to something said before ("what did we decide about X?"). It returns the best match from each matching conversation with its title, date, who wrote it and a longer snippet (up to 6). In the UI the matches are links to those chats. Past messages can contain pasted web pages, so the result is labelled as information, not instructions. It searches the user's *other* conversations: the chat it runs in is already in front of the model, so it is left out. A tool that needs to know which chat it runs in declares `per_chat=True` and takes a `conversation_id`; the route binds it for each reply with `tools.bound_to`, so the shared tool object is never changed. Titles are searched too (a title-only match is reported as such).
 
 ## fetch_url
 Reads one web page: the readable text, up to 12,000 characters (about 3,000 tokens; longer pages say so). The usual follow-up to a search result.

@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.sse import EventSourceResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app import attachments, context, db, store
+from app import attachments, context, db, store, tools
 from app.llm import REASONING_EFFORTS, supports_reasoning
 from app.store import ConversationSettings, Instructions
 
@@ -246,7 +246,8 @@ def _model_options(request: Request, conn: sqlite3.Connection, conv: dict, model
     conversation's system prompt and the enabled tools' guidance, in that order (the stable part first)."""
     s = conv["settings"]
     # A saved setting for a tool that is not configured (right now) is ignored, not an error.
-    enabled = {n: request.app.state.tools[n] for n in s["tools"] if n in request.app.state.tools}
+    enabled = {n: tools.bound_to(request.app.state.tools[n], conv["id"])
+               for n in s["tools"] if n in request.app.state.tools}
     guidance = [t.guidance for t in enabled.values()]
     base = request.app.state.settings.default_system_prompt.replace("{date}", date.today().isoformat())
     parts = [base, store.get_app_setting(conn, "custom_instructions"), s["system_prompt"], *guidance]

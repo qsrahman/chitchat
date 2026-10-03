@@ -129,3 +129,43 @@ async def test_the_chat_search_tool_reports_a_title_match_as_one(client, llm, ap
     result = await tools.search_chats({"query": "quokka"}, db_path=app.state.settings.db_path)
     assert 'the title matches' in result.output and "wrote:" not in result.output
     assert result.display["results"][0]["title"] == "Quokka care" and result.display["results"][0]["snippet"] == ""
+
+
+# ---- the tool leaves out the chat it is running in ----
+
+async def test_search_chats_leaves_out_the_conversation_it_runs_in(client, llm, app):
+    from app import tools
+
+    here = await titled(client, llm, "Quokka here", "quokka question")
+    there = await titled(client, llm, "Quokka there", "another quokka question")
+    path = app.state.settings.db_path
+    both = await tools.search_chats({"query": "quokka"}, db_path=path)
+    assert {r["id"] for r in both.display["results"]} == {here, there}
+    others = await tools.search_chats({"query": "quokka"}, db_path=path, conversation_id=here)
+    assert [r["id"] for r in others.display["results"]] == [there]
+
+
+async def test_a_reply_gets_the_tool_bound_to_its_own_chat(client, llm):
+    here = await titled(client, llm, "Quokka here", "quokka question")
+    there = await titled(client, llm, "Quokka there", "another quokka question")
+    r = await client.patch(f"/api/conversations/{here}", json={"settings": {"tools": ["search_chats", "calculator"]}})
+    assert r.status_code == 200
+    await say(client, here, "what did we say about quokkas?")
+    tool = llm.calls[-1]["options"]["tools"]["search_chats"]
+    found = await tool.run({"query": "quokka"})
+    assert [r["id"] for r in found.display["results"]] == [there]  # not the chat it is running in
+    assert (await llm.calls[-1]["options"]["tools"]["calculator"].run({"expression": "2+2"})).display["result"] == "4"
+
+
+async def test_the_shared_tool_is_not_changed_by_binding(app):
+    from app import tools
+
+    shared = app.state.tools["search_chats"]
+    bound = tools.bound_to(shared, "abc")
+    assert bound is not shared and bound.run is not shared.run
+    assert tools.bound_to(app.state.tools["calculator"], "abc") is app.state.tools["calculator"]  # not per-chat: as is
+
+
+def test_the_description_tells_the_model_it_searches_other_chats(app):
+    tool = app.state.tools["search_chats"]
+    assert tool.per_chat and "OTHER" in tool.description and "other conversations" in tool.guidance
