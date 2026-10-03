@@ -45,7 +45,7 @@ marked.use({
       const name = (lang || "").split(/\s/)[0];
       const known = name && hljs.getLanguage(name);
       const html = known ? hljs.highlight(text, { language: name }).value : escapeHtml(text);
-      return `<div class="code"><div class="code-bar"><span>${escapeHtml(name || "text")}</span>` +
+      return `<div class="code" dir="ltr"><div class="code-bar"><span>${escapeHtml(name || "text")}</span>` +
         `<button type="button" class="code-copy">Copy</button></div>` +
         `<pre><code class="hljs">${html}</code></pre></div>`;
     },
@@ -64,12 +64,18 @@ const reasoningMarked = new marked.Marked(math, {
   },
 });
 
-// Links in model output open in a new tab and never get window.opener.
+// Links in model output open in a new tab and never get window.opener. Text blocks pick their own direction
+// from their first strong character, so Arabic or Urdu runs right to left while an English paragraph, or code
+// (always left to right, see the code renderer), in the same reply does not. Only the outermost block gets
+// dir="auto": the browser skips descendants that have their own dir when it looks for that character, so a list
+// whose items each had one would find no text and stay left to right.
+const TEXT_BLOCKS = "p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, table";
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
     node.setAttribute("target", "_blank");
     node.setAttribute("rel", "noopener noreferrer");
   }
+  if (node.matches?.(TEXT_BLOCKS) && !node.parentElement?.closest(TEXT_BLOCKS)) node.setAttribute("dir", "auto");
 });
 
 // No <img>: a remote image URL in model output would make the page send requests (and whatever the

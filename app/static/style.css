@@ -150,6 +150,8 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 .msg.user .body { max-width: 85%; padding: 9px 14px; border-radius: var(--r-lg) var(--r-lg) var(--size-1) var(--r-lg); background: var(--bubble); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.assistant .body { font: 1rem/1.75 var(--sans); overflow-wrap: anywhere; }
 .msg.assistant .body :is(p, ul, ol, blockquote) { max-width: var(--measure); }
+/* A narrow block is placed by its container's direction, not its own: right-to-left text goes to the right edge. */
+.msg.assistant .body :is(p, ul, ol, blockquote):dir(rtl) { margin-left: auto; }
 .msg.assistant .body :is(p, li, blockquote) { text-wrap: pretty; }
 .msg.assistant .body strong { font-weight: var(--font-weight-6); }
 .msg.assistant .body a { text-underline-offset: .2em; text-decoration-thickness: 1px; }
@@ -157,7 +159,7 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 .reasoning { margin: 0 0 12px; font: .9rem/1.55 var(--sans); color: var(--muted); }
 .reasoning summary { width: fit-content; padding: 2px 0; cursor: pointer; }
 .reasoning summary:hover { color: var(--ink); }
-.reasoning-body { margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--line); max-height: 16rem; overflow-y: auto; }
+.reasoning-body { margin-top: 6px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line); max-height: 16rem; overflow-y: auto; }
 .reasoning-body > * { margin: 0 0 .6em; }
 .reasoning-body > :last-child { margin-bottom: 0; }
 .tool-calls { display: grid; gap: 2px; margin: 0 0 12px; font: .9rem/1.55 var(--sans); color: var(--muted); }
@@ -165,8 +167,8 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 .tool-call summary:hover { color: var(--ink); }
 .tool-call[data-status="running"] summary { animation: pulse 1.4s ease-in-out infinite; }
 .tool-call[data-status="error"] summary { color: var(--danger); }
-.tool-body { margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--line); }
-.tool-body ol { margin: 0; padding-left: 1.3em; }
+.tool-body { margin-top: 6px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line); }
+.tool-body ol { margin: 0; padding-inline-start: 1.3em; }
 .tool-body li { margin: 0 0 .6em; }
 .tool-body a { color: var(--accent); overflow-wrap: anywhere; }
 .tool-body .domain { margin-left: .5em; font-size: var(--font-size-0); }
@@ -177,12 +179,12 @@ main:not(.is-started) #empty { padding-bottom: 24px; }
 .body > :last-child { margin-bottom: 0; }
 .msg.assistant .body :is(h1, h2, h3, h4) { font-family: var(--sans); line-height: var(--font-lineheight-2); margin: 1.4em 0 .5em; text-wrap: balance; }
 .msg.assistant .body h1 { font-size: var(--font-size-4); } .msg.assistant .body h2 { font-size: var(--font-size-3); } .msg.assistant .body h3 { font-size: var(--font-size-2); }
-.msg.assistant .body :is(ul, ol) { padding-left: 1.5em; }
+.msg.assistant .body :is(ul, ol) { padding-inline-start: 1.5em; }
 .msg.assistant .body li { margin: .25em 0; }
 .msg.assistant .body a { color: var(--accent); }
-.msg.assistant .body blockquote { margin: 1em 0; padding-left: 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.msg.assistant .body blockquote { margin: 1em 0; padding-inline-start: 14px; border-inline-start: 3px solid var(--line); color: var(--muted); }
 .msg.assistant .body table { border-collapse: collapse; display: block; overflow-x: auto; font: .92rem/1.5 var(--sans); }
-.msg.assistant .body :is(th, td) { padding: 6px 12px; border: 1px solid var(--line); text-align: left; }
+.msg.assistant .body :is(th, td) { padding: 6px 12px; border: 1px solid var(--line); text-align: start; }
 .msg.assistant .body hr { border: 0; border-top: 1px solid var(--line); margin: 1.6em 0; }
 .math-block { margin: 1em 0; overflow-x: auto; }
 .math-block .katex-display { margin: 0; }

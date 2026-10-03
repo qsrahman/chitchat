@@ -23,7 +23,7 @@
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16l1-4 8-8 3 3-8 8-4 1zM11 6l3 3"/></svg>
     <span class="label">New chat</span>
   </button>
-  <input id="search" type="search" class="side-search" placeholder="Search chats" aria-label="Search conversations" autocomplete="off" maxlength="200">
+  <input id="search" dir="auto" type="search" class="side-search" placeholder="Search chats" aria-label="Search conversations" autocomplete="off" maxlength="200">
   <nav id="conversations"></nav>
   <div class="side-foot">
     <button id="instructions-btn" type="button" class="side-item" aria-label="Custom instructions" title="Custom instructions">
@@ -43,7 +43,7 @@
       <span id="model-name">Model</span>
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
     </button>
-    <h1 id="title">New chat</h1>
+    <h1 id="title" dir="auto">New chat</h1>
     <button id="settings-btn" type="button" class="icon-btn" aria-label="Chat settings">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8"/><circle cx="13" cy="6" r="2"/><circle cx="7" cy="14" r="2"/></svg>
     </button>
@@ -72,7 +72,7 @@
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 3a4 4 0 0 0-3.7 5.5L3.6 13.7a1.7 1.7 0 0 0 2.4 2.4l5.2-5.2A4 4 0 0 0 16.7 7.5l-2.4 2.4-2.2-.6-.6-2.2 2.4-2.4A4 4 0 0 0 12.5 3z"/></svg>
         </button>
       </div>
-      <textarea id="input" rows="1" placeholder="Ask anything" aria-label="Message" autofocus></textarea>
+      <textarea id="input" dir="auto" rows="1" placeholder="Ask anything" aria-label="Message" autofocus></textarea>
       <label id="effort-wrap" class="effort" title="Thinking effort" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 14.5h5M8.5 17h3M10 3a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z"/></svg>
         <select id="effort" aria-label="Thinking effort"></select>
@@ -111,7 +111,7 @@
 <dialog id="rename-dialog" closedby="any" aria-labelledby="rename-heading">
   <form method="dialog">
     <h2 id="rename-heading">Rename conversation</h2>
-    <input id="rename-input" required maxlength="200" autocomplete="off" aria-label="Conversation title" autofocus>
+    <input id="rename-input" dir="auto" required maxlength="200" autocomplete="off" aria-label="Conversation title" autofocus>
     <div class="dialog-actions">
       <button type="button" class="btn" data-cancel>Cancel</button>
       <button type="submit" value="save" class="btn primary">Save</button>
@@ -135,7 +135,7 @@
     <h2 id="settings-heading">Chat settings</h2>
     <label>Model <select id="set-model"></select></label>
     <label>System prompt
-      <textarea id="set-system" rows="4" maxlength="10000" placeholder="Optional. Applies to this conversation only."></textarea>
+      <textarea id="set-system" dir="auto" rows="4" maxlength="10000" placeholder="Optional. Applies to this conversation only."></textarea>
     </label>
     <label id="effort-field">Reasoning effort
       <select id="set-effort"></select>
@@ -159,7 +159,7 @@
   <form method="dialog">
     <h2 id="instructions-heading">Custom instructions</h2>
     <label>What should the model know about you or how you like answers?
-      <textarea id="set-instructions" rows="6" maxlength="10000"></textarea>
+      <textarea id="set-instructions" dir="auto" rows="6" maxlength="10000"></textarea>
     </label>
     <p class="field-note">Sent with every conversation, before its own system prompt.</p>
     <p class="field-error" role="alert" hidden></p>

@@ -49,6 +49,7 @@ function addMessage(role, text = "", meta = {}) {
   const el = document.createElement("div");
   el.className = `msg ${role}`;
   for (const cls of ["body", "note", "actions"]) el.append(Object.assign(document.createElement("div"), { className: cls }));
+  if (role !== "assistant") bodyOf(el).dir = "auto"; // plain text; a reply's blocks get theirs when rendered (markdown.js)
   thread.append(el);
   main.classList.add("is-started");
   for (const call of meta.tools ?? []) renderToolCall(el, call);
@@ -135,7 +136,7 @@ const hostOf = (url) => new URL(url).hostname.replace(/^www\./, "");
 const isWebUrl = (url) => { try { return ["http:", "https:"].includes(new URL(url).protocol); } catch { return false; } };
 
 const safeHost = (url) => { try { return hostOf(url); } catch { return ""; } };
-const textEl = (tag, text, className = "") => Object.assign(document.createElement(tag), { textContent: text, className });
+const textEl = (tag, text, className = "") => Object.assign(document.createElement(tag), { textContent: text, className, dir: "auto" });
 const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
 
 const TOOL_UI = {
@@ -213,6 +214,7 @@ function renderToolCall(el, call) {
     box.append(row);
   }
   const ui = TOOL_UI[call.name];
+  row.querySelector("summary").dir = "auto";
   row.dataset.status = call.status;
   row.setAttribute("aria-busy", String(call.status === "running"));
   row.querySelector("summary").textContent = {
@@ -289,6 +291,7 @@ function startEdit(m) {
   clearActions();
   const ta = document.createElement("textarea");
   ta.className = "edit";
+  ta.dir = "auto";
   ta.setAttribute("aria-label", "Edit your message");
   ta.value = m._text;
   bodyOf(m).replaceChildren(ta);
@@ -688,6 +691,7 @@ async function runSearch() {
     li.className = "conv";
     const a = document.createElement("a");
     a.className = "result";
+    a.dir = "auto";
     a.href = `#${r.id}`;
     a.onclick = closeNavIfOverlay;
     const snippet = document.createElement("span");
@@ -734,6 +738,7 @@ function renderConv(c) {
   const link = document.createElement("a");
   link.href = `#${c.id}`;
   link.textContent = c.title;
+  link.dir = "auto";
   link.title = c.title;
   if (c.id === state.id) link.setAttribute("aria-current", "page");
   link.onclick = closeNavIfOverlay;

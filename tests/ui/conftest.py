@@ -97,6 +97,9 @@ class ScriptedLLM:
                 yield {"type": "delta", "text": "It is **3.14**, per [python.org](https://www.python.org/)."}
             yield {"type": "done"}
             return
+        elif "urdu" in text:  # an Arabic-script paragraph, an English one, a list and code, in one reply
+            yield {"type": "delta", "text": "السلام عليكم، هذه فقرة عربية.\n\nThis paragraph is English.\n\n"
+                   "- بند أول\n- بند ثان\n\n```python\nprint('hi')\n```\n\n> اقتباس"}
         elif text in ("calcsum", "calcbad"):  # the calculator: "calcbad" fails
             call = {"type": "tool_call", "id": "call_c", "name": "calculator"}
             args = {"arguments": {"expression": "17 * 23" if text == "calcsum" else "1 / 0"}}
