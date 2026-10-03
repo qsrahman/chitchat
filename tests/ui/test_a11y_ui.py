@@ -15,8 +15,11 @@ AXE = (Path(__file__).parent / "assets" / "axe.min.js").read_text()
 RUN_AXE = """() => axe.run(document, {resultTypes: ['violations']}).then((r) => r.violations.map((v) =>
     `${v.id} (${v.impact}): ${v.help} -> ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`))"""
 # Entrances fade in, and colors are read mid-fade otherwise: wait until everything is fully opaque.
+# Nor mid-slide: the phone's sidebar is off screen while it moves, and axe takes a link to a "#..." in an off-screen
+# element for a skip link whose target is missing (and a color changing in a transition is read halfway).
 SETTLED = """() => [...document.querySelectorAll('.msg, dialog[open], [popover]:popover-open')]
-    .every((e) => getComputedStyle(e).opacity === '1')"""
+    .every((e) => getComputedStyle(e).opacity === '1')
+    && document.getAnimations().every((a) => !(a instanceof CSSTransition))"""
 
 
 @pytest.fixture(params=["light", "dark"])

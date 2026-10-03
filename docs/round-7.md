@@ -18,3 +18,6 @@ Tests: `tests/test_pin_archive.py`, `tests/test_store.py`, `tests/ui/test_pin_ar
 
 ## 3. Old database copies are pruned
 Each upgrade leaves a copy (`docs/round-6.md`) and nothing removed them. After making a copy, `db._prune` now keeps the copies of the **two most recent versions** (`KEEP_BACKUPS`) and deletes older ones, so the folder holds at most two `<db>.bak-v<N>` files however many upgrades there are. Only files named exactly `<db>.bak-v<number>` are touched: a file you put there yourself (`chitchat.db.bak-v2.keep`, `other.db.bak-v1`) is never deleted. Nothing is pruned on a start that upgrades nothing. This upgrade (v6 to v7) is the first to prune: your folder will hold `chitchat.db.bak-v6` and, if you have it, `.bak-v5`. Tests: `tests/test_db_backup.py`.
+
+## Also: a flaky accessibility test
+One load run of 14 failed `test_on_a_phone` with an axe `skip-link` violation on a sidebar link. On a phone the sidebar slides in over 0.2 s; while it is still off screen axe takes a link to `#<chat id>` for a skip link whose target is missing. The test measured too early. The helper that waits before each axe run (`SETTLED`) now also waits until no CSS transition is running, and 12 runs of the file under CPU load passed. (A real user is not affected: the same link is fine once the sidebar is in view.)
