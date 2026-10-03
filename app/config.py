@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     context_tokens: int | None = None
     title_model: str = ""  # writes the chat titles; empty = a small default, see title_model_name
     brave_api_key: str = ""  # enables the web_search tool (Brave Search API)
-    max_tool_calls: int = 4  # per reply: each web search is billed by Brave
+    # Per reply, over all tools: a search, a few pages and reading one of them on is already six. Only web searches
+    # cost money (Brave bills per request), so this is also the most one reply can spend there: about 4 cents.
+    max_tool_calls: int = 8
     db_path: str = "chitchat.db"
     attachments_dir: str = "attachments"
 

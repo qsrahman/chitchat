@@ -44,7 +44,7 @@ Environment variables or `.env`:
 | `COMPACT_THRESHOLD` | `150000` | Tokens after which OpenAI compacts the older turns of a conversation (OpenAI only); `0` turns it off |
 | `CONTEXT_TOKENS` | `32000` on a custom endpoint, none on OpenAI | Most history to send without compaction; older messages are left out (not deleted) and a note says so. `0` = no limit. See `docs/context-window.md` |
 | `BRAVE_API_KEY` | none | Enables web search (Brave Search API). Without it the globe button in the composer is disabled |
-| `MAX_TOOL_CALLS` | `4` | Most tool calls (searches) in one reply |
+| `MAX_TOOL_CALLS` | `8` | Most tool calls in one reply, over all tools (each web search is billed by Brave, about half a cent) |
 | `DB_PATH` | `chitchat.db` | SQLite file |
 
 ## Test

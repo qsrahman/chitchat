@@ -69,7 +69,7 @@ async def test_a_switched_on_tool_goes_to_the_model_with_its_guidance_and_the_ca
     cid = await create(client, tools=["web_search"], system_prompt="Be brief.")
     await chat(client, cid)
     options = llm.calls[-1]["options"]
-    assert list(options["tools"]) == ["web_search"] and options["max_tool_calls"] == 4
+    assert list(options["tools"]) == ["web_search"] and options["max_tool_calls"] == 8
     assert options["instructions"] == "About me.\n\nBe brief.\n\nSEARCH GUIDANCE."
 
 
