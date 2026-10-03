@@ -21,7 +21,7 @@ purpose = "Sanitizes everything rendered from model output: the one that matters
 
 [highlightjs]
 package = "@highlightjs/cdn-assets"
-version = "11.11.1"
+version = "11.12.0"
 purpose = "Syntax highlighting in code blocks (the common languages build)"
 [highlightjs.files]
 "highlight.min.js" = "highlight.min.js"

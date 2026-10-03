@@ -6,7 +6,7 @@ The third-party code the page runs is copied into `app/static/vendor/`: no CDN (
 |---|---|---|---|
 | [DOMPurify](https://github.com/cure53/DOMPurify) | 3.4.16 | Sanitizes everything rendered from model output. **The one that matters most.** | `dist/purify.min.js` |
 | [marked](https://github.com/markedjs/marked) | 16.4.2 | Markdown to HTML | `lib/marked.umd.js` (the npm package has no minified build; it was misnamed `marked.min.js` before) |
-| [highlight.js](https://highlightjs.org) | 11.11.1 | Syntax highlighting (the "common languages" build) | `@highlightjs/cdn-assets`: `highlight.min.js` |
+| [highlight.js](https://highlightjs.org) | 11.12.0 | Syntax highlighting (the "common languages" build) | `@highlightjs/cdn-assets`: `highlight.min.js` |
 | [KaTeX](https://katex.org) | 0.19.0 | Math | `dist/katex.min.js`, `dist/katex.min.css`, `dist/fonts/*.woff2` |
 | [Open Props](https://open-props.style) | 1.7.23 | Design tokens (CSS variables) | six files from the package root, see the manifest |
 | [axe-core](https://github.com/dequelabs/axe-core) | 4.13.0 | **Tests only**: the accessibility checker (`docs/accessibility.md`), kept in `tests/ui/assets/`, never served | `axe.min.js`, `LICENSE` |

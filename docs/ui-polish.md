@@ -15,7 +15,7 @@ Reading-first. Replies have no bubbles, so long answers read like a document (th
 - **Notes:** "Stopped." and "Reply cut off: output limit reached." show under the reply and persist (from `messages.meta`).
 - **Keys:** Enter sends, Shift+Enter adds a line, Esc stops a reply.
 - **Accessibility:** `role="log"`, `aria-busy` while streaming (no per-token announcements), labelled icon buttons, visible focus, reduced-motion respected.
-- **Offline:** `marked`, `DOMPurify` and `highlight.js` are vendored in `app/static/vendor/` (no CDN). Source versions: marked 16.4.2, DOMPurify 3.4.16, highlight.js 11.11.1.
+- **Offline:** `marked`, `DOMPurify` and `highlight.js` are vendored in `app/static/vendor/` (no CDN). Source versions: marked 16.4.2, DOMPurify 3.4.16, highlight.js 11.12.0.
 - **Code layout:** `static/markdown.js` (render + sanitize + code blocks) and the app itself, loaded as ES modules without a build step (it was one `app.js`; now split, see `docs/architecture.md`).
 
 ## Tests
