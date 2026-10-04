@@ -96,7 +96,7 @@ def test_the_chat_menu_follows_the_chat_on_screen(page, app_url):
     expect(chat_menu(page).get_by_role("menuitem")).to_have_text(["Instructions for this chat…"])
     page.keyboard.press("Escape")
     page.get_by_role("button", name="Show conversations").click()
-    page.get_by_role("link", name="to keep").click()
+    page.locator("#conversations").get_by_role("link", name="to keep").click()
     link = chat_menu(page).get_by_role("menuitem", name="Download as Markdown")
     expect(link).to_have_attribute("href", f"/api/conversations/{first}/export?format=md")
 

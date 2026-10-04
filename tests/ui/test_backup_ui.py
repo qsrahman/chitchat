@@ -66,7 +66,7 @@ def test_importing_a_file_adds_the_chat_to_the_list_and_it_opens(page, app_url):
     expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat.")
     dialog.get_by_role("button", name="Close").click()
     open_sidebar(page)
-    page.get_by_role("link", name="Imported wombats").click()
+    page.locator("#conversations").get_by_role("link", name="Imported wombats").click()
     expect(page.locator(".msg.user .body")).to_have_text("where do wombats sleep?")
     expect(page.locator(".msg.assistant .body")).to_have_text("In burrows, mostly.")
 
@@ -179,7 +179,7 @@ def test_a_backup_with_attachments_brings_the_pictures_back(page, app_url):
         {"name": "backup.zip", "mimeType": "application/zip", "buffer": open(zipped, "rb").read()})
     expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat with 1 file.")
     dialog.get_by_role("button", name="Close").click()
-    page.get_by_role("link", name="keep this picture").click()
+    page.locator("#conversations").get_by_role("link", name="keep this picture").click()
     image = page.locator(".msg.user .tile-image img")
     expect(image).to_be_visible()
     page.wait_for_function("(el) => el.complete && el.naturalWidth > 0", arg=image.element_handle())  # it loads
@@ -201,9 +201,10 @@ def test_importing_a_chat_you_just_deleted_brings_it_back_and_it_stays(page, app
     dialog.get_by_label("Import chats from a file").set_input_files(as_upload(backup))
     expect(dialog.locator("#backup-status")).to_have_text("Imported 1 chat.")
     dialog.get_by_role("button", name="Close").click()
-    expect(page.get_by_role("link", name="tell me about quokkas")).to_be_visible()  # not hidden
+    quokkas = page.locator("#conversations").get_by_role("link", name="tell me about quokkas")
+    expect(quokkas).to_be_visible()  # not hidden
     page.clock.fast_forward(11_000)
-    expect(page.get_by_role("link", name="tell me about quokkas")).to_be_visible()
+    expect(page.locator("#conversations").get_by_role("link", name="tell me about quokkas")).to_be_visible()
     assert page.request.get(f"{app_url}/api/conversations/{cid}").status == 200  # and not deleted again
 
 

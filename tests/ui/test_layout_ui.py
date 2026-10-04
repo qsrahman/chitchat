@@ -175,7 +175,7 @@ def test_drafts_are_kept_per_conversation_and_cleared_on_send(page, app_url):
     expect(field).to_have_value("")  # a new chat does not inherit it
     field.fill("draft for a new chat")
 
-    page.get_by_role("link", name="first chat").click()
+    page.locator("#conversations").get_by_role("link", name="first chat").click()
     expect(page.locator(".msg.user .body")).to_have_text("first chat")
     expect(field).to_have_value("draft for the first chat")
     expect(field).to_be_focused()  # opening a chat focuses the box last; until then Enter goes to the link clicked

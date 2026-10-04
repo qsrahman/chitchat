@@ -21,3 +21,14 @@ After an update the browser reused some of the page's JavaScript modules from it
 - **Web search says so in words.** When the globe is on, "Search" appears beside it, in addition to the accent color. **No background**: a highlighted button was taken out earlier on purpose, and the tests that kept it out stay (the old rule "on is color alone, no label" became "on is color and a word, no background"). The word is in the text color, not the accent, because on the hover background the accent is 4.15:1, below the 4.5:1 the accessibility test asks for. The button's name is "Web search" on or off.
 
 Tests: `tests/ui/test_polish_ui.py` (the order and contents of the line, the chevron turning, the spacing) and `tests/ui/test_search_ui.py` (the label and the missing background).
+
+## 9 to 11: identity, the new-chat screen, the sidebar
+- **Recent chats under the composer** of a new chat: the latest three (not archived), one click to pick up where you left off, `nav#recent` filled by `list.js` from the list it already has, hidden once a conversation is open and in the archive view. The new-chat screen was otherwise a greeting and a box.
+- **The accent is used on purpose.** The model name in the header is the accent (it turns to the ink on hover: on the hover background the accent is 4.15:1, under the 4.5:1 text needs), next to the accent that marks the open chat, the focus rings and the Search label's globe. Everything else stays quiet: that restraint is what makes the page look as good as it does.
+- **The composer's shadow** in the light theme was Open Props' `shadow-2`, which read as a second outline next to the border; it is now a faint two-layer shadow (checked by eye in both themes; the dark one is as it was in effect).
+- **The sidebar's width** is yours: drag its edge, or focus it (it is a `role="separator"` with a value, the "window splitter" pattern) and use the left and right arrows (16px), Home and End. 224 to 480px, kept in this browser (`nav.js`, `--sidebar-w`). Only the open, wide sidebar has the edge; on a phone the sidebar is a drawer and closed it is a rail.
+
+Tests: `tests/ui/test_polish_ui.py` (the recent chats, the resizing by keyboard and by dragging, the limits, where the edge exists, the model name's colour). The tests that clicked a sidebar link by its name on the new-chat screen now say `#conversations`, because the same title is also a recent chat there.
+
+## What was left alone
+The Settings dialog (cards, tabs, switches), the model menu, the code blocks and math, and the phone layout (nothing overflows).

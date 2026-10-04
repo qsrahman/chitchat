@@ -177,9 +177,10 @@ svg {
 /* sidebar: closed by default. Desktop: a narrow icon rail, or the full list when open (it pushes the content).
    Mobile: an overlay drawer (see the media query at the end). */
 body.nav-open {
-  grid-template-columns: 17rem minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w, 17rem) minmax(0, 1fr);
 }
 #sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -187,6 +188,31 @@ body.nav-open {
   padding: 8px;
   background: var(--bg);
   border-right: 1px solid var(--line);
+}
+/* The edge you drag to change the width (nav.js). Only the open, wide sidebar has it. */
+#sidebar-resize {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 1;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+#sidebar-resize:hover,
+#sidebar-resize:focus-visible,
+#sidebar-resize:active {
+  background: linear-gradient(
+    to right,
+    transparent 3px,
+    var(--accent) 3px 5px,
+    transparent 5px
+  );
+}
+#sidebar-resize:focus-visible {
+  outline: 0;
+}
+body:not(.nav-open) #sidebar-resize {
+  display: none;
 }
 .side-head {
   display: flex;
@@ -374,7 +400,13 @@ main:not(.is-started) #title {
 .model-btn:hover {
   background: var(--hover);
 }
+.model-btn:hover #model-name {
+  color: var(
+    --ink
+  ); /* the accent is 4.15:1 on the hover background, under the 4.5:1 text needs */
+}
 .model-btn #model-name {
+  color: var(--accent);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -596,6 +628,29 @@ main:not(.is-started) #thread {
 }
 main:not(.is-started) #empty {
   padding-bottom: 24px;
+}
+/* The latest chats under the composer of a new chat. */
+#recent {
+  display: grid;
+  width: min(var(--col), 100% - 32px);
+  margin-inline: auto;
+  padding: 0 8px;
+}
+#recent a {
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#recent a:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+main.is-started #recent {
+  display: none;
 }
 
 /* messages */
@@ -1103,14 +1158,19 @@ dialog[open]::backdrop {
   border: 1px solid var(--line);
   border-radius: var(--size-6);
   background: var(--raised);
-  box-shadow: var(--shadow-2);
+  /* Quiet in light, where Open Props' shadow-2 looked like a second outline next to the border */
+  box-shadow:
+    0 1px 2px light-dark(rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.5)),
+    0 4px 14px light-dark(rgb(0 0 0 / 0.04), rgb(0 0 0 / 0.3));
   transition:
     border-color 0.15s var(--ease-out-3),
     box-shadow 0.2s var(--ease-out-3);
 }
 .composer:focus-within {
   border-color: color-mix(in srgb, var(--ink) 35%, var(--line));
-  box-shadow: var(--shadow-3);
+  box-shadow:
+    0 1px 2px light-dark(rgb(0 0 0 / 0.07), rgb(0 0 0 / 0.55)),
+    0 6px 20px light-dark(rgb(0 0 0 / 0.07), rgb(0 0 0 / 0.4));
 }
 /* stacked: when the text wraps (set from app.js), and always on narrow screens, where the controls would squeeze the input */
 .composer.is-multiline {
@@ -1864,6 +1924,9 @@ dialog input[type='number'] {
 }
 
 @media (max-width: 760px) {
+  #sidebar-resize {
+    display: none;
+  }
   body,
   body.nav-open {
     grid-template: minmax(0, 1fr) / minmax(0, 1fr);

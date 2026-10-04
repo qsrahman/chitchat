@@ -130,7 +130,29 @@ export function hideChat(id, render = true) {
   if (render) renderList()
 }
 
+// Under the composer on the new-chat screen: the latest few chats, one click from picking up where you left off.
+const RECENT = 3
+function renderRecent() {
+  const shown = showArchived
+    ? []
+    : state.convs.filter((c) => c.id !== hiddenId).slice(0, RECENT)
+  const nav = $('recent')
+  nav.hidden = !shown.length
+  nav.replaceChildren(
+    ...shown.map((c) => {
+      const link = Object.assign(document.createElement('a'), {
+        href: `#${c.id}`,
+        textContent: c.title,
+        dir: 'auto',
+        title: c.title,
+      })
+      return link
+    }),
+  )
+}
+
 export function renderList() {
+  renderRecent()
   if (searchBox.value.trim()) return // results are showing; they stay until the box is cleared
   const nav = $('conversations')
   const shown = state.convs.filter((c) => c.id !== hiddenId) // a chat waiting to be deleted is hidden

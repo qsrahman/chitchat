@@ -20,6 +20,16 @@
   />
   <body>
     <aside id="sidebar" aria-label="Conversations">
+      <div
+        id="sidebar-resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Sidebar width"
+        aria-valuemin="224"
+        aria-valuemax="480"
+        aria-valuenow="272"
+        tabindex="0"
+      ></div>
       <div class="side-head">
         <span class="brand">ChitChat</span>
         <button
@@ -233,6 +243,8 @@
         <p id="composer-note" class="composer-note" role="alert" hidden></p>
         <input id="file-input" type="file" multiple hidden />
       </form>
+
+      <nav id="recent" aria-label="Recent chats" hidden></nav>
 
       <div id="toast" role="status" hidden>
         <span></span>
