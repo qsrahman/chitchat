@@ -2,11 +2,11 @@
 
     uv run python scripts/check.py
 
-It runs the Python lint (ruff), the type checker (pyright, on `app/`), the JavaScript format check (prettier, settings
-in `.prettierrc.json`) and lint (eslint: both when Node is installed, and a missing import in the UI only shows when
-that line runs, and nothing else here would find it), tsc (the UI's types, from JSDoc) and the whole test suite, in
-parallel. Stops at the first step that fails. The network is not needed once prettier, eslint and tsc have been
-fetched once. See docs/development.md.
+It runs the Python lint (ruff), the type checker (pyright, on `app/`), the format check of the UI files (prettier,
+settings in `.prettierrc.json`) and lint (eslint: both when Node is installed, and a missing import in the UI only
+shows when that line runs, and nothing else here would find it), tsc (the UI's types, from JSDoc) and the whole test
+suite, in parallel. Stops at the first step that fails. The network is not needed once prettier, eslint and tsc have
+been fetched once. See docs/development.md.
 """
 import shutil
 import subprocess
@@ -16,7 +16,7 @@ import time
 STEPS = [
     ("ruff", ["uv", "run", "ruff", "check", "."]),
     ("pyright", ["uv", "run", "pyright"]),
-    ("prettier", ["npx", "--yes", "prettier@3", "--check", "app/static/*.js", "app/static/early/*.js"]),
+    ("prettier", ["npx", "--yes", "prettier@3", "--check", "app/static"]),
     ("eslint", ["npx", "--yes", "eslint@10", "app/static"]),
     ("tsc", ["npx", "--yes", "-p", "typescript@7", "tsc", "-p", "jsconfig.json"]),
     ("tests", ["uv", "run", "pytest", "-q"]),

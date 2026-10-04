@@ -71,7 +71,7 @@ def test_the_tabs_work_with_arrows_home_and_end_and_only_one_is_in_the_tab_order
     page.keyboard.press("Home")
     expect(general).to_be_focused()
     tabbable = d.get_by_role("tab").evaluate_all(
-        "tabs => tabs.filter((t) => t.tabIndex === 0).map((t) => t.textContent)")
+        "tabs => tabs.filter((t) => t.tabIndex === 0).map((t) => t.innerText)")
     assert tabbable == ["General"]
 
 
