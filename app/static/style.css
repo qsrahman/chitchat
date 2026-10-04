@@ -1001,6 +1001,13 @@ main.is-started #recent {
 .actions .icon-btn {
   padding: 5px;
 }
+.actions .icon-btn.with-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  font-size: var(--text-sm);
+}
 .reply-meta {
   display: flex;
   align-items: center;
@@ -1986,6 +1993,11 @@ dialog input[type='number'] {
   }
   .conv a {
     padding-block: 11px;
+  }
+  /* the rows of every menu: the chat menu, the model lists and the tools */
+  .menu-item,
+  .tool-row {
+    min-height: 44px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

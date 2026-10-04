@@ -84,7 +84,7 @@ export function updateActions() {
     )
   } else if (last && lastUser) {
     actionsOf(last).append(
-      iconButton('Retry', ICONS.refresh, () => retry(lastUser)),
+      retryButton(() => retry(lastUser)),
       anotherModel((model) => retry(lastUser, model)),
     )
   }
@@ -101,6 +101,14 @@ export function updateActions() {
     }
     actionsOf(m).append(meta)
   }
+}
+
+// After a failed reply the way forward is the one thing to do: the icon has its word beside it (the name is the same).
+function retryButton(onclick) {
+  const b = iconButton('Retry', ICONS.refresh, onclick)
+  b.classList.add('with-label')
+  b.append(textEl('span', 'Retry'))
+  return b
 }
 
 // The button after Regenerate / Retry: a menu of models to run that reply again with.

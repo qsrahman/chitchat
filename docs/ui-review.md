@@ -32,3 +32,14 @@ Tests: `tests/ui/test_polish_ui.py` (the recent chats, the resizing by keyboard 
 
 ## What was left alone
 The Settings dialog (cards, tabs, switches), the model menu, the code blocks and math, and the phone layout (nothing overflows).
+
+## A second pass: the moments, not the resting page
+The first review looked at the page at rest. This one drove the states that matter most with scripted replies: a web search and its sources, a reply streaming (and its Stop button), a failed reply, attachments in the message box and in a sent message, the drop overlay, a message box of several lines, the undo toast, and a phone-sized window. Nearly everything held: the streaming edge, the Stop button, the sources list, the chips (stacked on a phone) and the drop overlay read well. Three things did not:
+
+- **The end of the conversation was covered when the message box grew.** Adding an attachment or typing several lines made the box taller and the pane shorter, and the last reply's buttons (or the failed reply's Retry) slid under the box. A reader at the bottom now stays at the bottom: a `ResizeObserver` on the pane keeps it pinned while `state.stick` says they were there, and leaves a reader who scrolled up where they are.
+- **After a failed reply the way forward was an unlabeled icon.** Retry now has its word beside the icon (the accessible name was already "Retry"). A normal reply's Regenerate stays the bare icon.
+- **Touch targets in the menus.** On a touch screen the rows of the chat menu, the model lists and the tools menu were 43px; they are 44px, as the rest of the page's controls (the sidebar rows were already).
+
+A thing that looked wrong and was not: after deleting a chat the new-chat screen still listed a chat of the same title. It was another chat; the one waiting to be deleted is hidden from the recent list, which a test now pins (`test_a_chat_waiting_to_be_deleted_is_not_a_recent_chat_and_undo_opens_it_again`). And "3 results" over a list of two links is the count the model got: a result that is not a web address is not made a link, by design.
+
+Tests: `tests/ui/test_polish_ui.py` (staying at the end, not following a reader who scrolled up, Retry's word) and `tests/ui/test_chat_menu_ui.py` (44px rows).

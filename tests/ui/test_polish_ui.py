@@ -1,7 +1,7 @@
 """Details of how a conversation reads: the line under a reply, the disclosure marker, the spacing."""
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app, send
+from tests.ui.test_chat_ui import chat_menu, open_app, send
 
 
 def saved(page, count=1):
@@ -167,3 +167,65 @@ def test_the_model_name_is_the_accent_and_readable_on_hover(page, app_url):
     resting = color()
     page.locator(".model-btn").hover()
     assert color() != resting  # on the hover background the accent is too faint for text, so it turns to the ink
+
+
+def test_a_chat_waiting_to_be_deleted_is_not_a_recent_chat_and_undo_opens_it_again(page, app_url):
+    open_app(page, app_url)
+    send(page, "goner")  # made in this session, so it is only in the list the page has refreshed
+    saved(page)
+    chat_menu(page).get_by_role("menuitem", name="Delete…").click()
+    page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+    expect(page.get_by_role("status")).to_contain_text('Deleted "goner"')
+    expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
+    expect(page.get_by_role("navigation", name="Recent chats")).to_be_hidden()  # nothing left to show
+    page.get_by_role("button", name="Undo").click()
+    expect(page.locator("#title")).to_have_text("goner")  # it is open again
+
+
+# ---- the end of the conversation stays in view ----
+
+SCROLLS = "() => { const e = document.getElementById('messages'); return e.scrollHeight > e.clientHeight }"
+AT_THE_END = ("() => { const e = document.getElementById('messages'); "
+              "return e.scrollHeight - e.scrollTop - e.clientHeight < 2 }")
+
+
+def gap_below(page):
+    """How far the end of the thread is below the bottom of the visible pane (0: the reader is at the end)."""
+    return page.locator("#messages").evaluate("e => e.scrollHeight - e.scrollTop - e.clientHeight")
+
+
+def test_a_reader_at_the_end_stays_there_when_the_message_box_grows(page, app_url):
+    page.set_viewport_size({"width": 1100, "height": 520})
+    open_app(page, app_url)
+    send(page, "long answer please")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=15000)
+    page.wait_for_function(SCROLLS)
+    assert gap_below(page) < 2
+    page.get_by_label("Message", exact=True).fill("one\ntwo\nthree\nfour\nfive\nsix")  # the box grows by lines
+    expect(page.locator(".composer")).to_have_class("composer is-multiline")
+    page.wait_for_function(AT_THE_END)
+    expect(page.locator(".msg.assistant .actions button").first).to_be_in_viewport()  # not covered by the box
+
+
+def test_a_reader_who_scrolled_up_is_left_where_they_are_when_the_box_grows(page, app_url):
+    page.set_viewport_size({"width": 1100, "height": 520})
+    open_app(page, app_url)
+    send(page, "long answer please")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=15000)
+    page.locator("#messages").evaluate("e => { e.scrollTop = 0 }")
+    expect(page.get_by_role("button", name="Jump to latest")).to_be_visible()
+    page.get_by_label("Message", exact=True).fill("one\ntwo\nthree\nfour\nfive\nsix")
+    expect(page.locator(".composer")).to_have_class("composer is-multiline")
+    assert page.locator("#messages").evaluate("e => e.scrollTop") < 5  # still at the top
+
+
+def test_after_a_failed_reply_retry_has_its_word(page, app_url):
+    open_app(page, app_url)
+    send(page, "fail now")
+    expect(page.locator(".msg.error")).to_contain_text("simulated failure")
+    retry = page.get_by_role("button", name="Retry")
+    expect(retry).to_be_visible()
+    expect(retry).to_have_text("Retry")  # the word beside the icon, and the same name
+    retry.click()
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply")
+    expect(page.get_by_role("button", name="Regenerate")).to_have_text("")  # a normal reply keeps the bare icon

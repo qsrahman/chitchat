@@ -1,4 +1,6 @@
 """The ⋯ menu of a chat: in the header for the open chat and on every sidebar row, one menu for both."""
+import re
+
 from playwright.sync_api import expect
 
 from tests.ui.test_chat_ui import chat_menu, open_app, open_sidebar, row_action, send
@@ -110,3 +112,25 @@ def test_the_menu_stays_on_screen_on_a_phone(page, app_url):
     page.get_by_role("button", name='Actions for "a chat"').click()
     box = page.get_by_role("menu", name="Chat actions").bounding_box()
     assert box["x"] >= 0 and box["x"] + box["width"] <= 375
+
+
+def test_every_menu_row_is_a_44px_target_on_a_touch_screen(browser, app_url):
+    context = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True)
+    page = context.new_page()
+    open_app(page, app_url)
+    saved_chat(page)
+    heights = lambda menu: menu.locator("[role=menuitem], .tool-row").evaluate_all(  # noqa: E731
+        "rows => rows.map((r) => Math.round(r.getBoundingClientRect().height))")
+    menu = chat_menu(page)
+    assert len(heights(menu)) == 7 and min(heights(menu)) >= 44
+    page.keyboard.press("Escape")
+    page.get_by_role("button", name=re.compile("^Model")).click()
+    model_menu = page.get_by_role("menu", name="Choose a model")
+    expect(model_menu).to_be_visible()
+    assert min(heights(model_menu)) >= 44
+    page.keyboard.press("Escape")
+    page.get_by_role("button", name="Tools", exact=True).click()
+    tools = page.locator("#tools-menu")
+    expect(tools).to_be_visible()
+    assert min(heights(tools)) >= 44
+    context.close()

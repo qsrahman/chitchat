@@ -23,6 +23,11 @@ messagesEl.addEventListener('scroll', () => {
   state.stick = nearBottom()
   $('jump').hidden = state.stick
 })
+// A reader at the bottom stays at the bottom when the pane changes height: the message box grows with its text or its
+// attachments (and the window resizes), which would otherwise cover the end of the last reply and its buttons.
+new ResizeObserver(() => {
+  if (state.stick) scrollToBottom()
+}).observe(messagesEl)
 $('jump').onclick = () => {
   state.stick = true
   scrollToBottom()

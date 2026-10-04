@@ -4,7 +4,7 @@
 const browser = Object.fromEntries(
   ("document window location history fetch localStorage navigator requestAnimationFrame cancelAnimationFrame " +
     "setTimeout clearTimeout URL FormData AbortController TextDecoderStream CSS matchMedia getComputedStyle " +
-    "innerWidth innerHeight performance Option HTMLElement CustomEvent Event EventTarget console DOMPurify marked hljs katex")
+    "innerWidth innerHeight performance Option HTMLElement ResizeObserver CustomEvent Event EventTarget console DOMPurify marked hljs katex")
     .split(" ").map((name) => [name, "readonly"]),
 );
 
