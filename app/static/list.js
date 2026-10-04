@@ -1,5 +1,5 @@
-// The sidebar's list of conversations: paging, search, rename, pin and archive. Delete is in delete.js, the drawer in
-// nav.js, the shortcuts in shortcuts.js, and backup and import in backup.js.
+// The sidebar's list of conversations: paging, search, and the rename, pin and archive that the chat menu (chat-menu.js)
+// calls. Delete is in delete.js, the drawer in nav.js, the shortcuts in shortcuts.js, and backup and import in backup.js.
 import { $, ICONS, api, bus, iconButton, showDialog, state } from './core.js'
 import { jumpTo } from './messages.js'
 import { closeNavIfOverlay } from './nav.js'
@@ -25,15 +25,7 @@ const PAGE = 50
 let more = false // the last request came back full, so there may be older chats
 let showArchived = false // the list is the archived chats (the "Archived chats" button in the footer)
 
-// The header's Download button: a link to this chat as Markdown, there once the chat exists.
-function syncExport() {
-  const link = $('export-btn')
-  link.hidden = !state.id
-  if (state.id) link.href = `/api/conversations/${state.id}/export?format=md`
-}
-
 export async function refreshList() {
-  syncExport()
   const limit = Math.min(500, Math.max(PAGE, state.convs.length))
   state.convs = await api(
     `/conversations?limit=${limit}&archived=${showArchived}`,
@@ -189,29 +181,19 @@ function renderConv(c) {
   link.title = c.title
   if (c.id === state.id) link.setAttribute('aria-current', 'page')
   link.onclick = closeNavIfOverlay
-  const pin = iconButton(
-    `${c.pinned ? 'Unpin' : 'Pin'} "${c.title}"`,
-    ICONS.pin,
-    () => setFlags(c, { pinned: !c.pinned }),
-  )
-  pin.classList.toggle('is-on', !!c.pinned) // a pinned chat shows it without the mouse over it
-  li.append(
-    link,
-    ...(showArchived ? [] : [pin]),
-    iconButton(`Rename "${c.title}"`, ICONS.pencil, () => renameConv(c)),
-    iconButton(
-      `${showArchived ? 'Unarchive' : 'Archive'} "${c.title}"`,
-      ICONS.archive,
-      () => setFlags(c, { archived: !showArchived }),
-    ),
-    iconButton(`Delete "${c.title}"`, ICONS.trash, () =>
-      bus.dispatchEvent(new CustomEvent('delete-chat', { detail: c })),
+  // Everything else you can do with a chat is one menu away (chat-menu.js listens): a row of four icons crowded the title.
+  const more = iconButton(`Actions for "${c.title}"`, ICONS.more, () =>
+    bus.dispatchEvent(
+      new CustomEvent('chat-menu', { detail: { button: more, conv: c } }),
     ),
   )
+  more.setAttribute('aria-haspopup', 'menu')
+  more.setAttribute('aria-expanded', 'false')
+  li.append(link, more)
   return li
 }
 
-async function setFlags(c, flags) {
+export async function setFlags(c, flags) {
   await api(`/conversations/${c.id}`, {
     method: 'PATCH',
     body: JSON.stringify(flags),
@@ -227,7 +209,7 @@ $('archived-btn').onclick = async () => {
   await refreshList()
 }
 
-async function renameConv(c) {
+export async function renameConv(c) {
   $('rename-input').value = c.title
   if ((await showDialog($('rename-dialog'))) !== 'save') return
   const title = $('rename-input').value.trim()

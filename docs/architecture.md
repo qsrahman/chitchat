@@ -23,7 +23,8 @@ Streaming uses FastAPI's own SSE support (`fastapi.sse.EventSourceResponse`): ea
 | `controls.js` | thinking effort select, web search toggle, tools menu |
 | `settings.js` | settings of the open chat (`setSettings`, `saveSettings`), the model list, the settings and instructions dialogs |
 | `model-menu.js`, `retry-menu.js` | the header model picker, and the "try again with another model" menu |
-| `list.js` | the sidebar's conversation list: paging, search, rename, pin and archive |
+| `list.js` | the sidebar's conversation list: paging, search, and the rename, pin and archive that the chat menu calls |
+| `chat-menu.js` | the ⋯ menu of a chat, in the header and on each sidebar row (`docs/ui-review.md`) |
 | `delete.js` | deleting a chat with ten seconds to undo it |
 | `nav.js`, `shortcuts.js` | the drawer; the keyboard shortcuts |
 | `backup.js` | the backup dialog and what an import says it did |

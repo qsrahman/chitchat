@@ -1,6 +1,6 @@
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import conv_id, open_app, send
+from tests.ui.test_chat_ui import conv_id, open_app, open_chat_settings, send
 from tests.ui.test_model_picker_ui import pick
 
 
@@ -61,8 +61,7 @@ def test_it_stays_in_sync_with_the_settings_dialog(page, app_url):
     open_app(page, app_url)
     pick(page, "gpt-5-mini")
     effort(page).select_option("high")
-    page.get_by_role("button", name="Chat settings").click()
-    dialog = page.get_by_role("dialog", name="Chat settings")
+    dialog = open_chat_settings(page)
     expect(dialog.get_by_label("Reasoning effort")).to_have_value("high")
     dialog.get_by_label("Reasoning effort").select_option("medium")
     dialog.get_by_role("button", name="Save").click()

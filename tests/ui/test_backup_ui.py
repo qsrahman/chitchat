@@ -3,7 +3,7 @@ import json
 
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app, open_prefs, open_sidebar, send
+from tests.ui.test_chat_ui import open_app, open_prefs, open_sidebar, row_action, send
 
 CHAT_ID = "ab" * 16
 
@@ -170,7 +170,7 @@ def test_a_backup_with_attachments_brings_the_pictures_back(page, app_url):
     zipped = download.value.path()
     dialog.get_by_role("button", name="Close").click()
     open_sidebar(page)
-    page.get_by_role("button", name='Delete "keep this picture"').click()  # gone, files and all
+    row_action(page, "keep this picture", "Delete…")  # gone, files and all
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.get_by_text("Your conversations will show up here.")).to_be_visible()
     finish_delete(page)
@@ -194,7 +194,7 @@ def test_importing_a_chat_you_just_deleted_brings_it_back_and_it_stays(page, app
     cid = page.url.split("#")[1]
     backup = page.request.get(f"{app_url}/api/export").body()
     open_sidebar(page)
-    page.get_by_role("button", name='Delete "tell me about quokkas"').click()
+    row_action(page, "tell me about quokkas", "Delete…")
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.locator("#toast")).to_be_visible()
     dialog = open_backup(page)

@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.helpers import PNG
-from tests.ui.test_chat_ui import open_prefs
+from tests.ui.test_chat_ui import chat_menu, open_chat_settings, open_prefs, row_action
 
 AXE = (Path(__file__).parent / "assets" / "axe.min.js").read_text()
 
@@ -143,13 +143,13 @@ def test_the_drop_overlay(page_with_axe):
 
 
 @pytest.mark.parametrize("opener, dialog", [
-    (lambda p: p.get_by_role("button", name="Chat settings").click(), "Chat settings"),
+    (lambda p: open_chat_settings(p), "Instructions for this chat"),
     (lambda p: open_prefs(p, "General"), "Settings"),
     (lambda p: open_prefs(p, "Personalization"), "Settings"),
     (lambda p: open_prefs(p, "Data controls"), "Settings"),
     (lambda p: open_prefs(p, "Server"), "Settings"),
-    (lambda p: p.get_by_role("button", name="Rename").first.click(force=True), "Rename conversation"),
-    (lambda p: p.get_by_role("button", name="Delete").first.click(force=True), "Delete this conversation?"),
+    (lambda p: row_action(p, "hello", "Rename…"), "Rename conversation"),
+    (lambda p: row_action(p, "hello", "Delete…"), "Delete this conversation?"),
 ])
 def test_each_dialog(page_with_axe, opener, dialog):
     page = page_with_axe
@@ -235,7 +235,7 @@ def test_the_undo_toast(page_with_axe):
     page = page_with_axe
     say(page, "hello")
     page.get_by_role("button", name="Show conversations").first.click()
-    page.get_by_role("button", name="Delete").first.click(force=True)
+    row_action(page, "hello", "Delete…")
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.locator("#toast")).to_be_visible()
     assert violations(page) == []
@@ -280,12 +280,27 @@ def test_pinned_and_archived_lists(page_with_axe):
     page = page_with_axe
     say(page, "hello")
     page.get_by_role("button", name="Show conversations").first.click()
-    page.get_by_role("button", name=re.compile('^Pin "')).click()
+    row_action(page, "hello", "Pin")
     expect(page.locator("#conversations h2").first).to_have_text("Pinned")
     assert violations(page) == []
-    page.get_by_role("button", name=re.compile('^Archive "')).click()
+    row_action(page, "hello", "Archive")
     page.get_by_role("button", name="Archived chats").click()
-    expect(page.get_by_role("button", name=re.compile('^Unarchive "'))).to_be_visible()
+    expect(page.get_by_role("button", name=re.compile('^Actions for "'))).to_be_visible()
+    assert violations(page) == []
+
+
+def test_the_chat_menus(page_with_axe):
+    page = page_with_axe
+    chat_menu(page)  # a new chat: just its instructions
+    assert violations(page) == []
+    page.keyboard.press("Escape")
+    say(page, "hello")
+    chat_menu(page)  # a chat: rename, pin, download, archive, delete
+    assert violations(page) == []
+    page.keyboard.press("Escape")
+    page.get_by_role("button", name="Show conversations").first.click()
+    page.get_by_role("button", name=re.compile('^Actions for "')).click()  # the same menu from a row
+    expect(page.get_by_role("menu", name="Chat actions")).to_be_visible()
     assert violations(page) == []
 
 

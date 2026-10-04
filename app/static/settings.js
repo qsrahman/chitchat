@@ -3,13 +3,13 @@ import { $, DEFAULT_SETTINGS, api, bus, state, thread } from './core.js'
 
 export function setSettings(settings) {
   state.settings = settings
-  // The dot on the settings button means "something besides the model and the tools is customized": those have
+  // The dot on the chat menu button means "something besides the model and the tools is customized": those have
   // their own controls in the header and the composer.
   const own = ['model', 'tools', 'reasoning_effort']
   const customized = Object.keys(DEFAULT_SETTINGS).some(
     (k) => !own.includes(k) && settings[k] !== DEFAULT_SETTINGS[k],
   )
-  $('settings-btn').toggleAttribute('data-active', customized)
+  $('chat-menu-btn').toggleAttribute('data-active', customized)
   bus.dispatchEvent(new Event('settings'))
 }
 
@@ -89,43 +89,14 @@ export async function refreshModels() {
   bus.dispatchEvent(new Event('models'))
 }
 
-/** @type {Map<string, boolean | undefined>} */
-let reasoningModels = new Map() // model id -> takes reasoning effort (otherwise temperature)
+// The fields of the dialog that depend on the model: a thinking model takes a reasoning effort, the others a
+// temperature (an unlisted model shows both: the server sends the one that applies).
 function syncSettingsFields() {
-  const reasoning = reasoningModels.get($('set-model').value) // "" = the default model
+  const reasoning = modelInfo.models.find(
+    (m) => m.id === currentModel(),
+  )?.reasoning
   $('effort-field').hidden = reasoning === false
-  $('temp-field').hidden = reasoning === true // unknown model: show both, the server sends the one that applies
-}
-$('set-model').addEventListener('change', syncSettingsFields)
-
-// The model and effort choices come from the list the page already has, so the dialog opens at once; the list is
-// refreshed in the background and the choices rebuilt, keeping what has been picked meanwhile.
-function fillModelChoices(model, effort) {
-  const { default: fallback, efforts = [], models } = modelInfo
-  // "" is what the Default option carries, so it needs the default model's own reasoning flag. Both lines
-  // below ask for the default by id rather than trusting the order /api/models happens to use.
-  reasoningModels = new Map([
-    ['', models.find((m) => m.id === fallback)?.reasoning],
-    ...models.map(
-      (m) => /** @type {[string, boolean | undefined]} */ ([m.id, m.reasoning]),
-    ),
-  ])
-  const options = models
-    .filter((m) => m.id !== fallback)
-    .map((m) => new Option(m.id, m.id))
-  if (model && !reasoningModels.has(model))
-    options.push(new Option(model, model)) // no longer listed
-  $('set-model').replaceChildren(
-    new Option(`Default (${fallback ?? '…'})`, ''),
-    ...options,
-  )
-  $('set-effort').replaceChildren(
-    new Option('Default', ''),
-    ...efforts.map((e) => new Option(e, e)),
-  )
-  $('set-model').value = model ?? ''
-  $('set-effort').value = effort ?? ''
-  syncSettingsFields()
+  $('temp-field').hidden = reasoning === true
 }
 
 // What this chat has used so far, from the token counts on the replies on the page (so: the version being read, not
@@ -141,35 +112,27 @@ function showUsageTotal() {
   total.textContent = `Tokens in the replies shown: ${sum.input_tokens.toLocaleString()} in, ${sum.output_tokens.toLocaleString()} out.`
 }
 
+// The chat's own settings (the chat menu, and the model menu's last item): what to tell the model and how it samples.
+// The model itself is chosen in the header, so this dialog only needs the model list to know which fields apply.
 export function openSettings() {
   const s = state.settings
   const dialog = $('settings-dialog')
-  fillModelChoices(s.model, s.reasoning_effort)
+  $('set-effort').replaceChildren(
+    new Option('Default', ''),
+    ...(modelInfo.efforts ?? []).map((e) => new Option(e, e)),
+  )
+  $('set-effort').value = s.reasoning_effort ?? ''
   $('set-system').value = s.system_prompt
   $('set-temp').value = s.temperature ?? ''
-  $('export-row').hidden = !state.id
-  if (state.id) {
-    // no hrefs before there is a conversation, so nothing can ask for /conversations/null
-    $('export-md').href = `/api/conversations/${state.id}/export?format=md`
-    $('export-json').href = `/api/conversations/${state.id}/export?format=json`
-  }
+  syncSettingsFields()
   showUsageTotal()
   dialog.querySelector('.field-error').hidden = true
   dialog.showModal()
-  refreshModels().then(() => {
-    if (dialog.open)
-      fillModelChoices(
-        $('set-model').value || null,
-        $('set-effort').value || null,
-      )
-  })
 }
-$('settings-btn').onclick = openSettings
 
 bindSave($('settings-dialog'), async () => {
   await saveSettings({
-    ...state.settings, // keeps what the dialog doesn't show, such as the tools
-    model: $('set-model').value || null,
+    ...state.settings, // keeps what the dialog doesn't show: the model and the tools
     system_prompt: $('set-system').value.trim(),
     reasoning_effort: $('set-effort').value || null,
     temperature:

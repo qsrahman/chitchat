@@ -308,10 +308,6 @@ body.nav-open {
 .conv .icon-btn:hover {
   color: var(--ink);
 }
-.conv .icon-btn.is-on {
-  opacity: 1;
-  color: var(--accent);
-}
 #archived-btn[aria-pressed='true'] {
   background: var(--hover);
   box-shadow: inset 2px 0 0 var(--accent);
@@ -392,7 +388,8 @@ main:not(.is-started) #title {
 /* model menu: a popover under the header button (placed from app.js: CSS anchor positioning is not widely available) */
 #model-menu,
 #tools-menu,
-#retry-menu {
+#retry-menu,
+#chat-menu {
   position: fixed;
   inset: auto;
   margin: 0;
@@ -437,6 +434,28 @@ main:not(.is-started) #title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.menu-item > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+a.menu-item {
+  color: inherit;
+  text-decoration: none;
+}
+.menu-item.is-danger,
+.menu-item.is-danger > svg {
+  color: var(--danger);
+}
+.menu-sep {
+  margin: 6px 4px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+#chat-menu {
+  width: min(17rem, 100vw - 16px);
 }
 .menu-tag {
   flex: none;
@@ -507,19 +526,17 @@ main:not(.is-started) #title {
   margin: 4px 10px;
 }
 
-#settings-btn,
-#export-btn {
+#chat-menu-btn {
   position: relative;
   color: var(--muted);
 }
-#settings-btn:hover,
-#export-btn:hover {
+#chat-menu-btn:hover {
   color: var(--ink);
 }
-#settings-btn[data-active] {
+#chat-menu-btn[data-active] {
   color: var(--accent);
 }
-#settings-btn[data-active]::after {
+#chat-menu-btn[data-active]::after {
   content: '';
   position: absolute;
   top: 4px;
@@ -955,6 +972,7 @@ main:not(.is-started) #empty {
 #model-menu:popover-open,
 #tools-menu:popover-open,
 #retry-menu:popover-open,
+#chat-menu:popover-open,
 dialog[open] {
   transition:
     opacity 0.16s var(--ease-out-3),
@@ -967,6 +985,7 @@ dialog[open]::backdrop {
   #model-menu:popover-open,
   #tools-menu:popover-open,
   #retry-menu:popover-open,
+  #chat-menu:popover-open,
   dialog[open] {
     opacity: 0;
     translate: 0 -6px;
@@ -1462,6 +1481,17 @@ dialog input[type='number'] {
 #settings-dialog {
   width: min(30rem, 100% - 32px);
 }
+#settings-dialog .pref-card + .pref-card {
+  margin-top: 12px;
+}
+#settings-dialog .pref-row :is(input, select) {
+  width: 8rem;
+  flex: none;
+  margin: 0;
+}
+.pref-row[hidden] + .pref-row {
+  border-top: 0;
+}
 .field-note {
   margin-top: 14px !important;
   font-size: var(--text-sm);
@@ -1574,17 +1604,17 @@ dialog input[type='number'] {
   min-width: 0;
   margin: 0;
 }
-#prefs-dialog :is(.pref-text label, .pref-label) {
+:is(#prefs-dialog, #settings-dialog) :is(.pref-text label, .pref-label) {
   display: block;
   margin: 0;
   font-size: 1rem;
   color: var(--ink);
 }
-#prefs-dialog .pref-text p {
+:is(#prefs-dialog, #settings-dialog) .pref-text p {
   margin: 0;
   font-size: var(--text-sm);
 }
-#prefs-dialog .pref-text code {
+:is(#prefs-dialog, #settings-dialog) .pref-text code {
   font-size: var(--font-size-0);
   color: var(--muted);
 }
@@ -1594,12 +1624,13 @@ dialog input[type='number'] {
   overflow-wrap: anywhere;
   max-width: 55%;
 }
-#prefs-dialog .pref-row :is(select, .btn) {
+:is(#prefs-dialog, #settings-dialog) .pref-row :is(select, .btn) {
   width: auto;
   flex: none;
   margin: 0;
 }
 #prefs-dialog textarea,
+#settings-dialog textarea,
 #prefs-dialog input[type='file'] {
   margin: 0;
 }

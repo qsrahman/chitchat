@@ -31,6 +31,30 @@ def open_prefs(page: Page, tab: str = "General"):
     return dialog
 
 
+def chat_menu(page: Page):
+    """Open the header's ⋯ menu (everything you can do with the open chat); returns it."""
+    page.get_by_role("button", name="Chat actions").click()
+    menu = page.get_by_role("menu", name="Chat actions")
+    expect(menu).to_be_visible()
+    return menu
+
+
+def open_chat_settings(page: Page):
+    """Open "Instructions for this chat" (system prompt, temperature, effort) from the chat menu; returns the dialog."""
+    chat_menu(page).get_by_role("menuitem", name="Instructions for this chat…").click()
+    dialog = page.get_by_role("dialog", name="Instructions for this chat")
+    expect(dialog).to_be_visible()
+    return dialog
+
+
+def row_action(page: Page, title: str, action: str):
+    """Choose an action from the ⋯ menu of a sidebar row (the sidebar must be open)."""
+    page.get_by_role("button", name=f'Actions for "{title}"').click()
+    menu = page.get_by_role("menu", name="Chat actions")
+    expect(menu).to_be_visible()
+    menu.get_by_role("menuitem", name=action, exact=True).click()
+
+
 def conv_id(page: Page) -> str:
     return page.url.split("#")[1]
 
@@ -344,7 +368,7 @@ def test_rename_via_dialog_with_enter(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
-    page.get_by_role("button", name='Rename "old name"').click()
+    row_action(page, "old name", "Rename…")
     dialog = page.get_by_role("dialog", name="Rename conversation")
     expect(dialog.get_by_label("Conversation title")).to_be_focused()
     dialog.get_by_label("Conversation title").fill("Shiny new name")
@@ -362,7 +386,7 @@ def test_rename_can_be_cancelled_with_escape(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
-    page.get_by_role("button", name='Rename "stay put"').click()
+    row_action(page, "stay put", "Rename…")
     page.get_by_label("Conversation title").fill("nope")
     page.keyboard.press("Escape")
     expect(page.get_by_role("dialog")).to_have_count(0)
@@ -381,12 +405,12 @@ def test_delete_asks_first_then_removes(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     open_sidebar(page)
-    page.get_by_role("button", name='Delete "doomed chat"').click()
+    row_action(page, "doomed chat", "Delete…")
     dialog = page.get_by_role("dialog", name="Delete this conversation?")
     expect(dialog).to_contain_text("doomed chat")
     dialog.get_by_role("button", name="Keep it").click()
     expect(page.locator("#conversations a")).to_have_text("doomed chat")
-    page.get_by_role("button", name='Delete "doomed chat"').click()
+    row_action(page, "doomed chat", "Delete…")
     dialog.get_by_role("button", name="Delete").click()
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
     expect(page.get_by_text("Your conversations will show up here.")).to_be_visible()

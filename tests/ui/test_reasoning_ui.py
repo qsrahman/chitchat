@@ -1,6 +1,6 @@
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app, send
+from tests.ui.test_chat_ui import open_app, open_chat_settings, send
 
 
 def test_reasoning_streams_open_then_collapses_and_can_be_expanded(page, app_url):
@@ -45,7 +45,7 @@ def test_a_reply_without_a_count_has_no_usage_tag(page, app_url):
     send(page, "hello")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(page.locator(".usage-tag")).to_have_count(0)
-    page.get_by_role("button", name="Chat settings").click()
+    open_chat_settings(page)
     expect(page.locator("#usage-total")).to_be_hidden()
 
 
@@ -55,7 +55,7 @@ def test_the_chat_settings_add_up_the_replies_shown(page, app_url):
     expect(page.locator(".usage-tag")).to_have_count(1)
     send(page, "ponder again")
     expect(page.locator(".usage-tag")).to_have_count(2)
-    page.get_by_role("button", name="Chat settings").click()
+    open_chat_settings(page)
     expect(page.locator("#usage-total")).to_have_text(
         "Tokens in the replies shown: 2,468 in, 1,134 out."
     )

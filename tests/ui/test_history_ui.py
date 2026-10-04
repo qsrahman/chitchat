@@ -3,7 +3,15 @@ import re
 
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app, open_sidebar, send
+from tests.ui.test_chat_ui import (
+    chat_menu,
+    conv_id,
+    open_app,
+    open_chat_settings,
+    open_sidebar,
+    row_action,
+    send,
+)
 
 
 def search_box(page):
@@ -59,39 +67,38 @@ def test_a_snippet_is_text_not_html(page, app_url):
     expect(page.locator(".result b")).to_have_count(0)
 
 
-def test_export_links_in_settings_download_the_chat(page, app_url):
+def test_the_chat_menu_downloads_the_chat_as_markdown_or_json(page, app_url):
     open_app(page, app_url)
-    page.get_by_role("button", name="Chat settings").click()
-    expect(page.locator("#settings-dialog")).to_be_visible()
-    expect(page.locator("#export-row")).to_be_hidden()  # nothing to export in a new chat
-    assert page.locator("#export-md").get_attribute("href") is None  # so no link can ask for a conversation named null
+    menu = chat_menu(page)
+    # a new chat has no chat yet: nothing to download, rename or delete, so no link can ask for one named null
+    expect(menu.get_by_role("menuitem")).to_have_text(["Instructions for this chat…"])
     page.keyboard.press("Escape")
     send(page, "hello export")
-    page.get_by_role("button", name="Chat settings").click()
-    expect(page.locator("#export-row")).to_be_visible()
+    expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
+    menu = chat_menu(page)
     with page.expect_download() as download:
-        page.get_by_role("link", name="Markdown", exact=True).click()
+        menu.get_by_role("menuitem", name="Download as Markdown").click()
     assert download.value.suggested_filename.endswith(".md")
-    text = open(download.value.path()).read()
-    assert "## You\n\nhello export" in text
+    assert "## You\n\nhello export" in open(download.value.path()).read()
+    menu = chat_menu(page)
+    with page.expect_download() as download:
+        menu.get_by_role("menuitem", name="Download as JSON").click()
+    assert download.value.suggested_filename.endswith(".json")
+    assert "hello export" in open(download.value.path()).read()
 
 
-def test_the_header_has_a_download_button_once_the_chat_exists(page, app_url):
+def test_the_chat_menu_follows_the_chat_on_screen(page, app_url):
     open_app(page, app_url)
-    button = page.get_by_role("link", name="Download as Markdown")
-    expect(button).to_be_hidden()  # nothing to download in a new chat
     send(page, "to keep")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
-    expect(button).to_be_visible()
-    with page.expect_download() as download:
-        button.click()
-    assert download.value.suggested_filename.endswith(".md")
-    assert "## You\n\nto keep" in open(download.value.path()).read()
+    first = conv_id(page)
     page.get_by_role("button", name="New chat").click()
-    expect(button).to_be_hidden()
+    expect(chat_menu(page).get_by_role("menuitem")).to_have_text(["Instructions for this chat…"])
+    page.keyboard.press("Escape")
     page.get_by_role("button", name="Show conversations").click()
     page.get_by_role("link", name="to keep").click()
-    expect(button).to_be_visible()
+    link = chat_menu(page).get_by_role("menuitem", name="Download as Markdown")
+    expect(link).to_have_attribute("href", f"/api/conversations/{first}/export?format=md")
 
 
 def test_the_note_says_when_the_context_was_compacted(page, app_url):
@@ -137,7 +144,7 @@ def test_a_chat_beyond_the_first_page_opens_with_its_title_and_stays_loaded_on_r
     page.get_by_role("button", name="Show more").click()
     page.get_by_role("link", name="chat 000").click()
     expect(page.locator("#title")).to_have_text("chat 000")
-    page.get_by_role("button", name='Rename "chat 001"').click()
+    row_action(page, "chat 001", "Rename…")
     page.locator("#rename-input").fill("renamed one")
     page.get_by_role("button", name="Save").click()
     expect(page.get_by_role("link", name="renamed one")).to_be_visible()
@@ -164,7 +171,7 @@ def test_the_shortcuts_are_ignored_while_a_dialog_is_open_and_without_the_modifi
     open_app(page, app_url)
     page.keyboard.press("k")  # plain letters belong to the message box
     expect(page.locator("#input")).to_have_value("k")
-    page.get_by_role("button", name="Chat settings").click()
+    open_chat_settings(page)
     page.keyboard.press("Control+k")
     expect(page.locator("body")).not_to_have_class(re.compile("nav-open"))  # nothing opened behind the dialog
 
@@ -180,7 +187,7 @@ def test_the_shortcuts_are_in_the_tooltips(page, app_url):
 
 def delete_chat(page, title):
     open_sidebar(page)
-    page.get_by_role("button", name=f'Delete "{title}"').click()
+    row_action(page, title, "Delete…")
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
 
 
@@ -240,7 +247,7 @@ def test_deleting_a_second_chat_makes_the_first_delete_final(page, app_url):
     ids = [c["id"] for c in page.request.get(f"{app_url}/api/conversations").json()]
     delete_chat(page, "chat 001")
     with page.expect_response(lambda r: r.request.method == "DELETE"):
-        page.get_by_role("button", name='Delete "chat 000"').click()
+        row_action(page, "chat 000", "Delete…")
         page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.get_by_role("status")).to_contain_text('Deleted "chat 000"')
     assert not chat_exists(page, app_url, ids[0])  # chat 001, the first one

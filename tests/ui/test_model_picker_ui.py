@@ -2,7 +2,7 @@ import re
 
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import conv_id, open_app, open_sidebar, send
+from tests.ui.test_chat_ui import conv_id, open_app, open_chat_settings, open_sidebar, send
 
 DEFAULT = "scripted-default"  # the model the UI test server is configured with
 
@@ -117,33 +117,36 @@ def test_each_conversation_keeps_its_own_model(page, app_url):
     expect(picker(page)).to_have_text("alpha-model")
 
 
-def test_the_picker_and_the_settings_dialog_stay_in_sync(page, app_url):
+def test_the_chat_dialog_has_no_model_of_its_own_and_follows_the_picker(page, app_url):
     open_app(page, app_url)
-    pick(page, "alpha-model")
-    page.get_by_role("button", name="Chat settings").click()
-    dialog = page.get_by_role("dialog", name="Chat settings")
-    expect(dialog.get_by_label("Model")).to_have_value("alpha-model")
-    dialog.get_by_label("Model").select_option("gpt-5-mini")
+    dialog = open_chat_settings(page)
+    expect(dialog.get_by_label("Model", exact=True)).to_have_count(0)  # the model is chosen at the top of the chat
+    expect(dialog.get_by_label("Temperature")).to_be_visible()  # the default model takes a temperature
+    expect(dialog.get_by_label("Reasoning effort")).to_be_hidden()
+    page.keyboard.press("Escape")
+    pick(page, "gpt-5-mini")
+    dialog = open_chat_settings(page)
+    expect(dialog.get_by_label("Reasoning effort")).to_be_visible()  # now the fields are those of a thinking model
+    expect(dialog.get_by_label("Temperature")).to_be_hidden()
     dialog.get_by_role("button", name="Save").click()
-    expect(dialog).to_be_hidden()
-    expect(picker(page)).to_have_text("gpt-5-mini")
+    expect(picker(page)).to_have_text("gpt-5-mini")  # saving the instructions kept the model
 
 
 def test_the_menu_links_to_the_full_settings(page, app_url):
     open_app(page, app_url)
-    open_menu(page).get_by_role("menuitem", name="Chat settings…").click()
+    open_menu(page).get_by_role("menuitem", name="Instructions for this chat…").click()
     expect(menu(page)).to_be_hidden()
-    expect(page.get_by_role("dialog", name="Chat settings")).to_be_visible()
+    expect(page.get_by_role("dialog", name="Instructions for this chat")).to_be_visible()
 
 
 def test_choosing_a_model_does_not_light_the_settings_dot(page, app_url):
     open_app(page, app_url)
     pick(page, "alpha-model")
-    expect(page.get_by_role("button", name="Chat settings")).not_to_have_attribute("data-active", "")
-    page.get_by_role("button", name="Chat settings").click()
+    expect(page.get_by_role("button", name="Chat actions")).not_to_have_attribute("data-active", "")
+    open_chat_settings(page)
     page.get_by_label("System prompt").fill("Be brief")
     page.get_by_role("button", name="Save").click()
-    expect(page.get_by_role("button", name="Chat settings")).to_have_attribute("data-active", "")
+    expect(page.get_by_role("button", name="Chat actions")).to_have_attribute("data-active", "")
 
 
 def test_keyboard_opens_navigates_selects_and_escape_closes(page, app_url):
@@ -155,11 +158,11 @@ def test_keyboard_opens_navigates_selects_and_escape_closes(page, app_url):
     page.keyboard.press("ArrowDown")
     expect(row(page, "alpha-model")).to_be_focused()
     page.keyboard.press("End")
-    expect(page.get_by_role("menuitem", name="Chat settings…")).to_be_focused()
+    expect(page.get_by_role("menuitem", name="Instructions for this chat…")).to_be_focused()
     page.keyboard.press("ArrowDown")  # wraps
     expect(row(page, DEFAULT)).to_be_focused()
     page.keyboard.press("ArrowUp")
-    expect(page.get_by_role("menuitem", name="Chat settings…")).to_be_focused()
+    expect(page.get_by_role("menuitem", name="Instructions for this chat…")).to_be_focused()
     page.keyboard.press("Home")
     page.keyboard.press("ArrowDown")
     page.keyboard.press("Enter")
@@ -244,5 +247,5 @@ def test_a_long_model_name_is_truncated_not_overflowing_the_header(page, app_url
     expect(picker(page)).to_contain_text("a-very-long-model-name-")
     box = picker(page).bounding_box()
     assert box["x"] + box["width"] <= 375 * 0.7
-    gear = page.get_by_role("button", name="Chat settings").bounding_box()
-    assert gear["x"] + gear["width"] <= 375  # the settings button is still on screen
+    more = page.get_by_role("button", name="Chat actions").bounding_box()
+    assert more["x"] + more["width"] <= 375  # the chat menu button is still on screen

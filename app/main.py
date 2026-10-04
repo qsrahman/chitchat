@@ -30,7 +30,8 @@ SECURITY_HEADERS = {
 
 
 class SecurityHeaders:
-    """Adds SECURITY_HEADERS to every HTTP response unless the route already set that header. Plain ASGI rather than
+    """Adds SECURITY_HEADERS to every HTTP response unless the route already set that header, and `no-cache` to the
+    page's own files (below). Plain ASGI rather than
     BaseHTTPMiddleware, which wraps streaming responses in a way that gets in the way of a dropped connection
     cancelling the reply (Stop)."""
 
@@ -46,6 +47,11 @@ class SecurityHeaders:
                 headers = MutableHeaders(scope=message)
                 for name, value in SECURITY_HEADERS.items():
                     headers.setdefault(name, value)
+                if not scope["path"].startswith("/api/"):
+                    # The UI is many modules that must all be the same version. Without this a browser reuses its copy
+                    # of some for a while (a heuristic from Last-Modified) and mixes old and new after an update, which
+                    # fails at load. no-cache still lets it keep them: it asks first, and the ETag answers 304.
+                    headers.setdefault("Cache-Control", "no-cache")
             await send(message)
 
         await self.app(scope, receive, send_with_headers)

@@ -1,7 +1,9 @@
 """Search finds chats by title, and a result for a message opens the chat at that message."""
+import re
+
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import conv_id, open_app, open_sidebar, send
+from tests.ui.test_chat_ui import conv_id, open_app, open_sidebar, row_action, send
 
 
 def search_box(page):
@@ -58,8 +60,7 @@ def test_a_title_only_match_has_no_snippet(page, app_url):
     send(page, "kangaroo facts")
     expect(page.locator("#title")).to_have_text("kangaroo facts")  # titled: saved, and searchable
     open_sidebar(page)
-    page.locator(".conv").first.hover()
-    page.get_by_role("button", name='Rename "kangaroo facts"').click()
+    row_action(page, "kangaroo facts", "Rename…")
     page.get_by_label("Conversation title").fill("Marsupial notes")
     page.get_by_role("button", name="Save").click()
     search_box(page).fill("marsupial")
@@ -98,8 +99,8 @@ def test_a_result_for_the_chat_already_open_scrolls_there_without_reloading_the_
 def test_a_title_match_opens_the_chat_at_the_end_as_usual(page, app_url):
     long_chat_then_another(page, app_url)
     open_sidebar(page)
-    page.locator(".conv").nth(1).hover()  # the older chat, the long one
-    page.get_by_role("button", name="Rename").nth(1).click()
+    page.locator(".conv").nth(1).get_by_role("button", name=re.compile("^Actions for")).click()  # the older, long chat
+    page.get_by_role("menuitem", name="Rename…").click()
     page.get_by_label("Conversation title").fill("Aardvark archive")
     page.get_by_role("button", name="Save").click()
     search_box(page).fill("aardvark")

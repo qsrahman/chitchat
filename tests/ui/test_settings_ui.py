@@ -1,13 +1,11 @@
 from playwright.sync_api import Page, expect
 
-from tests.ui.test_chat_ui import conv_id, open_app, open_prefs, open_sidebar, send
+from tests.ui.test_chat_ui import conv_id, open_app, open_chat_settings, open_prefs, open_sidebar, send
+from tests.ui.test_model_picker_ui import pick
 
 
 def open_settings(page: Page):
-    page.get_by_role("button", name="Chat settings").click()
-    dialog = page.get_by_role("dialog", name="Chat settings")
-    expect(dialog).to_be_visible()
-    return dialog
+    return open_chat_settings(page)
 
 
 def save(dialog):
@@ -15,28 +13,14 @@ def save(dialog):
     expect(dialog).to_be_hidden()
 
 
-def test_model_picker_lists_models_and_shows_the_control_that_applies(page, app_url):
-    open_app(page, app_url)
-    dialog = open_settings(page)
-    model = dialog.get_by_label("Model")
-    expect(model.locator("option")).to_have_text(["Default (scripted-default)", "alpha-model", "gpt-5-mini"])
-    expect(dialog.get_by_label("Temperature")).to_be_visible()  # the default model is not a reasoning model
-    expect(dialog.get_by_label("Reasoning effort")).to_be_hidden()
-    model.select_option("gpt-5-mini")
-    expect(dialog.get_by_label("Reasoning effort")).to_be_visible()
-    expect(dialog.get_by_label("Temperature")).to_be_hidden()
-    model.select_option("alpha-model")
-    expect(dialog.get_by_label("Temperature")).to_be_visible()
-
-
 def test_settings_chosen_before_the_first_message_apply_to_the_new_chat(page, app_url):
     open_app(page, app_url)
+    pick(page, "alpha-model")
     dialog = open_settings(page)
     dialog.get_by_label("System prompt").fill("Be brief")
-    dialog.get_by_label("Model").select_option("alpha-model")
     dialog.get_by_label("Temperature").fill("0.3")
     save(dialog)
-    expect(page.get_by_role("button", name="Chat settings")).to_have_attribute("data-active", "")
+    expect(page.get_by_role("button", name="Chat actions")).to_have_attribute("data-active", "")
     send(page, "hello")
     reply = page.locator(".msg.assistant .body")
     expect(reply).to_contain_text("[model=alpha-model]")
@@ -46,10 +30,12 @@ def test_settings_chosen_before_the_first_message_apply_to_the_new_chat(page, ap
 
 def test_a_reasoning_model_gets_effort_and_not_temperature(page, app_url):
     open_app(page, app_url)
+    pick(page, "alpha-model")
     dialog = open_settings(page)
-    dialog.get_by_label("Model").select_option("alpha-model")
-    dialog.get_by_label("Temperature").fill("0.9")  # then switch to a model where it no longer applies
-    dialog.get_by_label("Model").select_option("gpt-5-mini")
+    dialog.get_by_label("Temperature").fill("0.9")
+    dialog.get_by_role("button", name="Save").click()
+    pick(page, "gpt-5-mini")  # a model where the temperature no longer applies
+    dialog = open_settings(page)
     dialog.get_by_label("Reasoning effort").select_option("high")
     save(dialog)
     send(page, "think")
@@ -67,13 +53,13 @@ def test_settings_persist_per_conversation(page, app_url):
     dialog.get_by_label("System prompt").fill("Only for the first chat")
     save(dialog)
     page.reload()
-    expect(page.get_by_role("button", name="Chat settings")).to_have_attribute("data-active", "")
+    expect(page.get_by_role("button", name="Chat actions")).to_have_attribute("data-active", "")
     assert "Only for the first chat" == open_settings(page).get_by_label("System prompt").input_value()
     page.keyboard.press("Escape")
 
     open_sidebar(page)
     page.get_by_role("button", name="New chat").click()
-    expect(page.get_by_role("button", name="Chat settings")).not_to_have_attribute("data-active", "")
+    expect(page.get_by_role("button", name="Chat actions")).not_to_have_attribute("data-active", "")
     assert "" == open_settings(page).get_by_label("System prompt").input_value()
     page.keyboard.press("Escape")
 
@@ -81,7 +67,7 @@ def test_settings_persist_per_conversation(page, app_url):
     expect(page.locator(".msg.assistant .body")).not_to_contain_text("instructions")
     page.get_by_role("link", name="first chat").click()
     expect(page.locator(".msg.user .body")).to_have_text("first chat")
-    expect(page.get_by_role("button", name="Chat settings")).to_have_attribute("data-active", "")
+    expect(page.get_by_role("button", name="Chat actions")).to_have_attribute("data-active", "")
 
 
 def test_settings_apply_from_the_next_message_in_an_existing_chat(page, app_url):
@@ -105,7 +91,7 @@ def test_cancel_and_escape_discard_changes(page, app_url):
     expect(dialog).to_be_hidden()
     assert "" == open_settings(page).get_by_label("System prompt").input_value()
     page.keyboard.press("Escape")
-    expect(page.get_by_role("button", name="Chat settings")).not_to_have_attribute("data-active", "")
+    expect(page.get_by_role("button", name="Chat actions")).not_to_have_attribute("data-active", "")
 
 
 def test_invalid_temperature_keeps_the_dialog_open(page, app_url):
@@ -164,32 +150,16 @@ def test_custom_instructions_apply_to_every_chat_and_persist(page, app_url):
 
 
 def test_the_dialog_does_not_depend_on_the_order_the_models_arrive_in(page, app_url):
-    open_app(page, app_url)
-    # The same models, but with the default last and reasoning while the first one is not: the dialog has to
-    # find the default by id rather than by position, both to drop it from the list and to read its flag.
+    # The same models, but with the default last and reasoning while the first one is not: the fields are those of
+    # the default model, found by its id rather than by its position in the list.
     page.route("**/api/models", lambda route: route.fulfill(json={
         "default": "scripted-default", "efforts": ["low", "high"],
         "models": [{"id": "alpha-model", "reasoning": False},
                    {"id": "gpt-5-mini", "reasoning": True},
                    {"id": "scripted-default", "reasoning": True}],
     }))
+    open_app(page, app_url)
     dialog = open_settings(page)
-    model = dialog.get_by_label("Model")
-    expect(model.locator("option")).to_have_text(["Default (scripted-default)", "alpha-model", "gpt-5-mini"])
     expect(dialog.get_by_label("Reasoning effort")).to_be_visible()  # the default's own flag, not the first listed
     expect(dialog.get_by_label("Temperature")).to_be_hidden()
-
-
-def test_the_dialog_opens_at_once_even_when_the_model_list_is_slow(page, app_url):
-    open_app(page, app_url)
-    expect(page.get_by_role("button", name="scripted-default")).to_be_visible()  # the startup list has loaded
-    page.route("**/api/models", lambda route: (page.wait_for_timeout(1500), route.continue_()))
-    page.get_by_role("button", name="Chat settings").click()
-    dialog = page.get_by_role("dialog", name="Chat settings")
-    expect(dialog).to_be_visible(timeout=500)
-    expect(dialog.get_by_label("Model").locator("option")).to_have_count(3, timeout=500)
-    dialog.get_by_label("Model").select_option("alpha-model")  # picked while the refresh is still in flight
-    dialog.get_by_label("System prompt").fill("kept")
-    page.wait_for_timeout(1800)  # the refresh lands and rebuilds the choices
-    expect(dialog.get_by_label("Model")).to_have_value("alpha-model")
-    expect(dialog.get_by_label("System prompt")).to_have_value("kept")
+    expect(dialog.get_by_label("Reasoning effort").locator("option")).to_have_text(["Default", "low", "high"])

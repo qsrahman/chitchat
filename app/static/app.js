@@ -20,6 +20,7 @@ import {
 } from './settings.js'
 import { loadTools } from './controls.js'
 import './backup.js'
+import './chat-menu.js'
 import './delete.js'
 import './model-menu.js'
 import './retry-menu.js'

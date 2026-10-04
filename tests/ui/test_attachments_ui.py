@@ -327,7 +327,8 @@ def test_deleting_the_conversation_deletes_its_files(page, app_url):
     href = page.locator(".msg.user .tile-image").get_attribute("href")
     assert page.request.get(f"{app_url}{href}").status == 200
     open_sidebar(page)
-    page.get_by_role("button", name=re.compile('^Delete "')).click()
+    page.get_by_role("button", name=re.compile('^Actions for "')).click()
+    page.get_by_role("menuitem", name="Delete…").click()
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
     finish_delete(page)

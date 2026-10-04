@@ -1,7 +1,7 @@
 """The Content-Security-Policy in a real browser: the app works under it, and injected script does not run."""
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import open_app, send
+from tests.ui.test_chat_ui import open_app, open_chat_settings, send
 
 
 def watch_violations(page):
@@ -80,8 +80,7 @@ def test_the_app_itself_runs_without_a_single_violation(page, app_url):
     page.get_by_role("button", name="Tools", exact=True).click()
     expect(page.locator("#tools-menu")).to_be_visible()
     page.keyboard.press("Escape")
-    page.get_by_role("button", name="Chat settings").click()
-    expect(page.get_by_role("dialog", name="Chat settings")).to_be_visible()
+    open_chat_settings(page)
     assert violations(page) == []
 
 

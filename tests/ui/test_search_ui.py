@@ -3,7 +3,7 @@ import re
 
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import conv_id, open_app, open_sidebar, saved_messages, send
+from tests.ui.test_chat_ui import conv_id, open_app, open_chat_settings, open_sidebar, saved_messages, send
 
 
 def toggle(page):
@@ -110,7 +110,7 @@ def test_saving_the_settings_dialog_keeps_the_search_setting(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     search_on(page)
-    page.get_by_role("button", name="Chat settings").click()
+    open_chat_settings(page)
     page.get_by_label("System prompt").fill("Be brief")
     page.get_by_role("button", name="Save").click()
     expect(page.get_by_role("dialog")).to_be_hidden()
@@ -121,7 +121,7 @@ def test_saving_the_settings_dialog_keeps_the_search_setting(page, app_url):
 def test_the_toggle_does_not_light_the_settings_dot_and_picking_a_model_keeps_it(page, app_url):
     open_app(page, app_url)
     search_on(page)
-    expect(page.get_by_role("button", name="Chat settings")).not_to_have_attribute("data-active", "")
+    expect(page.get_by_role("button", name="Chat actions")).not_to_have_attribute("data-active", "")
     page.get_by_role("button", name=re.compile("^Model")).click()
     page.get_by_role("menuitemradio", name=re.compile("^alpha-model")).click()
     expect(toggle(page)).to_have_attribute("aria-pressed", "true")  # saving the model kept the tools

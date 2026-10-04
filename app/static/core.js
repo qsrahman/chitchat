@@ -61,6 +61,10 @@ export const ICONS = {
   chevronDown: 'M6 8l4 4 4-4',
   previous: 'M12 5l-5 5 5 5',
   next: 'M8 5l5 5-5 5',
+  more: 'M5 10m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M10 10m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M15 10m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
+  sliders:
+    'M3 6h8M15 6h2M3 14h2M9 14h8M11 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M5 14a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+  download: 'M10 3v9M6 8.5l4 4 4-4M4 16h12',
 }
 export const icon = (path) =>
   `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${path}"/></svg>`

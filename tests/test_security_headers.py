@@ -55,3 +55,15 @@ async def test_errors_from_the_api_have_the_headers_too(client):
     assert r.status_code == 404 and r.headers["x-frame-options"] == "DENY"
     r = await client.post("/api/conversations/missing/chat", json={"content": "x"})
     assert r.status_code == 404 and "content-security-policy" in r.headers
+
+
+async def test_the_pages_files_are_revalidated_not_reused_blindly(client):
+    first = await client.get("/chat.js")
+    assert first.headers["cache-control"] == "no-cache" and first.headers["etag"]
+    again = await client.get("/chat.js", headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304  # nothing is sent again when it has not changed
+    assert (await client.get("/")).headers["cache-control"] == "no-cache"
+
+
+async def test_the_api_is_left_to_say_for_itself(client):
+    assert "cache-control" not in (await client.get("/api/models")).headers

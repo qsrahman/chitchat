@@ -55,7 +55,7 @@ def test_controls_are_44px_on_a_touch_screen(browser, app_url):
     context = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True)
     page = context.new_page()
     open_app(page, app_url)
-    for selector in ("#send", "#attach", "#settings-btn"):
+    for selector in ("#send", "#attach", "#chat-menu-btn"):
         b = page.locator(selector).bounding_box()
         assert b["width"] >= 44 and b["height"] >= 44, (selector, b)
     context.close()
