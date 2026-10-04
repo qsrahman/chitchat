@@ -19,6 +19,9 @@ export const composer = /** @type {HTMLElement} */ (
 // "models" (the model list was refreshed) and "open" (open the conversation in event.detail, null for a new chat).
 export const bus = new EventTarget()
 
+// The web search tool, by its name in app/tools/: the composer's toggle and the default for new chats switch it on.
+export const WEB_SEARCH = 'web_search'
+
 // id: current conversation (null = new chat, created lazily on first send).
 // stick: keep the view pinned to the bottom unless the reader scrolled up.
 // jumpTo: id of a message to scroll to when the next conversation opens (set by a search result).

@@ -14,6 +14,6 @@ The UI stays plain JavaScript with no build step (so what the browser loads is t
 - The vendored libraries (`marked`, `hljs`, `katex`, `DOMPurify`) are declared as `any`.
 
 ## Adding to it
-A new field in a response or event: add it to `types.d.ts` in the same change. A new element property on a message: add it to `MessageEl`. The checker's own version is pinned to 7 in `scripts/check.py`, like eslint.
+A new field in a response or event: add it to `types.d.ts` in the same change. A new *kind* of event is held to it by `tests/test_event_types.py`, which compares the events `llm.py` and `routes.py` send with `StreamEvent`, both ways (a missing type and a type nobody sends both fail). A field inside an event is not compared: that is what the types are for. A new element property on a message: add it to `MessageEl`. The checker's own version is pinned to 7 in `scripts/check.py`, like eslint.
 
 First run: the code needed no behavior change. The fixes were annotations and casts (`/** @type {NodeListOf<HTMLElement>} */`), a typed `pending` in `delete.js` and the retry menu's `anchor` and `onPick`, a guard for a response with no body in `readSSE`, and `getTime()` for the date difference in `list.js`.

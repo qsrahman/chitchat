@@ -1,5 +1,5 @@
 // The composer's controls: thinking effort, the web search toggle and the tools menu.
-import { $, api, bus, state, textEl } from './core.js'
+import { $, WEB_SEARCH, api, bus, state, textEl } from './core.js'
 import { showNote } from './composer.js'
 import { currentModel, modelInfo, saveSettings } from './settings.js'
 
@@ -45,12 +45,11 @@ effortSelect.onchange = async () => {
 // ---- web search toggle ----
 // Always shown; it is disabled while the server has no search tool configured (a Brave key). On or off is a
 // per-conversation setting.
-const SEARCH = 'web_search'
-const searchOn = () => state.settings.tools.includes(SEARCH)
+const searchOn = () => state.settings.tools.includes(WEB_SEARCH)
 
 function syncSearchToggle() {
   const toggle = $('search-toggle')
-  const tool = state.tools.find((t) => t.name === SEARCH)
+  const tool = state.tools.find((t) => t.name === WEB_SEARCH)
   // The tool names itself; the page's own wording stands in until the list arrives (or if it never does).
   const label = tool?.label ?? toggle.getAttribute('aria-label')
   toggle.disabled = !tool
@@ -64,7 +63,7 @@ function syncSearchToggle() {
 // ---- tools menu ----
 // The tools besides web search (which has the globe): a checkbox each, saved per conversation like the search toggle.
 const toolsMenu = $('tools-menu')
-const otherTools = () => state.tools.filter((t) => t.name !== SEARCH)
+const otherTools = () => state.tools.filter((t) => t.name !== WEB_SEARCH)
 
 function syncToolsMenu() {
   const on = otherTools().filter((t) => state.settings.tools.includes(t.name))
@@ -127,8 +126,8 @@ toolsMenu.addEventListener('toggle', (e) => {
 
 $('search-toggle').onclick = async () => {
   const tools = searchOn()
-    ? state.settings.tools.filter((t) => t !== SEARCH)
-    : [...state.settings.tools, SEARCH]
+    ? state.settings.tools.filter((t) => t !== WEB_SEARCH)
+    : [...state.settings.tools, WEB_SEARCH]
   try {
     await saveSettings({ ...state.settings, tools })
   } catch {

@@ -1,7 +1,7 @@
 // The Settings dialog (the sidebar's gear): appearance and shortcuts, custom instructions, export and import, and what
 // the server is set up with. Settings that belong to one chat (model, system prompt, temperature) are in
 // settings.js; the import itself is in backup.js. The design and what is where: docs/settings-dialog.md.
-import { $, api, bus, state } from './core.js'
+import { $, WEB_SEARCH, api, bus, state } from './core.js'
 import { closeNavIfOverlay } from './nav.js'
 import { loadStorage } from './storage.js'
 import {
@@ -94,7 +94,6 @@ theme.onchange = () => {
 const defaultModel = $('pref-model')
 const defaultEffort = $('pref-effort')
 const defaultSearch = $('pref-search')
-const SEARCH = 'web_search'
 
 function fillDefaults() {
   const { models, efforts = [], server_default: server } = modelInfo
@@ -111,9 +110,9 @@ function fillDefaults() {
     ...efforts.map((e) => new Option(e[0].toUpperCase() + e.slice(1), e)),
   )
   defaultEffort.value = defaults.reasoning_effort ?? ''
-  const tool = state.tools.find((t) => t.name === SEARCH)
+  const tool = state.tools.find((t) => t.name === WEB_SEARCH)
   defaultSearch.disabled = !tool
-  defaultSearch.checked = !!tool && defaults.tools.includes(SEARCH)
+  defaultSearch.checked = !!tool && defaults.tools.includes(WEB_SEARCH)
   $('pref-search-note').textContent = tool
     ? 'Start new chats with web search on.'
     : 'Unavailable: set BRAVE_API_KEY on the server.'
@@ -145,8 +144,8 @@ defaultEffort.onchange = () =>
 defaultSearch.onchange = () =>
   saveDefault({
     tools: defaultSearch.checked
-      ? [...new Set([...defaults.tools, SEARCH])]
-      : defaults.tools.filter((t) => t !== SEARCH),
+      ? [...new Set([...defaults.tools, WEB_SEARCH])]
+      : defaults.tools.filter((t) => t !== WEB_SEARCH),
   })
 
 // ---- General: shortcuts ----
