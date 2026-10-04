@@ -1,5 +1,5 @@
-// The composer's controls: thinking effort, the web search toggle and the tools menu.
-import { $, WEB_SEARCH, api, bus, state, textEl } from './core.js'
+// The composer's controls: thinking effort and the tools menu.
+import { $, api, bus, state, textEl } from './core.js'
 import { showNote } from './composer.js'
 import { currentModel, modelInfo, saveSettings } from './settings.js'
 
@@ -42,33 +42,14 @@ effortSelect.onchange = async () => {
   }
 }
 
-// ---- web search toggle ----
-// Always shown; it is disabled while the server has no search tool configured (a Brave key). On or off is a
-// per-conversation setting.
-const searchOn = () => state.settings.tools.includes(WEB_SEARCH)
-
-function syncSearchToggle() {
-  const toggle = $('search-toggle')
-  const tool = state.tools.find((t) => t.name === WEB_SEARCH)
-  // The tool names itself; the page's own wording stands in until the list arrives (or if it never does).
-  const label = tool?.label ?? toggle.getAttribute('aria-label')
-  toggle.disabled = !tool
-  toggle.setAttribute('aria-pressed', String(!!tool && searchOn()))
-  toggle.setAttribute('aria-label', label)
-  toggle.title = !tool
-    ? `${label} is unavailable: set BRAVE_API_KEY on the server`
-    : `${label}: ${searchOn() ? 'on' : 'off'}`
-}
-
 // ---- tools menu ----
-// The tools besides web search (which has the globe): a checkbox each, saved per conversation like the search toggle.
+// Every tool the server offers, a checkbox each, saved per conversation.
 const toolsMenu = $('tools-menu')
-const otherTools = () => state.tools.filter((t) => t.name !== WEB_SEARCH)
 
 function syncToolsMenu() {
-  const on = otherTools().filter((t) => state.settings.tools.includes(t.name))
+  const on = state.tools.filter((t) => state.settings.tools.includes(t.name))
   const button = $('tools-btn')
-  button.hidden = !otherTools().length
+  button.hidden = !state.tools.length
   button.toggleAttribute('data-active', on.length > 0)
   button.title = on.length
     ? `Tools: ${on.map((t) => t.label).join(', ')}`
@@ -79,7 +60,7 @@ function syncToolsMenu() {
 
 function renderToolsMenu() {
   $('tools-list').replaceChildren(
-    ...otherTools().map((t) => {
+    ...state.tools.map((t) => {
       const row = document.createElement('label')
       row.className = 'tool-row'
       const box = Object.assign(document.createElement('input'), {
@@ -124,30 +105,17 @@ toolsMenu.addEventListener('toggle', (e) => {
   toolsMenu.querySelector('input')?.focus()
 })
 
-$('search-toggle').onclick = async () => {
-  const tools = searchOn()
-    ? state.settings.tools.filter((t) => t !== WEB_SEARCH)
-    : [...state.settings.tools, WEB_SEARCH]
-  try {
-    await saveSettings({ ...state.settings, tools })
-  } catch {
-    showNote("Couldn't change web search. Check your connection and try again.")
-  }
-}
-
 bus.addEventListener('settings', () => {
   syncEffort()
-  syncSearchToggle()
   syncToolsMenu()
 })
 bus.addEventListener('models', syncEffort)
 
-// The tools the server offers; until they arrive (or if they never do) the toggles stay disabled or hidden.
+// The tools the server offers; until they arrive (or if they never do) the button stays hidden.
 export function loadTools() {
   return api('/tools')
     .then((tools) => {
       state.tools = tools
-      syncSearchToggle()
       syncToolsMenu()
     })
     .catch(() => {})

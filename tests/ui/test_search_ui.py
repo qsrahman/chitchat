@@ -3,11 +3,8 @@ import re
 
 from playwright.sync_api import expect
 
-from tests.ui.test_chat_ui import conv_id, open_app, open_chat_settings, open_sidebar, saved_messages, send
-
-
-def toggle(page):
-    return page.get_by_role("button", name="Web search")
+from tests.ui.test_chat_ui import conv_id, open_app, open_chat_settings, open_prefs, open_sidebar, saved_messages, send
+from tests.ui.test_tools_ui import open_menu, row, tools_btn
 
 
 def saved_tools(page):
@@ -15,46 +12,57 @@ def saved_tools(page):
     return page.request.get(f"{origin}api/conversations/{conv_id(page)}").json()["settings"]["tools"]
 
 
+def search_box(page):
+    return row(page, "Web search").get_by_role("checkbox")
+
+
 def search_on(page):
-    toggle(page).click()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")
+    open_menu(page)
+    search_box(page).check()
+    page.keyboard.press("Escape")
+    expect(tools_btn(page)).to_have_attribute("data-active", "")
 
 
-# ---- the toggle ----
+def search_is_on(page):
+    open_menu(page)
+    on = search_box(page).is_checked()
+    page.keyboard.press("Escape")
+    return on
 
-def test_the_toggle_is_off_by_default_and_turns_on_and_off(page, app_url):
+
+# ---- the choice ----
+
+def test_web_search_is_off_by_default_and_turns_on_and_off(page, app_url):
     open_app(page, app_url)
-    expect(toggle(page)).to_be_visible()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "false")
-    expect(toggle(page)).to_have_attribute("title", "Web search: off")
-    toggle(page).click()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")
-    expect(toggle(page)).to_have_attribute("title", "Web search: on")
-    label = toggle(page).locator(".chip-label")
-    expect(label).to_be_visible()  # on says so in words, beside the globe
-    expect(label).to_have_text("Search")
-    expect(toggle(page)).to_have_accessible_name("Web search")  # the name is the same on or off
-    toggle(page).click()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "false")
-    expect(label).to_be_hidden()  # off is the bare icon
+    open_menu(page)
+    expect(search_box(page)).not_to_be_checked()
+    expect(tools_btn(page)).not_to_have_attribute("data-active", "")
+    page.keyboard.press("Escape")
+    search_on(page)
+    assert search_is_on(page)
+    open_menu(page)
+    search_box(page).uncheck()
+    page.keyboard.press("Escape")
+    assert not search_is_on(page)
 
 
-def test_the_toggle_is_named_after_the_tool_the_server_offers(page, app_url):
-    # The tool carries its own display name, so the button takes it from /api/tools rather than from the
-    # wording baked into the page.
+def test_the_row_is_named_after_the_tool_the_server_offers(page, app_url):
+    # The tool carries its own display name, so the menu takes it from /api/tools rather than from the wording
+    # baked into the page.
     page.route("**/api/tools", lambda route: route.fulfill(json=[{"name": "web_search", "label": "Brave search"}]))
     open_app(page, app_url)
-    named = page.get_by_role("button", name="Brave search")
-    expect(named).to_be_visible()
-    expect(named).to_have_attribute("title", "Brave search: off")
+    open_menu(page)
+    expect(page.locator("#tools-menu .tool-row")).to_have_count(1)
+    expect(page.locator("#tools-menu")).to_contain_text("Brave search")
 
 
-def test_it_is_shown_but_disabled_when_search_is_not_configured(page, app_url):
+def test_there_is_no_search_control_when_the_server_has_no_search_key(page, app_url):
     page.route("**/api/tools", lambda route: route.fulfill(json=[]))
     open_app(page, app_url)
-    expect(toggle(page)).to_be_visible()
-    expect(toggle(page)).to_be_disabled()
-    expect(toggle(page)).to_have_attribute("title", "Web search is unavailable: set BRAVE_API_KEY on the server")
+    expect(tools_btn(page)).to_be_hidden()  # nothing to offer, so nothing in the composer
+    d = open_prefs(page)  # Settings still says how to get it
+    expect(d.get_by_role("switch", name="Web search")).to_be_disabled()
+    expect(d).to_contain_text("Unavailable: set BRAVE_API_KEY on the server.")
 
 
 def test_a_choice_made_on_the_new_chat_screen_applies_to_the_first_message(page, app_url):
@@ -80,18 +88,18 @@ def test_the_setting_persists_per_conversation(page, app_url):
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     page.reload()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")
+    assert search_is_on(page)
 
     open_sidebar(page)
     page.get_by_role("button", name="New chat").click()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "false")  # a new chat starts off
+    assert not search_is_on(page)  # a new chat starts off
     send(page, "without search")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #2")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
 
     page.get_by_role("link", name="with search").click()
     expect(page.locator(".msg.user .body")).to_have_text("with search")
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")
+    assert search_is_on(page)
 
 
 def test_turning_it_on_mid_conversation_applies_from_the_next_message(page, app_url):
@@ -116,17 +124,17 @@ def test_saving_the_settings_dialog_keeps_the_search_setting(page, app_url):
     page.get_by_label("System prompt").fill("Be brief")
     page.get_by_role("button", name="Save").click()
     expect(page.get_by_role("dialog")).to_be_hidden()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")
+    assert search_is_on(page)
     assert saved_tools(page) == ["web_search"]
 
 
-def test_the_toggle_does_not_light_the_settings_dot_and_picking_a_model_keeps_it(page, app_url):
+def test_the_search_choice_does_not_light_the_settings_dot_and_picking_a_model_keeps_it(page, app_url):
     open_app(page, app_url)
     search_on(page)
     expect(page.get_by_role("button", name="Chat actions")).not_to_have_attribute("data-active", "")
     page.get_by_role("button", name=re.compile("^Model")).click()
     page.get_by_role("menuitemradio", name=re.compile("^alpha-model")).click()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")  # saving the model kept the tools
+    assert search_is_on(page)  # saving the model kept the tools
 
 
 def test_a_failed_save_says_so_and_keeps_the_old_state(page, app_url, expected_console_errors):
@@ -140,22 +148,25 @@ def test_a_failed_save_says_so_and_keeps_the_old_state(page, app_url, expected_c
         route.abort() if route.request.method == "PATCH" else route.continue_()
 
     page.route("**/api/conversations/*", abort_patch)
-    toggle(page).click()
-    expect(page.get_by_role("alert").filter(has_text="Couldn't change web search")).to_be_visible()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "false")
+    open_menu(page)
+    search_box(page).check()
+    expect(page.get_by_role("alert").filter(has_text="Couldn't change Web search")).to_be_visible()
+    expect(search_box(page)).not_to_be_checked()
     page.unroute("**/api/conversations/*")
-    toggle(page).click()
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")
+    search_box(page).check()
+    expect(search_box(page)).to_be_checked()
 
 
-def test_the_toggle_works_from_the_keyboard(page, app_url):
+def test_web_search_is_the_first_row_the_keyboard_lands_on(page, app_url):
     open_app(page, app_url)
-    expect(toggle(page)).to_be_enabled()  # it is disabled until the page has asked which tools exist
-    toggle(page).focus()
-    page.keyboard.press("Space")
-    expect(toggle(page)).to_have_attribute("aria-pressed", "true")
+    tools_btn(page).focus()
     page.keyboard.press("Enter")
-    expect(toggle(page)).to_have_attribute("aria-pressed", "false")
+    expect(search_box(page)).to_be_focused()  # the menu opens with the keyboard on the first tool
+    page.keyboard.press("Space")
+    expect(search_box(page)).to_be_checked()
+    expect(tools_btn(page)).to_have_attribute("title", "Tools: Web search")
+    page.keyboard.press("Escape")
+    expect(tools_btn(page)).to_be_focused()
 
 
 # ---- a search in a reply ----
@@ -288,25 +299,12 @@ def test_a_tool_the_page_does_not_know_still_shows_up(page, app_url):
     expect(page.locator(".tool-call summary")).to_have_text("Used mystery_tool")
 
 
-def test_on_a_phone_the_toggle_fits_when_on(page, app_url):
+def test_on_a_phone_the_menu_holding_web_search_fits(page, app_url):
     page.set_viewport_size({"width": 375, "height": 700})
     open_app(page, app_url)
-    search_on(page)
-    composer = page.locator(".composer").bounding_box()
-    box = toggle(page).bounding_box()
-    assert box["x"] >= composer["x"] and box["x"] + box["width"] <= composer["x"] + composer["width"]
+    page.locator("#tools-menu").evaluate("e => e.style.transition = 'none'")  # measured where it comes to rest
+    open_menu(page)
+    menu = page.locator("#tools-menu").bounding_box()
+    assert menu["x"] >= 0 and menu["x"] + menu["width"] <= page.viewport_size["width"]
+    assert menu["y"] >= 0 and menu["y"] + menu["height"] <= page.viewport_size["height"]
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-
-
-def test_the_pressed_toggle_has_a_label_and_a_color_but_no_background(page, app_url):
-    open_app(page, app_url)
-    colors = lambda: toggle(page).evaluate(  # noqa: E731
-        "e => { const s = getComputedStyle(e); return [s.color, s.backgroundColor]; }")
-    page.locator("#search-toggle").evaluate("e => e.style.transition = 'none'")
-    off = colors()
-    search_on(page)
-    page.mouse.move(0, 0)  # the hover background is not the pressed state
-    on = colors()
-    assert on[0] != off[0]  # accent color
-    assert on[1] == off[1]  # no background highlight: that was taken out on purpose
-    assert toggle(page).bounding_box()["width"] > page.locator("#attach").bounding_box()["width"]  # room for the word

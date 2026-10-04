@@ -524,6 +524,8 @@ a.menu-item {
   font-size: var(--font-size-0);
   color: var(--muted);
 }
+/* A tool on is the accent on the wrench and nothing else. No background: a highlighted button was taken out on
+   purpose (docs/ui-review.md). */
 #tools-btn[data-active] {
   color: var(--accent);
 }
@@ -1266,32 +1268,8 @@ dialog[open]::backdrop {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-#search-toggle {
-  padding: 0 6px;
-}
-#search-toggle[hidden] {
+#tools-btn[hidden] {
   display: none;
-}
-#search-toggle[aria-pressed='true'] {
-  color: var(--accent);
-}
-/* On, it says so in words as well as in color: "Search" beside the globe. No background: a highlighted button was
-   taken out on purpose (docs/ui-review.md). */
-#search-toggle .chip-label {
-  display: none;
-  font-size: var(--text-sm);
-}
-#search-toggle[aria-pressed='true'] {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 8px;
-}
-#search-toggle[aria-pressed='true'] .chip-label {
-  display: inline;
-  color: var(
-    --ink
-  ); /* the globe is the accent; the word must stay readable on the hover background too */
 }
 .composer-note {
   margin: 6px 12px 0;

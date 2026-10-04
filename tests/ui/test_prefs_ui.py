@@ -209,21 +209,23 @@ def test_new_chats_start_with_web_search_when_the_switch_is_on(page, app_url):
     expect(switch).not_to_be_checked()
     switch.check()
     page.keyboard.press("Escape")
-    search = page.get_by_role("button", name="Web search")
-    expect(search).to_have_attribute("aria-pressed", "true")  # the chat on screen is a new one: it follows at once
+    tools = page.get_by_role("button", name="Tools", exact=True)
+    expect(tools).to_have_attribute("title", "Tools: Web search")  # the chat on screen is a new one: it follows at once
     send(page, "look it up")
     expect(page.locator(".msg.assistant .body")).to_contain_text("[tools=web_search]")
-    search.click()  # this chat turns it off for itself
-    expect(search).to_have_attribute("aria-pressed", "false")
+    page.locator("#tools-btn").click()  # this chat turns it off for itself
+    page.locator("#tools-menu .tool-row", has_text="Web search").get_by_role("checkbox").uncheck()
+    page.keyboard.press("Escape")
+    expect(tools).not_to_have_attribute("data-active", "")
 
     page.get_by_role("button", name="New chat").click()
     # other chats still start with it on
-    expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "true")
+    expect(tools).to_have_attribute("title", "Tools: Web search")
 
     d = open_prefs(page)
     d.get_by_role("switch", name="Web search").uncheck()
     page.keyboard.press("Escape")
-    expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "false")
+    expect(tools).not_to_have_attribute("data-active", "")
 
 
 def test_a_failed_save_is_said_and_the_control_goes_back(page, app_url, expected_console_errors):

@@ -26,17 +26,17 @@ def row(page, label):
 
 # ---- the menu ----
 
-def test_the_menu_lists_the_tools_besides_web_search_with_a_hint_each(page, app_url):
+def test_the_menu_lists_every_tool_in_the_order_the_server_gives_them(page, app_url):
     open_app(page, app_url)
     open_menu(page)
     rows = page.locator("#tools-menu .tool-row")
-    expect(rows).to_have_count(3)
-    expect(rows.nth(0)).to_contain_text("Calculator")
-    expect(rows.nth(0)).to_contain_text("Exact arithmetic")
-    expect(rows.nth(1)).to_contain_text("Search chats")
-    expect(rows.nth(2)).to_contain_text("Read web pages")
-    expect(page.locator("#tools-menu")).not_to_contain_text("Web search")  # that one is the globe
-    for i in range(3):
+    expect(rows).to_have_count(4)
+    expect(rows.nth(0)).to_contain_text("Web search")
+    expect(rows.nth(1)).to_contain_text("Calculator")
+    expect(rows.nth(1)).to_contain_text("Exact arithmetic")  # a hint each, where the tool has one
+    expect(rows.nth(2)).to_contain_text("Search chats")
+    expect(rows.nth(3)).to_contain_text("Read web pages")
+    for i in range(4):
         expect(rows.nth(i).get_by_role("checkbox")).not_to_be_checked()  # all off by default
 
 
@@ -59,10 +59,10 @@ def test_switching_a_tool_on_applies_to_the_first_message_of_a_new_chat(page, ap
     assert saved_tools(page) == ["calculator"]
 
 
-def test_several_tools_and_the_search_globe_work_together_and_persist(page, app_url):
+def test_several_tools_work_together_and_persist(page, app_url):
     open_app(page, app_url)
-    page.get_by_role("button", name="Web search").click()
     open_menu(page)
+    row(page, "Web search").get_by_role("checkbox").check()
     row(page, "Search chats").get_by_role("checkbox").check()
     row(page, "Read web pages").get_by_role("checkbox").check()
     page.keyboard.press("Escape")
@@ -70,13 +70,14 @@ def test_several_tools_and_the_search_globe_work_together_and_persist(page, app_
     expect(page.locator(".msg.assistant .body")).to_contain_text("[tools=web_search,search_chats,fetch_url]")
     page.reload()
     expect(tools_btn(page)).to_have_attribute("data-active", "")
-    expect(tools_btn(page)).to_have_attribute("title", "Tools: Search chats, Read web pages")
+    expect(tools_btn(page)).to_have_attribute("title", "Tools: Web search, Search chats, Read web pages")
     open_menu(page)
+    expect(row(page, "Web search").get_by_role("checkbox")).to_be_checked()
     expect(row(page, "Search chats").get_by_role("checkbox")).to_be_checked()
     expect(row(page, "Calculator").get_by_role("checkbox")).not_to_be_checked()
     row(page, "Search chats").get_by_role("checkbox").uncheck()
-    expect(tools_btn(page)).to_have_attribute("title", "Tools: Read web pages")
-    assert saved_tools(page) == ["web_search", "fetch_url"]  # the globe's choice is untouched
+    expect(tools_btn(page)).to_have_attribute("title", "Tools: Web search, Read web pages")
+    assert saved_tools(page) == ["web_search", "fetch_url"]
 
 
 def test_each_chat_keeps_its_own_tools(page, app_url):
@@ -106,11 +107,35 @@ def test_a_failed_save_puts_the_checkbox_back_and_says_so(page, app_url, expecte
     expect(page.locator("#composer-note")).to_contain_text("Couldn't change Calculator")
 
 
-def test_the_button_is_hidden_when_only_web_search_is_available(page, app_url):
+def test_the_button_is_shown_when_only_web_search_is_available(page, app_url):
     page.route("**/api/tools", lambda r: r.fulfill(json=[{"name": "web_search", "label": "Web search", "hint": ""}]))
     open_app(page, app_url)
-    expect(page.get_by_role("button", name="Web search")).to_be_visible()
+    expect(tools_btn(page)).to_be_visible()  # it used to be hidden, when web search had a globe of its own
+    open_menu(page)
+    expect(row(page, "Web search").get_by_role("checkbox")).not_to_be_checked()
+
+
+def test_the_button_is_hidden_when_the_server_offers_no_tools(page, app_url):
+    page.route("**/api/tools", lambda r: r.fulfill(json=[]))
+    open_app(page, app_url)
     expect(tools_btn(page)).to_be_hidden()
+
+
+def test_the_button_is_the_accent_when_a_tool_is_on_and_never_resizes(page, app_url):
+    open_app(page, app_url)
+    page.locator("#tools-btn").evaluate("e => e.style.transition = 'none'")
+    colors = lambda: tools_btn(page).evaluate(  # noqa: E731
+        "e => { const s = getComputedStyle(e); return [s.color, s.backgroundColor]; }")
+    off = colors()
+    off_box = tools_btn(page).bounding_box()
+    open_menu(page)
+    row(page, "Web search").get_by_role("checkbox").check()
+    page.keyboard.press("Escape")
+    page.mouse.move(0, 0)  # the hover background is not the active state
+    on = colors()
+    assert on[0] != off[0]  # accent color
+    assert on[1] == off[1]  # no background highlight: that was taken out on purpose
+    assert tools_btn(page).bounding_box() == off_box  # nothing is written beside the wrench
 
 
 def test_the_menu_is_keyboard_operable(page, app_url):
@@ -118,6 +143,8 @@ def test_the_menu_is_keyboard_operable(page, app_url):
     tools_btn(page).focus()
     page.keyboard.press("Enter")
     expect(page.locator("#tools-menu")).to_be_visible()
+    expect(row(page, "Web search").get_by_role("checkbox")).to_be_focused()  # the first tool is first
+    page.keyboard.press("Tab")
     expect(row(page, "Calculator").get_by_role("checkbox")).to_be_focused()
     page.keyboard.press("Space")
     expect(row(page, "Calculator").get_by_role("checkbox")).to_be_checked()

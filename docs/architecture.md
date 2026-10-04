@@ -20,7 +20,7 @@ Streaming uses FastAPI's own SSE support (`fastapi.sse.EventSourceResponse`): ea
 | `tools-ui.js` | `TOOL_UI` (how each tool's call reads) and `renderToolCall` |
 | `chat.js` | a turn: SSE reading, `runTurn`, message actions (copy, edit, regenerate, retry), submit and Escape |
 | `composer.js` | the input box: send button state, auto-grow, drafts, attachments, the composer note |
-| `controls.js` | thinking effort select, web search toggle, tools menu |
+| `controls.js` | thinking effort select, tools menu |
 | `settings.js` | settings of the open chat (`setSettings`, `saveSettings`), the model list, the settings and instructions dialogs |
 | `model-menu.js`, `retry-menu.js` | the header model picker, and the "try again with another model" menu |
 | `list.js` | the sidebar's conversation list: paging, search, and the rename, pin and archive that the chat menu calls |
@@ -34,7 +34,7 @@ Streaming uses FastAPI's own SSE support (`fastapi.sse.EventSourceResponse`): ea
 | `markdown.js` | markdown to sanitized HTML (unchanged) |
 
 **Rules that keep it from tangling again:**
-- The import graph has no cycles: `core` is the base, `app.js` the top. Modules that would otherwise need each other talk through `bus` (an `EventTarget`): `settings` (the open chat's settings changed: the model button, effort select, search toggle, tools menu and the dot on the ⋯ button all update from it), `models` (the model list was refreshed), and `open` (open a chat, used by delete so it doesn't import `app.js`), `delete-chat` (the chat menu's Delete… asks `delete.js`, which imports `list.js`, to start a delete) and `chat-menu` (a sidebar row's ⋯ asks `chat-menu.js`, which imports `list.js`, to open the menu).
+- The import graph has no cycles: `core` is the base, `app.js` the top. Modules that would otherwise need each other talk through `bus` (an `EventTarget`): `settings` (the open chat's settings changed: the model button, effort select, tools menu and the dot on the ⋯ button all update from it), `models` (the model list was refreshed), and `open` (open a chat, used by delete so it doesn't import `app.js`), `delete-chat` (the chat menu's Delete… asks `delete.js`, which imports `list.js`, to start a delete) and `chat-menu` (a sidebar row's ⋯ asks `chat-menu.js`, which imports `list.js`, to open the menu).
 - A module wires up its own part of the page when it loads (its listeners are at the top level). `app.js` only imports them, then starts.
 - `tests/test_static_modules.py` checks, with no browser: every imported name is exported by its module, every import is used, no cycles, every module is reachable from `app.js`.
 - To add UI: put it in the module that owns that part of the page; a new tool's display goes in `tools-ui.js`; a new setting's control goes in `controls.js` or `settings.js`.

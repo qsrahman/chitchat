@@ -1,6 +1,6 @@
 # More tools: calculator, search_chats, fetch_url
 
-Three tools were added to the registry from phase 7 (`app/tools/`). They need no API key. Like web search they are off by default and switched on per conversation: web search keeps its globe in the composer, and the others are in the **Tools** menu (wrench icon, left of the text box), a checkbox each with a one-line hint. `GET /api/tools` lists every usable tool as `{name, label, hint}`. The loop, the per-reply call cap (`MAX_TOOL_CALLS`), the guidance added to the instructions while a tool is on, and the UI line per call all work as described in `docs/phase-7.md`.
+Three tools were added to the registry from phase 7 (`app/tools/`). They need no API key. Like web search they are off by default and switched on per conversation, and all of them are in the **Tools** menu (wrench icon, left of the text box), a checkbox each with a one-line hint. Web search used to have a globe of its own in the composer; it is in the menu now, so the composer has one tools control and every tool is named in words where it is chosen (`docs/ui-review.md`). `GET /api/tools` lists every usable tool as `{name, label, hint}`. The loop, the per-reply call cap (`MAX_TOOL_CALLS`), the guidance added to the instructions while a tool is on, and the UI line per call all work as described in `docs/phase-7.md`.
 
 ## calculator
 Exact arithmetic: models are unreliable at long multiplication, percentages and compound interest, and the answer shows in the reply as `17 * 23 = 391`.

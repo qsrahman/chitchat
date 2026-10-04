@@ -175,8 +175,8 @@ def test_with_thinking_effort_and_search_switched_on(page_with_axe):
     page.locator("#model-btn").click()
     page.get_by_role("menuitemradio", name="gpt-5-mini").click()
     page.locator("#effort").select_option("high")
-    page.get_by_role("button", name="Web search").click()
-    expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "true")
+    page.get_by_role("button", name="Tools", exact=True).click()
+    page.locator("#tools-menu .tool-row", has_text="Web search").get_by_role("checkbox").check()
     assert violations(page) == []
 
 

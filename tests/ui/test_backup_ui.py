@@ -218,4 +218,5 @@ def test_an_import_says_when_it_took_the_defaults_for_new_chats(page, app_url):
     expect(dialog.get_by_label("Model", exact=True)).to_have_value("alpha-model")
     expect(dialog.get_by_role("switch", name="Web search")).to_be_checked()
     page.keyboard.press("Escape")
-    expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "true")  # the new chat
+    # the new chat follows at once, and its tools are the wrench's business now
+    expect(page.get_by_role("button", name="Tools", exact=True)).to_have_attribute("title", "Tools: Web search")
