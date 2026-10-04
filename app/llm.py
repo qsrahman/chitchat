@@ -29,7 +29,6 @@ from openai.types.shared import ReasoningEffort
 from app.config import Settings
 from app.tools import Tool, ToolError
 
-Event = dict
 MODELS_TTL = 300  # seconds to keep the model list
 logger = logging.getLogger(__name__)
 
@@ -170,6 +169,7 @@ class OpenAILLM:
         self.settings = settings
         self._client = client
         self._models: tuple[float, list[str]] | None = None  # (when fetched, ids): see list_models
+        self._listing = asyncio.Lock()  # so a page that opens several pickers makes one call, not one each
 
     @property
     def client(self) -> AsyncOpenAI:
@@ -186,19 +186,24 @@ class OpenAILLM:
         seconds, since it is a remote call made whenever the page or the picker asks; a failure is not remembered."""
         if self._models and time.monotonic() - self._models[0] < MODELS_TTL:
             return self._models[1]
-        try:
-            models = [m async for m in self.client.models.list()]
-        except openai.OpenAIError:
-            return []
-        listed = {m.id for m in models}
+        async with self._listing:
+            # Another caller may have fetched it while this one waited for its turn: the cache is checked again.
+            if self._models and time.monotonic() - self._models[0] < MODELS_TTL:
+                return self._models[1]
+            try:
+                models = [m async for m in self.client.models.list()]
+            except openai.OpenAIError:
+                return []
+            listed = {m.id for m in models}
 
-        def wanted(model) -> bool:
-            snapshot = _SNAPSHOT.match(model.id)
-            return not _NOT_CHAT.search(model.id) and not (snapshot and snapshot["alias"] in listed)
+            def wanted(model) -> bool:
+                snapshot = _SNAPSHOT.match(model.id)
+                return not _NOT_CHAT.search(model.id) and not (snapshot and snapshot["alias"] in listed)
 
-        ids = [m.id for m in sorted(filter(wanted, models), key=lambda m: (-(getattr(m, "created", 0) or 0), m.id))]
-        self._models = (time.monotonic(), ids)
-        return ids
+            ids = [m.id for m in sorted(filter(wanted, models),
+                                        key=lambda m: (-(getattr(m, "created", 0) or 0), m.id))]
+            self._models = (time.monotonic(), ids)
+            return ids
 
     async def stream_reply(
         self,
@@ -208,10 +213,13 @@ class OpenAILLM:
         reasoning_effort: str | None = None,
         temperature: float | None = None,
         tools: dict[str, Tool] | None = None,
-        max_tool_calls: int = 4,
-    ) -> AsyncIterator[Event]:
+        max_tool_calls: int | None = None,
+    ) -> AsyncIterator[dict]:
         """Stream a reply. With `tools`, loops: each round the model may call tools, whose results go back to it,
-        until it answers. At most `max_tool_calls` calls run per reply; the loop is also bounded in rounds."""
+        until it answers. At most `max_tool_calls` calls run per reply (the server's limit unless one is passed);
+        the loop is also bounded in rounds."""
+        if max_tool_calls is None:
+            max_tool_calls = self.settings.max_tool_calls
         # Only send what was set: a parameter the model doesn't know is an API error.
         extra = {}
         if instructions:

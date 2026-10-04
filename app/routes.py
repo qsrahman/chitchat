@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import sqlite3
 import time
 import uuid
@@ -109,10 +110,15 @@ def create_conversation(conn: Conn, body: NewConversation | None = None):
     return store.create_conversation(conn, settings=settings)
 
 
-@router.get("/conversations/{cid}")
-def get_conversation(cid: str, conn: Conn):
+def _conversation(conn: sqlite3.Connection, cid: str) -> dict:
+    """The conversation and the messages of the path shown, as GET /conversations/{cid} returns them."""
     conv = _require(conn, cid)
     return {**conv, "messages": [backup.public_message(m) for m in store.list_messages(conn, cid)]}
+
+
+@router.get("/conversations/{cid}")
+def get_conversation(cid: str, conn: Conn):
+    return _conversation(conn, cid)
 
 
 @router.post("/conversations/{cid}/branch")
@@ -122,13 +128,18 @@ def choose_branch(cid: str, body: BranchRequest, conn: Conn):
     _require(conn, cid)
     if not store.select_branch(conn, cid, body.message_id):
         raise HTTPException(404, "message not found")
-    return get_conversation(cid, conn)
+    return _conversation(conn, cid)
 
 
 @router.get("/search")
 def search(q: Annotated[str, Query(min_length=1, max_length=200)], conn: Conn):
     """Conversations whose messages match; `snippet` marks the matched words with STX/ETX characters."""
     return store.search_conversations(conn, q)
+
+
+def _download(name: str) -> dict[str, str]:
+    """The header that makes a browser save the answer under `name` instead of showing it."""
+    return {"Content-Disposition": f'attachment; filename="{name}"'}
 
 
 @router.get("/conversations/{cid}/export")
@@ -140,10 +151,8 @@ def export_conversation(cid: str, conn: Conn, format: Literal["md", "json"] = "m
         body, media_type = backup.markdown(conv, messages), "text/markdown"
     else:
         body, media_type = json.dumps({**conv, "messages": messages}, indent=2, ensure_ascii=False), "application/json"
-    return Response(
-        body, media_type=f"{media_type}; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{backup.file_name(conv["title"])}.{format}"'},
-    )
+    return Response(body, media_type=f"{media_type}; charset=utf-8",
+                    headers=_download(f'{backup.file_name(conv["title"])}.{format}'))
 
 
 def _chunks(file: BinaryIO) -> Iterator[bytes]:
@@ -156,20 +165,29 @@ def _chunks(file: BinaryIO) -> Iterator[bytes]:
 def export_everything(request: Request, conn: Conn, format: Literal["json", "md", "full"] = "json"):
     """Every conversation: one JSON file that /api/import takes back, a zip of Markdown files, or ("full") a zip
     with the JSON and the attachment files, which /api/import takes back too."""
+    stamp = f"{datetime.now(UTC):%Y-%m-%d}"  # the day it was made, whichever way it is asked for
     if format == "full":
         archive = backup.export_archive(conn, request.app.state.settings.attachments_dir)
-        return StreamingResponse(_chunks(archive), media_type="application/zip", headers={
-            "Content-Disposition": f'attachment; filename="chitchat-{datetime.now(UTC):%Y-%m-%d}-with-files.zip"'})
+        return StreamingResponse(_chunks(archive), media_type="application/zip",
+                                 headers=_download(f"chitchat-{stamp}-with-files.zip"))
     if format == "json":
         body, media_type, extension = backup.export_json(conn), "application/json", "json"
     else:
         body, media_type, extension = backup.export_zip(conn), "application/zip", "zip"
-    return Response(body, media_type=media_type, headers={
-        "Content-Disposition": f'attachment; filename="chitchat-{datetime.now(UTC):%Y-%m-%d}.{extension}"'})
+    return Response(body, media_type=media_type, headers=_download(f"chitchat-{stamp}.{extension}"))
 
 
 def _too_large(limit: int) -> HTTPException:
     return HTTPException(413, f"That file is too large to import (over {limit // 1_000_000} MB).")
+
+
+def _uploaded_size(file: UploadFile) -> int:
+    """How many bytes were really uploaded: measured from the file the parser spooled, because what the client said
+    the size was (file.size) is not filled in by every version of Starlette. Leaves it at the start."""
+    file.file.seek(0, os.SEEK_END)
+    size = file.file.tell()
+    file.file.seek(0)
+    return size
 
 
 @router.post("/import", status_code=201)
@@ -180,7 +198,7 @@ async def import_conversations(file: UploadFile, request: Request, conn: Conn):
     await file.seek(0)
     try:
         if is_zip:
-            if (file.size or 0) > backup.MAX_ARCHIVE_BYTES:
+            if _uploaded_size(file) > backup.MAX_ARCHIVE_BYTES:
                 raise _too_large(backup.MAX_ARCHIVE_BYTES)
             files_dir = request.app.state.settings.attachments_dir
             return await asyncio.to_thread(backup.import_archive, conn, file.file, files_dir)
@@ -235,16 +253,28 @@ def list_tools(request: Request):
     return [{"name": t.name, "label": t.label, "hint": t.hint} for t in request.app.state.tools.values()]
 
 
+def _endpoint(base_url: str) -> str:
+    """The endpoint as the Settings dialog shows it: its scheme and host, without a path or credentials. A port that
+    isn't a number (a mistyped one) is left out rather than raise, since this only reads a setting."""
+    parsed = urlsplit(base_url)
+    port = None
+    try:
+        port = parsed.port
+    except ValueError:
+        pass
+    if not parsed.hostname:
+        return "custom"  # not a scheme and host we can name
+    return f"{parsed.scheme}://{parsed.hostname}{f':{port}' if port else ''}"
+
+
 @router.get("/config")
 def server_config(request: Request, conn: Conn):
     """What the server is set up with, for the Settings dialog to show (read only: it comes from the environment or
     `.env`, and changing it means editing that and restarting). No secrets: a key is only reported as set or not,
     and the endpoint is its scheme and host, without a path or credentials."""
     s = request.app.state.settings
-    endpoint = urlsplit(s.openai_base_url) if s.openai_base_url else None
     return {
-        "endpoint": f"{endpoint.scheme}://{endpoint.hostname}{f':{endpoint.port}' if endpoint.port else ''}"
-        if endpoint and endpoint.hostname else ("custom" if endpoint else "OpenAI"),
+        "endpoint": _endpoint(s.openai_base_url) if s.openai_base_url else "OpenAI",
         "custom_endpoint": bool(s.openai_base_url),
         "model": s.openai_model,
         "title_model": s.title_model_for(store.get_defaults(conn)["model"] or s.openai_model),
@@ -300,6 +330,7 @@ def attachment_limits():
 async def upload_attachment(file: UploadFile, request: Request, conn: Conn):
     """Store an upload and say what it is; it is sent later, by id, with a chat message."""
     settings = request.app.state.settings
+    # Over the limit by one byte, so it can be seen to be over: what a client claims the size is says nothing.
     data = await file.read(max(attachments.LIMITS.values()) + 1)
     aid = uuid.uuid4().hex
     try:
@@ -310,8 +341,11 @@ async def upload_attachment(file: UploadFile, request: Request, conn: Conn):
     except attachments.Rejected as e:
         attachments.delete_files(settings.attachments_dir, [aid])
         raise HTTPException(e.status, e.message) from e
-    name = (file.filename or "attachment").replace("\\", "/").rsplit("/", 1)[-1].strip()[:200] or "attachment"
-    row = store.add_attachment(conn, aid, name, mime, kind, len(data))
+    try:
+        row = store.add_attachment(conn, aid, attachments.safe_name(file.filename), mime, kind, len(data))
+    except BaseException:  # no row and no message pointing at the file: it would be one nothing ever deletes
+        attachments.delete_files(settings.attachments_dir, [aid])
+        raise
     return {k: row[k] for k in store.ATTACHMENT_FIELDS}
 
 
@@ -351,11 +385,12 @@ def delete_conversation(cid: str, request: Request, conn: Conn):
     attachments.delete_files(request.app.state.settings.attachments_dir, files)
 
 
-def _history(request: Request, conn: sqlite3.Connection, cid: str) -> list[dict]:
+def _history(request: Request, conn: sqlite3.Connection, cid: str, loaded: list[dict] | None = None) -> list[dict]:
     """The conversation as llm.py takes it. Calls are stateless, so the files of the newest message that has any
-    go again with every turn; those of older messages are replaced by a note (see docs/round-3.md)."""
+    go again with every turn; those of older messages are replaced by a note (see docs/round-3.md). `loaded` is the
+    path as it was read by the caller, so it is not read again for nothing."""
     settings = request.app.state.settings
-    messages = store.list_messages(conn, cid)
+    messages = loaded if loaded is not None else store.list_messages(conn, cid)
     head = []
     # The latest compaction stands for the turns before it (see docs/phase-8.md); the messages stay in the
     # database and the UI, but they are no longer sent. `after_reply`: it also covers the message it is saved on.
@@ -447,11 +482,16 @@ def chat_turn(cid: str, req: ChatRequest, request: Request, conn: Conn) -> Turn:
 def regenerate_turn(cid: str, request: Request, conn: Conn, req: RegenerateRequest | None = None) -> Turn:
     """A new reply to the last user message. The reply there was (if any) stays, as another version of it."""
     conv = _require(conn, cid)
-    user = _last_user(store.list_messages(conn, cid))
+    path = store.list_messages(conn, cid)
+    user = _last_user(path)
     if not user:
         raise HTTPException(409, "no user message to reply to")
-    store.set_leaf(conn, cid, user["id"])  # the path now ends at the message being answered
-    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"], req.model if req else None)
+    # The path now ends at the message being answered, so the reply it replaces is not part of the history. (It
+    # stays in the conversation as another version; see docs/branching.md.)
+    answered = path[: path.index(user) + 1]
+    store.set_leaf(conn, cid, user["id"])
+    return _make_turn(request, conn, conv, _history(request, conn, cid, answered), user["id"],
+                      req.model if req else None)
 
 
 def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
@@ -470,7 +510,11 @@ def edit_turn(cid: str, req: EditRequest, request: Request, conn: Conn) -> Turn:
     files = target["meta"].get("attachments")
     user = store.add_message(conn, cid, "user", req.content, {"attachments": files} if files else None,
                              parent_id=target["parent_id"])
-    return _make_turn(request, conn, conv, _history(request, conn, cid), user["id"], req.model)
+    # The path shown now ends at that new version, so the history is the old path up to where it was replaced,
+    # with the new message where the old one was (it has the same attachments and the same parent).
+    index = path.index(target)
+    return _make_turn(request, conn, conv, _history(request, conn, cid, [*path[:index], user]), user["id"],
+                      req.model)
 
 
 def _tool_meta(calls: dict[str, dict], interrupted: str | None = None) -> list[dict]:
@@ -490,7 +534,8 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
 
     Yields the events from llm.py, plus {"type": "title", "title": ...} after "done" when the
     conversation still has its default title. A reply that errors is not saved; a reply cut
-    short (client disconnect = Stop) is saved with meta {"stopped": true}. The message's meta also keeps the
+    short by the client hanging up (Stop) is saved with meta {"stopped": true}; a reply cut short by something
+    breaking is not saved, because that is not something the reader asked for. The message's meta also keeps the
     reasoning summary and token usage when there are any. A reply is saved as a child of the user message it answers
     (`turn.reply_to`), which is how an edit or a regeneration becomes another version.
     """
@@ -498,6 +543,7 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
     needs_title = turn.conv["title"] == store.DEFAULT_TITLE
     reply, reasoning, tool_calls, compaction, finished = [], [], {}, None, False
     outcome, usage, started = "stopped", {}, time.monotonic()
+    stopped_by_client = False
     try:
         if turn.trimmed:
             yield {"type": "context_trimmed", "count": turn.trimmed}
@@ -539,11 +585,18 @@ async def _stream_turn(turn: Turn) -> AsyncIterator[dict]:
             elif event["type"] == "error":
                 finished, outcome = True, "error"
             yield event
+    except (asyncio.CancelledError, GeneratorExit):
+        stopped_by_client = True  # the client hung up: that is Stop, and what it saw is worth keeping
+        raise
+    except Exception:
+        logger.exception("reply failed: conversation %s, model %s", cid, turn.model)
+        outcome = "error"  # something broke, which is not Stop: nothing is saved, so a retry starts clean
+        raise
     finally:
         logger.info("reply %s: conversation %s, model %s, %d tool calls, %s tokens in, %s out, %.1f s", outcome, cid,
                     turn.model, len(tool_calls), usage.get("input_tokens", "?"), usage.get("output_tokens", "?"),
                     time.monotonic() - started)
-        if not finished and reply:
+        if stopped_by_client and not finished and reply:
             meta = {"stopped": True, "model": turn.model, **({"reasoning": "".join(reasoning)} if reasoning else {})}
             if turn.trimmed:
                 meta["trimmed"] = turn.trimmed
@@ -568,6 +621,7 @@ async def regenerate(turn: Annotated[Turn, Depends(regenerate_turn)]) -> AsyncIt
 
 @router.post("/conversations/{cid}/edit", response_class=EventSourceResponse)
 async def edit(turn: Annotated[Turn, Depends(edit_turn)]) -> AsyncIterator[dict]:
-    """Rewrite the last user message and get a new reply (no branching: later messages are dropped)."""
+    """Rewrite a user message as a new version of it and get a new reply to that. What came after the old version
+    stays with it, so the old path is still there to show again (see docs/branching.md)."""
     async for event in _stream_turn(turn):
         yield event

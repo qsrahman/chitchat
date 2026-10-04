@@ -17,6 +17,14 @@ def _size(file: Path) -> int:
     return file.stat().st_size if file.is_file() else 0
 
 
+def _freed(directory: str, ids: list[str], strays: list[Path]) -> int:
+    """The bytes of the files that go with these attachments (a PDF keeps its extracted text next to it), and of the
+    files that no row names."""
+    return (sum(_size(f) for a in ids for f in (attachments.path(directory, a),
+                                                attachments.path(directory, a).with_suffix(".txt")))
+            + sum(_size(f) for f in strays))
+
+
 def _unsent(conn: sqlite3.Connection) -> list[str]:
     """Uploads that were never sent with a message (the page's own attach-then-send is covered by GRACE)."""
     cutoff = (datetime.now(UTC) - GRACE).isoformat()
@@ -42,8 +50,6 @@ def _unused(conn: sqlite3.Connection, directory: str) -> tuple[list[str], list[P
 def overview(conn: sqlite3.Connection, db_path: str, directory: str) -> dict:
     """Sizes, for the Storage card. The database counts its write-ahead log, where recent changes still are."""
     unsent, strays = _unused(conn, directory)
-    unused_bytes = sum(_size(attachments.path(directory, a)) + _size(attachments.path(directory, a).with_suffix(".txt"))
-                       for a in unsent) + sum(_size(f) for f in strays)
     files = conn.execute(
         "SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes FROM attachments WHERE conversation_id IS NOT NULL"
     ).fetchone()
@@ -51,7 +57,7 @@ def overview(conn: sqlite3.Connection, db_path: str, directory: str) -> dict:
     return {
         "database_bytes": _size(Path(db_path)) + _size(Path(f"{db_path}-wal")),
         "attachment_files": files["n"], "attachment_bytes": files["bytes"],
-        "unused_files": len(unsent) + len(strays), "unused_bytes": unused_bytes,
+        "unused_files": len(unsent) + len(strays), "unused_bytes": _freed(directory, unsent, strays),
         "chats": chats["n"], "archived_chats": chats["archived"],
     }
 
@@ -59,8 +65,7 @@ def overview(conn: sqlite3.Connection, db_path: str, directory: str) -> dict:
 def clear_unused(conn: sqlite3.Connection, directory: str) -> dict:
     """Delete the uploads that were never sent and the files no row names. Returns what went."""
     unsent, strays = _unused(conn, directory)
-    freed = sum(_size(attachments.path(directory, a)) + _size(attachments.path(directory, a).with_suffix(".txt"))
-                for a in unsent) + sum(_size(f) for f in strays)
+    freed = _freed(directory, unsent, strays)
     conn.executemany("DELETE FROM attachments WHERE id = ?", [(a,) for a in unsent])
     conn.commit()
     attachments.delete_files(directory, unsent)
@@ -82,12 +87,14 @@ def count_archived(conn: sqlite3.Connection, days: int) -> int:
 
 def delete_archived(conn: sqlite3.Connection, directory: str, days: int) -> list[str]:
     """Delete those chats, their attachment rows (cascade) and files, then give the freed pages back to the disk:
-    SQLite keeps them in the file otherwise. Returns the ids, so the page can leave one that is open."""
+    SQLite keeps them in the file otherwise. All of them in one transaction, so a failure half way through leaves
+    every chat that was there. Returns the ids, so the page can leave one that is open."""
     ids = _archived_before(conn, days)
+    if not ids:
+        return []
     files = [a for cid in ids for a in store.attachment_ids(conn, cid)]
-    for cid in ids:
-        store.delete_conversation(conn, cid)
+    conn.executemany("DELETE FROM conversations WHERE id = ?", [(cid,) for cid in ids])
+    conn.commit()
     attachments.delete_files(directory, files)
-    if ids:
-        conn.execute("VACUUM")  # not inside a transaction: store.delete_conversation has committed
+    conn.execute("VACUUM")  # not inside a transaction, or it does nothing
     return ids

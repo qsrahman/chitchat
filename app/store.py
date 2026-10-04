@@ -14,8 +14,9 @@ from app.llm import ReasoningEffort
 
 DEFAULT_TITLE = "New chat"
 BULK_IMPORT = 200  # messages: from this many an import indexes them in one go (see import_conversations)
+MAX_INSTRUCTIONS = 10_000  # characters of custom instructions, in Settings and in an import
 
-Instructions = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10_000)]  # may be empty = unset
+Instructions = Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_INSTRUCTIONS)]  # may be empty
 
 
 def _known_tools(names: list[str]) -> list[str]:
@@ -112,9 +113,10 @@ def update_conversation_settings(conn: sqlite3.Connection, cid: str, settings: d
     return get_conversation(conn, cid)
 
 
-def get_app_setting(conn: sqlite3.Connection, key: str, default: str = "") -> str:
+def get_app_setting(conn: sqlite3.Connection, key: str) -> str:
+    """An app-wide setting; "" if it was never set (only these two keys exist)."""
     row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
-    return row["value"] if row else default
+    return row["value"] if row else ""
 
 
 def set_app_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
@@ -171,21 +173,30 @@ def add_message(conn: sqlite3.Connection, cid: str, role: str, content: str, met
             "parent_id": parent_id}
 
 
+# The path shown, from the conversation's leaf back to its root: `path` holds those messages. Ordered by id it is
+# the order they are shown in, because a parent is always older than its child.
+PATH_CTE = """WITH RECURSIVE path(id, parent_id, role, content, meta, created_at) AS (
+           SELECT m.id, m.parent_id, m.role, m.content, m.meta, m.created_at
+           FROM messages m JOIN conversations c ON c.leaf_id = m.id WHERE c.id = ?
+           UNION ALL
+           SELECT m.id, m.parent_id, m.role, m.content, m.meta, m.created_at
+           FROM messages m JOIN path ON m.id = path.parent_id)"""
+
+
 def list_messages(conn: sqlite3.Connection, cid: str) -> list[dict]:
     """The messages of the path shown, first to last, each with its `siblings` (ids) and `parent_id`."""
-    rows = conn.execute(
-        """WITH RECURSIVE path(id, parent_id, role, content, meta, created_at) AS (
-               SELECT m.id, m.parent_id, m.role, m.content, m.meta, m.created_at
-               FROM messages m JOIN conversations c ON c.leaf_id = m.id WHERE c.id = ?
-               UNION ALL
-               SELECT m.id, m.parent_id, m.role, m.content, m.meta, m.created_at
-               FROM messages m JOIN path ON m.id = path.parent_id)
-           SELECT * FROM path ORDER BY id""",
-        (cid,),
-    ).fetchall()  # a parent is always older than its child, so ordering by id is ordering by depth
+    rows = conn.execute(f"{PATH_CTE} SELECT * FROM path ORDER BY id", (cid,)).fetchall()
     families: dict[int | None, list[int]] = {}
-    for r in conn.execute("SELECT id, parent_id FROM messages WHERE conversation_id = ? ORDER BY id", (cid,)):
-        families.setdefault(r["parent_id"], []).append(r["id"])
+    if rows:
+        # The versions of the messages on the path, not of every message in the conversation: only the parents a
+        # message on the path can have. (None is the first message's, which every first message shares.)
+        wanted = [p for p in dict.fromkeys(r["parent_id"] for r in rows) if p is not None]
+        for r in conn.execute(
+            f"""SELECT id, parent_id FROM messages WHERE conversation_id = ?
+                AND (parent_id IS NULL OR parent_id IN ({",".join("?" * len(wanted))})) ORDER BY id""",
+            (cid, *wanted),
+        ):
+            families.setdefault(r["parent_id"], []).append(r["id"])
     return [{**dict(r), "meta": json.loads(r["meta"]), "siblings": families[r["parent_id"]]} for r in rows]
 
 
@@ -212,12 +223,7 @@ def siblings_of(conn: sqlite3.Connection, cid: str, message_id: int) -> list[int
 
 def _path_ids(conn: sqlite3.Connection, cid: str) -> list[int]:
     """The ids of the path shown, first to last."""
-    rows = conn.execute(
-        """WITH RECURSIVE path(id, parent_id) AS (
-               SELECT m.id, m.parent_id FROM messages m JOIN conversations c ON c.leaf_id = m.id WHERE c.id = ?
-               UNION ALL SELECT m.id, m.parent_id FROM messages m JOIN path ON m.id = path.parent_id)
-           SELECT id FROM path ORDER BY id""", (cid,))
-    return [r["id"] for r in rows]
+    return [r["id"] for r in conn.execute(f"{PATH_CTE} SELECT id FROM path ORDER BY id", (cid,))]
 
 
 def _remember_path(conn: sqlite3.Connection, cid: str) -> None:
@@ -354,7 +360,10 @@ def search_conversations(
 
 
 # ---- attachments (files live on disk, see attachments.py; these rows say what they are) ----
-ATTACHMENT_FIELDS = ("id", "name", "mime", "kind", "size")  # what a message's meta keeps about each one
+# What a message's meta keeps about each tool call and each attachment, so the page can show them again later.
+# backup.py checks the same lists when it reads a backup.
+TOOL_META_KEYS = ("id", "name", "arguments", "status", "display", "error")
+ATTACHMENT_FIELDS = ("id", "name", "mime", "kind", "size")  # of each attachment
 
 
 def add_attachment(conn: sqlite3.Connection, aid: str, name: str, mime: str, kind: str, size: int) -> dict:
@@ -375,8 +384,15 @@ def get_attachment(conn: sqlite3.Connection, aid: str) -> dict | None:
 
 def pending_attachments(conn: sqlite3.Connection, ids: list[str]) -> list[dict]:
     """The uploaded-but-unsent attachments among `ids`, in that order; ids that don't qualify are left out."""
-    rows = [get_attachment(conn, aid) for aid in dict.fromkeys(ids)]
-    return [r for r in rows if r and r["conversation_id"] is None]
+    wanted = list(dict.fromkeys(ids))
+    if not wanted:
+        return []
+    rows = [dict(r) for r in conn.execute(
+        f"SELECT * FROM attachments WHERE conversation_id IS NULL AND id IN ({",".join("?" * len(wanted))})",
+        wanted,
+    )]
+    order = {aid: i for i, aid in enumerate(wanted)}
+    return sorted(rows, key=lambda r: order[r["id"]])
 
 
 def link_attachments(conn: sqlite3.Connection, cid: str, ids: list[str]) -> None:

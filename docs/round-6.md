@@ -3,7 +3,7 @@
 Three changes, each its own commit: a copy of the database before it is upgraded, "try again with another model", and attachments in the backup.
 
 ## 1. A copy of the database before an upgrade
-Branching's migration ran on the real `chitchat.db` the moment the dev server reloaded, with no copy. It worked, but a migration that failed halfway (`executescript` is not a transaction) would have left the only copy of someone's chats half changed.
+Branching's migration ran on the real `chitchat.db` the moment the dev server reloaded, with no copy. It worked, but a migration that failed halfway (`executescript` is not a transaction, which is why each step is now run as one, `BEGIN`/`COMMIT` written into the script) would have left the only copy of someone's chats half changed.
 
 `db.init` now, when the file has a version above 0 (it holds something) and below the newest, copies it to **`<db_path>.bak-v<version>`** (for example `chitchat.db.bak-v5`, the database as it was before migration 6) and only then upgrades it. The copy is made with SQLite's backup API, not a file copy, because the database runs with a write-ahead log and a plain copy would miss what is still in the log (tested: a row that is only in the log is in the copy). It logs one line saying where. Fresh and up-to-date databases get none, so nothing is written on a normal start.
 - **A copy that exists is kept.** It can only be there from an earlier failed try at the same upgrade, and that is the better copy: nothing is overwritten.

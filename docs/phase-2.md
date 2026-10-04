@@ -1,6 +1,6 @@
 # Phase 2: persistence + conversation sidebar
 
-- `db.py`: `connect()` (row factory, foreign keys on) and `init()`, which applies `MIGRATIONS` in order and records progress in `PRAGMA user_version`. Add a schema change by appending a script to `MIGRATIONS`.
+- `db.py`: `connect()` (row factory, foreign keys on) and `init()`, which applies `MIGRATIONS` in order and records progress in `PRAGMA user_version`. Add a schema change by appending a script to `MIGRATIONS`; each step and the version it leaves behind are one transaction, so a step that fails half way is rolled back whole and the next start runs it again.
 - `store.py`: plain functions for conversations and messages. `add_message` bumps `conversations.updated_at`, and the sidebar sorts by it. `messages.meta` is a JSON column reserved for attachments, tool calls and usage in later phases.
 - API (`routes.py`):
   - `GET/POST /api/conversations`, `GET/PATCH/DELETE /api/conversations/{id}`

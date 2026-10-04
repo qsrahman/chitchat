@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 from datetime import timedelta
 from pathlib import Path
 
@@ -79,6 +80,17 @@ async def test_broken_pdf_is_rejected_and_leaves_no_file(client, app):
 async def test_pdf_without_text_is_fine_when_sent_as_a_file(client, app):
     app.state.settings.openai_pdf_input = "file"  # nothing to extract, so nothing can be missing
     assert (await upload(client, "scan.pdf", make_pdf(None))).status_code == 201
+
+
+async def test_an_upload_whose_row_cannot_be_saved_leaves_no_file(client, app, monkeypatch):
+    """Nothing points at the file then, so nothing would ever delete it."""
+    def boom(*_):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr("app.store.add_attachment", boom)
+    with pytest.raises(sqlite3.OperationalError):
+        await upload(client, "notes.txt", b"hi")
+    assert not list(Path(app.state.settings.attachments_dir).glob("*"))
 
 
 async def test_file_name_is_cleaned(client):

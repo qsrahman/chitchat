@@ -3,7 +3,7 @@ import os
 from contextlib import closing
 from pathlib import Path
 
-from app import db
+from app import db, storage
 from tests.helpers import PNG, make_pdf, new_conv, upload
 
 LONG_AGO = "2000-01-01T00:00:00+00:00"
@@ -112,6 +112,20 @@ async def test_the_search_index_forgets_a_deleted_chat(client, app):
     assert (await client.get("/api/search", params={"q": "zebra"})).json()
     await client.delete("/api/storage/archived", params={"days": 1})
     assert (await client.get("/api/search", params={"q": "zebra"})).json() == []
+
+
+async def test_old_archived_chats_are_deleted_in_one_transaction(client, app):
+    """All of them commit together, so a failure half way through leaves every chat that was there."""
+    gone = [await archived_chat(client, app, f"old {i}") for i in range(3)]
+    with closing(db.connect(app.state.settings.db_path)) as conn:
+        seen: list[str] = []
+        conn.set_trace_callback(seen.append)
+        assert storage.delete_archived(conn, app.state.settings.attachments_dir, 30) == gone
+    deletes = [s for s in seen if s.startswith("DELETE FROM conversations WHERE id = '")]
+    assert len({d[44:-1] for d in deletes}) == 3  # all three chats, and no chat twice
+    assert seen.index(deletes[-1]) < seen.index("COMMIT")  # and they were committed together at the end
+    assert [cid for cid in gone if (await client.get(f"/api/conversations/{cid}")).status_code == 200] == []
+    assert (await client.get("/api/storage/archived", params={"days": 30})).json() == {"count": 0}
 
 
 async def test_the_database_file_gets_smaller_after_a_big_delete(client, app):

@@ -31,6 +31,13 @@ async def test_a_custom_endpoint_shows_only_its_scheme_and_host_and_changes_the_
     assert "pass" not in str(c) and "secret" not in str(c) and "key=1" not in str(c)
 
 
+async def test_an_endpoint_that_is_not_a_url_is_still_shown_as_something_custom(tmp_path):
+    """A mistyped port, or no host at all: /api/config reads a setting to show it, and 500ing on it helps nobody."""
+    assert (await config_for(tmp_path, openai_base_url="http://localhost:not-a-port/v1"))["endpoint"] == "http://localhost"
+    assert (await config_for(tmp_path, openai_base_url="/v1"))["endpoint"] == "custom"
+    assert (await config_for(tmp_path, openai_base_url="not a url"))["endpoint"] == "custom"
+
+
 async def test_a_key_is_reported_as_set_or_not_and_never_shown(tmp_path):
     c = await config_for(tmp_path, openai_api_key="sk-very-secret", brave_api_key="BSA-also-secret")
     assert c["web_search"] is True and "Web search" in c["tools"]

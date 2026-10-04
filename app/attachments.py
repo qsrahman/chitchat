@@ -12,6 +12,7 @@ from pypdf.errors import PyPdfError
 
 MB = 1024 * 1024
 MAX_FILES = 5  # per message
+MAX_NAME = 200  # characters of a file's name, as kept and shown
 LIMITS = {"image": 10 * MB, "pdf": 20 * MB, "text": 256 * 1024}  # bytes, per kind
 MAX_TEXT_CHARS = 200_000  # what the model gets from one text file or PDF
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
@@ -51,6 +52,12 @@ def _is_text(data: bytes) -> bool:
 
 def path(directory: str, aid: str) -> Path:
     return Path(directory) / aid
+
+
+def safe_name(name: str | None) -> str:
+    """An upload's name as it is kept and shown: the last part of a path the client (or an imported file) may have
+    sent, at most MAX_NAME characters, and never empty, so a message can always name the file."""
+    return (name or "attachment").replace("\\", "/").rsplit("/", 1)[-1].strip()[:MAX_NAME] or "attachment"
 
 
 def save(directory: str, aid: str, data: bytes) -> None:

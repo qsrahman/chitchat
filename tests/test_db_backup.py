@@ -4,6 +4,8 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+import pytest
+
 from app import db
 
 
@@ -101,3 +103,22 @@ def test_nothing_is_pruned_when_nothing_is_upgraded(tmp_path):
         (tmp_path / f"chats.db.bak-v{v}").write_bytes(b"old")
     db.init(path)
     assert len(list(tmp_path.glob("chats.db.bak-v*"))) == 3
+
+
+BROKEN = "CREATE TABLE half (id TEXT);\nCREATE TABLE broken (id TEXT, id TEXT);"
+
+
+def test_a_step_that_fails_half_way_leaves_the_version_it_started_from(tmp_path, monkeypatch):
+    """So the next start runs that step again, on the schema it was meant to change, instead of on half of one."""
+    path = str(tmp_path / "chats.db")
+    monkeypatch.setattr(db, "MIGRATIONS", [db.SCHEMA, BROKEN, db.SETTINGS])
+    with pytest.raises(sqlite3.OperationalError):
+        db.init(path)
+    with closing(db.connect(path)) as conn:
+        assert version(path) == 1
+        assert not conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'half'").fetchone()
+
+    monkeypatch.setattr(db, "MIGRATIONS", [db.SCHEMA, db.SETTINGS])  # the step, fixed, applies as it should
+    db.init(path)
+    with closing(db.connect(path)) as conn:
+        assert version(path) == 2 and conn.execute("SELECT settings FROM conversations").fetchall() == []

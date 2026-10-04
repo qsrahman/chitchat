@@ -22,7 +22,7 @@ from typing import Any, BinaryIO, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
 from app import attachments, store, tools
-from app.store import ConversationSettings
+from app.store import MAX_INSTRUCTIONS, ConversationSettings
 
 FORMAT = "chitchat-backup"
 VERSION = 2  # 2: messages have a `parent` and conversations a `leaf` (versions of a message); 1 files import as a path
@@ -34,8 +34,6 @@ ARCHIVE_JSON = "chats.json"
 ARCHIVE_FILES = "attachments/"
 MAX_ARCHIVE_BYTES = 1_000_000_000  # an uploaded zip
 MAX_ARCHIVE_FILES_BYTES = 2_000_000_000  # all the files in it, unpacked
-MAX_INSTRUCTIONS = 10_000  # characters: what Settings accepts
-TOOL_KEYS = ("id", "name", "arguments", "status", "display", "error")
 TOOL_STATUSES = {"done", "error", "stopped"}  # a call that is still "running" is never saved
 
 
@@ -245,7 +243,7 @@ def _clean_meta(meta: dict) -> tuple[dict, list[dict]]:
         if usage:
             kept["usage"] = usage
     if isinstance(meta.get("tools"), list):
-        calls = [{k: c[k] for k in TOOL_KEYS if k in c} for c in meta["tools"][:50]
+        calls = [{k: c[k] for k in store.TOOL_META_KEYS if k in c} for c in meta["tools"][:50]
                  if isinstance(c, dict) and isinstance(c.get("id"), str) and isinstance(c.get("name"), str)
                  and c.get("status") in TOOL_STATUSES]
         for call in calls:  # arguments and display are objects, or absent
@@ -324,7 +322,7 @@ class _Files:
         `done` maps an old id to what it became (versions of a message share their files), `rows` collects new rows."""
         kept, missing = [], []
         for a in listed:
-            name = a["name"].replace("\\", "/").rsplit("/", 1)[-1].strip()[:200] or "attachment"
+            name = attachments.safe_name(a["name"])
             old = a.get("id")
             if isinstance(old, str) and old in done:
                 kept.append(done[old])

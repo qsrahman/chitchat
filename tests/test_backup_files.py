@@ -208,6 +208,16 @@ async def test_a_bad_chat_after_a_good_one_leaves_no_files_behind(second):
     assert (await second.get("/api/conversations")).json() == [] and on_disk(second.app) == []
 
 
+async def test_a_zip_over_the_size_limit_is_refused(second, monkeypatch):
+    """Measured from what was really uploaded: what the client said the size was is not to be trusted (and the
+    parser doesn't always fill it in at all)."""
+    data = zip_of({"conversations": [{"title": "t", "messages": []}]})
+    monkeypatch.setattr("app.backup.MAX_ARCHIVE_BYTES", len(data) - 1)
+    assert (await import_zip(second, data)).status_code == 413
+    monkeypatch.setattr("app.backup.MAX_ARCHIVE_BYTES", len(data))
+    assert (await import_zip(second, data)).status_code == 201  # and exactly at the limit it is not
+
+
 async def test_a_zip_that_is_not_a_backup_is_refused_in_words(second):
     assert (await import_zip(second, b"PK\x03\x04 not really a zip")).status_code == 422
     markdown = zip_of({}, {}).replace(b"chats.json", b"chats.jsno")  # a zip with another name inside

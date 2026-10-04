@@ -88,6 +88,22 @@ async def test_disconnect_before_any_text_saves_no_reply(client, llm):
     assert [m["role"] for m in await messages(client, cid)] == ["user"]
 
 
+async def test_a_reply_that_breaks_is_not_saved_as_stopped(client, llm, caplog):
+    """Stop is the reader pressing it; something breaking is not, so the half-written reply is dropped (and it is
+    logged as what it was, not as a reply the reader stopped)."""
+    async def broken(model, messages_, **options):
+        yield {"type": "delta", "text": "half an answer"}
+        raise RuntimeError("the stream broke")
+
+    llm.stream_reply = broken
+    cid = await new_conv(client)
+    with pytest.raises(BaseExceptionGroup) as raised:  # what a generator raises arrives grouped
+        await chat(client, cid, "hi")
+    assert [type(e).__name__ for e in raised.value.exceptions] == ["RuntimeError"]
+    assert [m["role"] for m in await messages(client, cid)] == ["user"]
+    assert "reply failed" in caplog.text and "reply error:" in caplog.text
+
+
 async def test_reasoning_and_usage_are_saved_in_meta(client, llm):
     usage = {"input_tokens": 10, "output_tokens": 20, "reasoning_tokens": 5}
     llm.events = [

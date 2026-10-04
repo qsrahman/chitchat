@@ -160,5 +160,7 @@ def init(path: str) -> None:
         if 0 < version < len(MIGRATIONS):  # a database with something in it, about to change
             _back_up(conn, path, version)
         for i, script in enumerate(MIGRATIONS[version:], start=version + 1):
-            conn.executescript(script)
-            conn.execute(f"PRAGMA user_version = {i}")
+            # The step and the version it leaves behind are one transaction: a step that fails half way rolls back
+            # whole, so the next start tries it again instead of building on half a schema. executescript() commits
+            # whatever is open before it runs, so the transaction is written into the script itself.
+            conn.executescript(f"BEGIN;\n{script}\nPRAGMA user_version = {i};\nCOMMIT;")

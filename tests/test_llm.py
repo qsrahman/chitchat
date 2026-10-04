@@ -1,5 +1,6 @@
 """OpenAILLM through the real SDK, against an httpx mock transport: the request we send and the SSE
 stream we parse are both the SDK's own, so only the wire format is faked."""
+import asyncio
 import base64
 import json
 
@@ -482,6 +483,14 @@ async def test_calls_beyond_the_limit_are_not_run():
     assert "limit" in requests[1]["input"][-1]["output"]
 
 
+async def test_the_tool_call_limit_is_the_servers_when_the_caller_has_no_opinion():
+    web, calls = tool()
+    llm = make_llm(rounds(*[[call_item(call_id=f"c{i}"), completed()] for i in range(10)], requests=[]),
+                   max_tool_calls=2)
+    await events_of(llm, tools={"web_search": web})
+    assert len(calls) == 2
+
+
 async def test_a_model_that_never_stops_calling_tools_is_cut_off():
     web, calls = tool()
     requests = []
@@ -630,6 +639,13 @@ async def test_when_a_refresh_fails_the_old_list_is_not_served_as_if_new(monkeyp
     assert await llm.list_models() == ["a-model"]
     clock[0] += 400
     assert await llm.list_models() == []  # the endpoint is down now, and the picker should say so
+
+
+async def test_a_model_list_many_callers_ask_for_at_once_costs_one_call():
+    """The page asks on every view of the picker: without the lock a cold cache would fetch once per caller."""
+    llm, requests = counting_models_llm(("a-model", 1))
+    assert await asyncio.gather(*(llm.list_models() for _ in range(8))) == [["a-model"]] * 8
+    assert len(requests) == 1
 
 
 async def test_a_tool_call_is_logged_by_name_and_outcome_not_by_its_message(caplog):
