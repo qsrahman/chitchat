@@ -1,6 +1,6 @@
 # ChitChat
 
-A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses). It is built in small phases, and each phase adds code, tests, docs and a commit. See [PLAN.md](PLAN.md) for the roadmap.
+A ChatGPT-style web chat app built on the [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses). It is built in small phases, and each phase adds code, tests, docs and a commit. See [PLAN.md](PLAN.md) for the roadmap and [docs/README.md](docs/README.md) for a guide to the docs.
 
 ## Features
 - Streaming replies (SSE) with markdown rendering

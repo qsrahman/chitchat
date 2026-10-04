@@ -48,8 +48,8 @@ The header shows the model the conversation uses ("gemma4:cloud ⌄") and opens 
 - **Menu:** the configured default first (tagged "default"), then what the endpoint lists (reasoning models tagged "reasoning"), then "Instructions for this chat…". A saved model that is no longer listed is still shown, checked and tagged "not listed". The list is fetched when the page loads and again each time the menu opens.
 - **Failures:** a failed save shows "Couldn't switch model…" in the menu and keeps the old model. If `/api/models` can't be reached the button reads "Model" until the menu is opened and the list loads.
 - **Implementation:** the Popover API (`popover` + `popovertarget`, light dismiss, Escape, focus returns to the button) and a real `role="menu"` with the keyboard contract (arrows, Home, End, Tab leaves). The menu is placed under the button from `model-menu.js`, because CSS anchor positioning is not widely available yet. It is kept inside the viewport on phones.
-- **Header:** the conversation title now sits after the model button in a quieter weight, and is hidden on the new-chat screen. A long model name is truncated so the settings button stays on screen.
-- The settings button's dot now means "something other than the model is customized", since the model has its own button. The settings dialog and the picker share one model list and stay in sync.
+- **Header:** the conversation title now sits after the model button in a quieter weight, and is hidden on the new-chat screen. A long model name is truncated so the ⋯ button stays on screen (it was the settings button then; `docs/ui-review.md`).
+- The dot now means "something other than the model is customized", since the model has its own button; it is on the ⋯ chat menu button now (`docs/ui-review.md`). The model is chosen only in the picker: the chat's own dialog no longer has a model select.
 
 Tests: `tests/ui/test_model_picker_ui.py`.
 
