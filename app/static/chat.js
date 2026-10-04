@@ -77,18 +77,6 @@ export function updateActions() {
       m.classList.add('has-versions')
     }
   }
-  for (const m of msgs.filter(
-    (m) => m._model && m.classList.contains('assistant'),
-  )) {
-    // which model wrote it
-    actionsOf(m).append(textEl('span', m._model, 'model-tag'))
-  }
-  for (const m of msgs.filter((m) => m._usage)) {
-    // what it cost, for endpoints that report it
-    const tag = textEl('span', usageLabel(m._usage), 'model-tag usage-tag')
-    tag.title = usageTitle(m._usage)
-    actionsOf(m).append(tag)
-  }
   if (last?.classList.contains('assistant')) {
     actionsOf(last).append(
       iconButton('Regenerate', ICONS.refresh, () => regenerate()),
@@ -99,6 +87,19 @@ export function updateActions() {
       iconButton('Retry', ICONS.refresh, () => retry(lastUser)),
       anotherModel((model) => retry(lastUser, model)),
     )
+  }
+  // Which model wrote a reply and what it cost (for endpoints that report it): one quiet group after the buttons.
+  for (const m of msgs.filter(
+    (m) => m.classList.contains('assistant') && (m._model || m._usage),
+  )) {
+    const meta = textEl('span', '', 'reply-meta')
+    if (m._model) meta.append(textEl('span', m._model, 'model-tag'))
+    if (m._usage) {
+      const tag = textEl('span', usageLabel(m._usage), 'usage-tag')
+      tag.title = usageTitle(m._usage)
+      meta.append(tag)
+    }
+    actionsOf(m).append(meta)
   }
 }
 

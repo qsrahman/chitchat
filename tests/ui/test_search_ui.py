@@ -30,11 +30,13 @@ def test_the_toggle_is_off_by_default_and_turns_on_and_off(page, app_url):
     toggle(page).click()
     expect(toggle(page)).to_have_attribute("aria-pressed", "true")
     expect(toggle(page)).to_have_attribute("title", "Web search: on")
-    expect(toggle(page)).not_to_contain_text("Search")  # on is shown by color alone, with no label
-    expect(toggle(page)).to_have_text("")
-    expect(page.locator(".toggle-label")).to_have_count(0)
+    label = toggle(page).locator(".chip-label")
+    expect(label).to_be_visible()  # on says so in words, beside the globe
+    expect(label).to_have_text("Search")
+    expect(toggle(page)).to_have_accessible_name("Web search")  # the name is the same on or off
     toggle(page).click()
     expect(toggle(page)).to_have_attribute("aria-pressed", "false")
+    expect(label).to_be_hidden()  # off is the bare icon
 
 
 def test_the_toggle_is_named_after_the_tool_the_server_offers(page, app_url):
@@ -296,7 +298,7 @@ def test_on_a_phone_the_toggle_fits_when_on(page, app_url):
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
 
-def test_the_pressed_toggle_changes_color_only_with_no_label_or_background(page, app_url):
+def test_the_pressed_toggle_has_a_label_and_a_color_but_no_background(page, app_url):
     open_app(page, app_url)
     colors = lambda: toggle(page).evaluate(  # noqa: E731
         "e => { const s = getComputedStyle(e); return [s.color, s.backgroundColor]; }")
@@ -306,5 +308,5 @@ def test_the_pressed_toggle_changes_color_only_with_no_label_or_background(page,
     page.mouse.move(0, 0)  # the hover background is not the pressed state
     on = colors()
     assert on[0] != off[0]  # accent color
-    assert on[1] == off[1]  # no background highlight
-    assert toggle(page).bounding_box()["width"] == page.locator("#attach").bounding_box()["width"]  # no wider when on
+    assert on[1] == off[1]  # no background highlight: that was taken out on purpose
+    assert toggle(page).bounding_box()["width"] > page.locator("#attach").bounding_box()["width"]  # room for the word

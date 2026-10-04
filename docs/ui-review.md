@@ -13,3 +13,11 @@ Tests: `tests/ui/test_chat_menu_ui.py` (one button per row, the groups, the open
 
 ### A finding on the way: stale modules
 After an update the browser reused some of the page's JavaScript modules from its cache and mixed old and new ones, which fails at load ("does not provide an export named ..."): static files had no `Cache-Control`, so browsers guessed a lifetime from `Last-Modified`. The page's own files (everything outside `/api/`) now carry `Cache-Control: no-cache`: the browser keeps them but asks first, and the `ETag` answers 304 when nothing changed (`tests/test_security_headers.py`).
+
+## 5 to 8: how a conversation reads
+- **The line under a reply** puts the buttons together first (copy, regenerate, another model) and the model name and token counts after them as one quiet group, `reply-meta`, instead of in the middle of the buttons. Older replies still show the line only on hover.
+- **One disclosure marker.** The reasoning block and the tool-call lines used the browser's own ▶ triangle while everything else on the page uses chevrons. Both now draw the same chevron, which turns down when open and points the other way in right-to-left text. A tool call with nothing to open has none.
+- **Spacing.** Your message and the reply to it are one exchange, so they sit closer (your message's action row is 24px instead of 28 and its margin 0.5rem instead of 1.25) than a reply and your next message: about 34px against 52px.
+- **Web search says so in words.** When the globe is on, "Search" appears beside it, in addition to the accent color. **No background**: a highlighted button was taken out earlier on purpose, and the tests that kept it out stay (the old rule "on is color alone, no label" became "on is color and a word, no background"). The word is in the text color, not the accent, because on the hover background the accent is 4.15:1, below the 4.5:1 the accessibility test asks for. The button's name is "Web search" on or off.
+
+Tests: `tests/ui/test_polish_ui.py` (the order and contents of the line, the chevron turning, the spacing) and `tests/ui/test_search_ui.py` (the label and the missing background).

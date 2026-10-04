@@ -602,6 +602,14 @@ main:not(.is-started) #empty {
 .msg {
   margin: 0 0 var(--size-5);
 }
+/* Your message and the reply to it are one exchange: closer together than a reply and your next message. */
+.msg.user {
+  margin-bottom: var(--size-2);
+}
+.msg.user .actions {
+  min-height: 24px;
+  margin-top: 2px;
+}
 .msg.is-found {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-radius: var(--r-lg);
@@ -669,6 +677,36 @@ main:not(.is-started) #empty {
   width: fit-content;
   padding: 2px 0;
   cursor: pointer;
+}
+/* One disclosure marker for the reasoning and the tool calls: the chevron icons of the rest of the page, not the
+   browser's triangle. It turns down when open, and points the other way in right-to-left text. */
+:is(.reasoning, .tool-call) summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+:is(.reasoning, .tool-call) summary::-webkit-details-marker {
+  display: none;
+}
+:is(.reasoning, .tool-call) summary::before {
+  content: '';
+  flex: none;
+  width: 0.4em;
+  height: 0.4em;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  rotate: -45deg;
+  transition: rotate 0.15s var(--ease-out-3);
+}
+:is(.reasoning, .tool-call) summary:dir(rtl)::before {
+  rotate: 135deg;
+}
+:is(.reasoning, .tool-call)[open] > summary::before {
+  rotate: 45deg;
+}
+.tool-call:not(:has(.tool-body > *)) summary::before {
+  display: none;
 }
 .reasoning summary:hover {
   color: var(--ink);
@@ -908,11 +946,17 @@ main:not(.is-started) #empty {
 .actions .icon-btn {
   padding: 5px;
 }
-.model-tag {
-  align-self: center;
-  margin-inline-start: 6px;
+.reply-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: 10px;
   font-size: var(--font-size-0);
   color: var(--muted);
+}
+.usage-tag::before {
+  content: '·';
+  margin-inline-end: 8px;
 }
 .versions {
   display: inline-flex;
@@ -1163,6 +1207,24 @@ dialog[open]::backdrop {
 }
 #search-toggle[aria-pressed='true'] {
   color: var(--accent);
+}
+/* On, it says so in words as well as in color: "Search" beside the globe. No background: a highlighted button was
+   taken out on purpose (docs/ui-review.md). */
+#search-toggle .chip-label {
+  display: none;
+  font-size: var(--text-sm);
+}
+#search-toggle[aria-pressed='true'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 8px;
+}
+#search-toggle[aria-pressed='true'] .chip-label {
+  display: inline;
+  color: var(
+    --ink
+  ); /* the globe is the accent; the word must stay readable on the hover background too */
 }
 .composer-note {
   margin: 6px 12px 0;
