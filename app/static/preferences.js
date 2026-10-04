@@ -3,6 +3,7 @@
 // settings.js; the import itself is in backup.js. The design and what is where: docs/settings-dialog.md.
 import { $, api, bus, state } from './core.js'
 import { closeNavIfOverlay } from './nav.js'
+import { loadStorage } from './storage.js'
 import {
   defaults,
   modelInfo,
@@ -37,6 +38,7 @@ function showTab(tab, focus = false) {
   if (focus) tab.focus()
   tab.scrollIntoView({ block: 'nearest', inline: 'nearest' }) // in the phone's row of tabs it may be off to the side
   if (tab.id === 'tab-server') loadServer()
+  if (tab.id === 'tab-data') loadStorage()
   try {
     localStorage.setItem('prefsTab', tab.id)
   } catch {

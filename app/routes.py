@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.sse import EventSourceResponse
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app import attachments, backup, context, db, store, tools
+from app import attachments, backup, context, db, storage, store, tools
 from app.llm import REASONING_EFFORTS, supports_reasoning
 from app.store import ConversationSettings, Defaults, Instructions
 
@@ -262,6 +262,33 @@ def server_config(request: Request):
         "attachments": s.attachments_dir,
         "default_instructions": s.default_system_prompt,
     }
+
+
+@router.get("/storage")
+def storage_overview(request: Request, conn: Conn):
+    s = request.app.state.settings
+    return storage.overview(conn, s.db_path, s.attachments_dir)
+
+
+@router.post("/storage/clear-unused")
+def clear_unused(request: Request, conn: Conn):
+    """Delete files that nothing uses: uploads never sent with a message, and files no row names."""
+    return storage.clear_unused(conn, request.app.state.settings.attachments_dir)
+
+
+Days = Annotated[int, Query(ge=1, le=3650)]
+
+
+@router.get("/storage/archived")
+def archived_count(days: Days, conn: Conn):
+    """How many archived chats have been untouched for `days` days: what the delete below would remove."""
+    return {"count": storage.count_archived(conn, days)}
+
+
+@router.delete("/storage/archived")
+def delete_archived(days: Days, request: Request, conn: Conn):
+    ids = storage.delete_archived(conn, request.app.state.settings.attachments_dir, days)
+    return {"deleted": len(ids), "ids": ids}
 
 
 @router.get("/attachments/limits")

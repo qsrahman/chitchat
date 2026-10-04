@@ -126,6 +126,17 @@ interface MessageEl extends HTMLDivElement {
   _resumeAt?: number
 }
 
+// GET /api/storage: what is kept, for Settings, Data controls.
+interface StorageOverview {
+  database_bytes: number
+  attachment_files: number
+  attachment_bytes: number
+  unused_files: number
+  unused_bytes: number
+  chats: number
+  archived_chats: number
+}
+
 // GET /api/config: what the server is set up with (Settings, Server tab).
 interface ServerConfig {
   endpoint: string

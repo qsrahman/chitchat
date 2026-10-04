@@ -71,6 +71,24 @@ export async function api(path, opts = {}) {
   return res.status === 204 ? null : res.json()
 }
 
+// A size as people read it: "12 B", "340 kB", "1.2 MB", "3.4 GB".
+export const bytes = (/** @type {number} */ n) => {
+  const [unit, size] =
+    n < 1000
+      ? ['byte', n]
+      : n < 1e6
+        ? ['kilobyte', n / 1e3]
+        : n < 1e9
+          ? ['megabyte', n / 1e6]
+          : ['gigabyte', n / 1e9]
+  return new Intl.NumberFormat(undefined, {
+    style: 'unit',
+    unit,
+    unitDisplay: 'narrow',
+    maximumFractionDigits: 1,
+  }).format(size)
+}
+
 // Token counts as people read them: "1.2K in · 567 out" in the line under a reply, the exact numbers in its tooltip.
 const compact = new Intl.NumberFormat(undefined, {
   notation: 'compact',

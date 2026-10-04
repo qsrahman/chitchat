@@ -3,6 +3,7 @@ import {
   $,
   ICONS,
   api,
+  bytes,
   composer,
   form,
   icon,
@@ -108,21 +109,6 @@ export function loadDraft() {
 // pending: [{ name, size, status: "uploading" | "done" | "error", file (the server's record), error, preview, ctrl, chip }]
 export const pending = []
 let maxFiles = 5 // replaced by the server's limit, see loadAttachmentLimits
-
-const bytes = (n) => {
-  const [unit, size] =
-    n < 1024
-      ? ['byte', n]
-      : n < 1024 ** 2
-        ? ['kilobyte', n / 1024]
-        : ['megabyte', n / 1024 ** 2]
-  return new Intl.NumberFormat(undefined, {
-    style: 'unit',
-    unit,
-    unitDisplay: 'narrow',
-    maximumFractionDigits: 1,
-  }).format(size)
-}
 
 // A chip's shape is fixed by its name and preview, so it is built once and then patched in place: rebuilding
 // them all on every status change would drop keyboard focus and re-create the preview images. They are only

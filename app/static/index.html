@@ -311,6 +311,19 @@
       </form>
     </dialog>
 
+    <dialog id="purge-dialog" closedby="any" aria-labelledby="purge-heading">
+      <form method="dialog">
+        <h2 id="purge-heading">Delete old archived chats?</h2>
+        <p id="purge-text"></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn" data-cancel>Keep them</button>
+          <button type="submit" value="delete" class="btn danger">
+            Delete for good
+          </button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="delete-dialog" closedby="any" aria-labelledby="delete-heading">
       <form method="dialog">
         <h2 id="delete-heading">Delete this conversation?</h2>
@@ -642,6 +655,54 @@
                 <p id="backup-status" role="status" hidden></p>
               </div>
             </div>
+            <h3>Storage</h3>
+            <div class="pref-card">
+              <div class="pref-row">
+                <div class="pref-text">
+                  <span class="pref-label">Space used</span>
+                  <p id="storage-summary">Loading…</p>
+                </div>
+              </div>
+              <div class="pref-row">
+                <div class="pref-text">
+                  <span class="pref-label">Unused files</span>
+                  <p id="unused-note"></p>
+                </div>
+                <button
+                  type="button"
+                  id="clear-unused"
+                  class="btn"
+                  aria-label="Delete unused files"
+                  disabled
+                >
+                  Delete
+                </button>
+              </div>
+              <div class="pref-row">
+                <div class="pref-text">
+                  <label for="archived-age">Old archived chats</label>
+                  <p id="archived-note"></p>
+                </div>
+                <div class="pref-controls">
+                  <select id="archived-age">
+                    <option value="30">Older than 30 days</option>
+                    <option value="90" selected>Older than 90 days</option>
+                    <option value="180">Older than 6 months</option>
+                    <option value="365">Older than a year</option>
+                  </select>
+                  <button
+                    type="button"
+                    id="delete-archived"
+                    class="btn"
+                    aria-label="Delete archived chats"
+                    disabled
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p id="storage-status" class="pref-note" role="status" hidden></p>
           </section>
 
           <section
