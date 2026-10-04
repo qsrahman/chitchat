@@ -11,6 +11,7 @@ from app import tools
 from app.config import Settings
 from app.main import create_app
 from app.tools import Tool
+from tests import network_changed
 
 CODE_REPLY = "Here is a loop:\n\n```python\nfor i in range(3):\n    print(i)\n```\n\nThat's it, with `inline` code.\n"
 MATH_REPLY = (
@@ -257,7 +258,7 @@ def wait_until_ready(page):
 
 
 @pytest.fixture
-def page(page, expected_console_errors):
+def page(page, expected_console_errors, request):
     """pytest-playwright's page, plus: navigations wait for the app to be ready, and any JS error or unexpected
     console error fails the test."""
     goto, reload = page.goto, page.reload
@@ -274,8 +275,16 @@ def page(page, expected_console_errors):
 
     page.goto, page.reload = goto_ready, reload_ready
     errors = []
-    page.on("pageerror", lambda e: errors.append(str(e)))
-    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+
+    def note(text):
+        errors.append(text)
+        if network_changed.seen([text]):  # see tests/network_changed.py
+            request.node.network_changed = True
+
+    page.on("pageerror", lambda e: note(str(e)))
+    page.on("console", lambda m: m.type == "error" and note(m.text))
     yield page
     unexpected = [e for e in errors if not any(w in e for w in expected_console_errors)]
+    if unexpected and all(network_changed.seen([e]) for e in unexpected):
+        raise network_changed.NetworkChanged(f"the page's requests failed: {len(unexpected)} x {unexpected[0]}")
     assert not unexpected, unexpected

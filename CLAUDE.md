@@ -37,6 +37,7 @@ uv run pytest -m live                  # real OpenAI API, needs OPENAI_API_KEY
 - Wire format is SSE over `POST`, produced by FastAPI: chat endpoints are generators with `response_class=EventSourceResponse`, each yielded dict becomes `data: {json}`. Checks that must be real HTTP errors (404, 409, 422) go in dependencies (`chat_turn` etc.), because once a generator endpoint starts streaming it is too late to change the status.
 - Every UI behavior change comes with a Playwright test in `tests/ui/`. Console errors fail those tests.
 - Build `Settings` in tests with `_env_file=None` so the developer's real `.env` can't leak in.
+- A browser test that failed because the host's network changed (`net::ERR_NETWORK_CHANGED`) is rerun, and no other failure is (`tests/network_changed.py`, `docs/development.md`): don't add retries for anything else, find the cause.
 - Tests must not touch the network. Inject `FakeLLM` through `app.state.llm` (see `tests/conftest.py`). Mark real-API tests `@pytest.mark.live`.
 - Anything the model or a user supplies is untrusted. Render assistant markdown through `DOMPurify`, and set user text with `textContent`.
 - Config comes from `Settings` (env / `.env`). Never commit `.env` or `*.db`.

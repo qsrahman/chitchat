@@ -11,3 +11,6 @@ Tests: `tests/test_backup_files.py` (the round trip, never overwriting, the odd 
 With `OPENAI_BASE_URL` set and no `TITLE_MODEL`, titles were written by `OPENAI_MODEL`. Once a different default can be chosen in Settings, that could be a model the endpoint no longer runs. `Settings.title_model_for(main_model)` now takes the default in force (the one chosen in Settings, else `OPENAI_MODEL`); the Server tab shows the same. Not changed: on OpenAI titles still come from a small fixed model whatever the default is, `TITLE_MODEL` still wins, and a chat that picks its own model still gets its title from the default, not from its own model (as before).
 
 Tests: `tests/test_settings.py`, `tests/test_config_api.py`.
+
+## Browser tests and the host's network
+The two failing runs in an earlier load sweep were `net::ERR_NETWORK_CHANGED`: the Mac's network changed during the run, and every browser test running then failed with console errors or a page that never became ready. Re-running the sweep would only have shown whether it happens again, so instead those failures are now recognised and the tests run again, and nothing else is. What it does and how it is tested: `docs/development.md`.

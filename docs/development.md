@@ -24,6 +24,8 @@ Like eslint and tsc it runs through `npx` with a pinned major version, because t
 ```
 uv run pytest -n 0 tests/ui/test_chat_ui.py -k retry
 ```
+**The host's network changing.** If your Mac's network changes while the suite runs (Wi-Fi, a VPN, waking from sleep), Chromium fails requests, even to `127.0.0.1`, with `net::ERR_NETWORK_CHANGED`, and every browser test running at that moment fails with errors that say nothing about the app: console errors, a page that never became ready, timeouts. Those tests are now run again (up to twice, after two seconds), and only those: `tests/network_changed.py` turns a failure into `NetworkChanged` when the page saw that error or the error names it, and `--only-rerun NetworkChanged` (pytest-rerunfailures, in `pyproject.toml`) reruns exactly that. Any other failure is reported at once and never run twice, and a test that keeps failing is reported as `NetworkChanged: the host's network changed during the test ...` with the original failure in the message, so it can't be taken for an app bug. Rerun lines (`R`, "2 rerun") in the output mean it happened. Tested in `tests/test_network_changed.py` with small sub-runs.
+
 `-m live` runs the tests that use real services (OpenAI or your local model, Brave, a real web page); they cost a little and are never part of the default run. Playwright needs `uv run playwright install chromium` once.
 
 ## Keeping things current

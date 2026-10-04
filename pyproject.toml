@@ -19,6 +19,8 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-playwright>=0.9.0",
+    "pytest-rerunfailures>=16.7",
+    "pytest-rerunfailures>=16.7",
     "pytest-xdist>=3.8.0",
     "ruff>=0.16.1",
 ]
@@ -26,7 +28,9 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = ["live: hits the real OpenAI API (needs OPENAI_API_KEY)"]
-addopts = "-m 'not live' -n auto"  # tests run in parallel (pytest-xdist); `-n 0` to run in one process, e.g. to debug
+# Tests run in parallel (pytest-xdist); `-n 0` to run in one process, e.g. to debug. A test that failed because the
+# host's network changed under the browser is run again (tests/network_changed.py), and no other failure ever is.
+addopts = "-m 'not live' -n auto --reruns 2 --reruns-delay 2 --only-rerun NetworkChanged"
 
 [tool.ruff]
 line-length = 120
