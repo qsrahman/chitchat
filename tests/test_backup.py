@@ -9,7 +9,8 @@ from app import db, store
 from app.backup import MAX_CHATS
 from tests.helpers import PNG, new_conv, parse_sse, upload
 
-NO_EXTRAS = {"attachments": 0, "custom_instructions": False}  # what an import result says besides the counts
+# what an import result says besides the counts
+NO_EXTRAS = {"attachments": 0, "custom_instructions": False, "defaults": False}
 ITEM = {"id": "cmp_1", "type": "compaction", "encrypted_content": "opaque"}
 
 

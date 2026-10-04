@@ -22,7 +22,8 @@ async def test_live_stream_normalization():
 @pytest.mark.live
 async def test_live_generate_title():
     s = Settings()
-    title = await OpenAILLM(s).generate_title(s.title_model_name, "How do I sort a list in Python?", "Use sorted().")
+    model = s.title_model_for(s.openai_model)
+    title = await OpenAILLM(s).generate_title(model, "How do I sort a list in Python?", "Use sorted().")
     assert title
 
 

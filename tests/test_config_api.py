@@ -43,3 +43,13 @@ async def test_the_values_are_the_effective_ones(tmp_path):
                          openai_max_output_tokens=900)
     assert (c["model"], c["title_model"], c["compact_threshold"], c["history_tokens"]) == ("gpt-x", "tiny", 5000, 12345)
     assert (c["max_tool_calls"], c["pdf_input"], c["log_level"], c["max_output_tokens"]) == (3, "file", "WARNING", 900)
+
+
+async def test_the_title_model_shown_follows_the_default_chosen_in_settings(tmp_path):
+    app = create_app(Settings(_env_file=None, db_path=str(tmp_path / "t.db"), attachments_dir=str(tmp_path / "f"),
+                              openai_model="env-model", openai_base_url="http://localhost:11434/v1"))
+    app.state.llm = FakeLLM()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://x") as client:
+        assert (await client.get("/api/config")).json()["title_model"] == "env-model"
+        await client.put("/api/defaults", json={"model": "chosen"})
+        assert (await client.get("/api/config")).json()["title_model"] == "chosen"

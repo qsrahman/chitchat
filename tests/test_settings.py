@@ -169,6 +169,17 @@ async def test_titles_use_the_main_model_on_a_custom_endpoint(client, llm, app):
     assert await titled_with(client, llm, model="big-model") == ["test-model"]
 
 
+async def test_titles_follow_the_default_model_chosen_in_settings_on_a_custom_endpoint(client, llm, app):
+    app.state.settings.openai_base_url = "http://localhost:11434/v1"
+    await client.put("/api/defaults", json={"model": "local-llama"})
+    assert await titled_with(client, llm, model="big-model") == ["local-llama"]  # not the chat's, not OPENAI_MODEL
+
+
+async def test_the_default_model_chosen_in_settings_does_not_change_titles_on_openai(client, llm):
+    await client.put("/api/defaults", json={"model": "gpt-5-mini"})
+    assert await titled_with(client, llm) == ["gpt-5.4-nano"]
+
+
 async def test_the_title_model_can_be_set(client, llm, app):
     app.state.settings.title_model = "my-title-model"
     app.state.settings.openai_base_url = "http://localhost:11434/v1"

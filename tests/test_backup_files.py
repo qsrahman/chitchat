@@ -93,7 +93,8 @@ async def test_the_files_come_back_with_their_chats(client, second, llm, with_fi
     archive = (await client.get("/api/export?format=full")).content
     r = await import_zip(second, archive)
     assert r.status_code == 201
-    assert r.json() == {"imported": 1, "skipped": 0, "messages": 6, "attachments": 3, "custom_instructions": False}
+    assert r.json() == {"imported": 1, "skipped": 0, "messages": 6, "attachments": 3, "custom_instructions": False,
+                        "defaults": False}
     versions = {m["id"]: m for m in (await conversation(second, cid))["messages"]}
     first_message = next(iter(versions.values()))
     assert first_message["content"] == "look at these, please"  # the path that was showing
@@ -240,3 +241,39 @@ async def test_existing_instructions_are_never_overwritten_and_odd_ones_are_igno
         r = await client.post("/api/import", files={"file": ("b.json", json.dumps(
             {"custom_instructions": odd, "conversations": []}).encode())})
         assert r.status_code == 201 and r.json()["custom_instructions"] is False
+
+
+# ---- the defaults for new chats ----
+
+async def test_the_defaults_for_new_chats_travel_with_the_backup(client, second):
+    chosen = {"model": "gpt-5-mini", "reasoning_effort": "low", "tools": ["calculator"]}
+    await client.put("/api/defaults", json=chosen)
+    document = (await client.get("/api/export")).json()
+    assert document["defaults"] == chosen
+    r = await second.post("/api/import", files={"file": ("b.json", json.dumps(document).encode())})
+    assert r.json()["defaults"] is True
+    assert (await second.get("/api/defaults")).json() == chosen
+
+
+async def test_existing_defaults_are_never_overwritten_and_odd_ones_are_ignored(client, second):
+    await second.put("/api/defaults", json={"model": "mine"})
+    theirs = {"model": "theirs", "reasoning_effort": None, "tools": []}
+    r = await second.post("/api/import", files={"file": ("b.json", json.dumps(
+        {"defaults": theirs, "conversations": []}).encode())})
+    assert r.json()["defaults"] is False
+    assert (await second.get("/api/defaults")).json()["model"] == "mine"
+    odd_ones = ("x", 5, ["x"], {"model": 5}, {"reasoning_effort": "extreme"}, {"model": ""}, {},
+                {"tools": "calculator"}, {"tools": ["no such tool"]})
+    for odd in odd_ones:
+        r = await client.post("/api/import", files={"file": ("b.json", json.dumps(
+            {"defaults": odd, "conversations": []}).encode())})
+        assert r.status_code == 201 and r.json()["defaults"] is False
+    assert (await client.get("/api/defaults")).json() == {"model": None, "reasoning_effort": None, "tools": []}
+
+
+async def test_tools_this_version_does_not_have_are_dropped_from_imported_defaults(client):
+    document = {"defaults": {"model": "m", "tools": ["calculator", "retired_tool"]}, "conversations": []}
+    r = await client.post("/api/import", files={"file": ("b.json", json.dumps(document).encode())})
+    assert r.json()["defaults"] is True
+    saved = (await client.get("/api/defaults")).json()
+    assert saved == {"model": "m", "reasoning_effort": None, "tools": ["calculator"]}

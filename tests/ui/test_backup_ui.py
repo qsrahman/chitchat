@@ -205,3 +205,16 @@ def test_importing_a_chat_you_just_deleted_brings_it_back_and_it_stays(page, app
     page.clock.fast_forward(11_000)
     expect(page.get_by_role("link", name="tell me about quokkas")).to_be_visible()
     assert page.request.get(f"{app_url}/api/conversations/{cid}").status == 200  # and not deleted again
+
+
+def test_an_import_says_when_it_took_the_defaults_for_new_chats(page, app_url):
+    open_app(page, app_url)
+    dialog = open_backup(page)
+    document = {**chat_file(), "defaults": {"model": "alpha-model", "tools": ["web_search"]}}
+    dialog.get_by_label("Import chats from a file").set_input_files(as_upload(document))
+    expect(dialog.locator("#backup-status")).to_contain_text("defaults for new chats added")
+    dialog.get_by_role("tab", name="General").click()  # the page takes them at once, not after a reload
+    expect(dialog.get_by_label("Model", exact=True)).to_have_value("alpha-model")
+    expect(dialog.get_by_role("switch", name="Web search")).to_be_checked()
+    page.keyboard.press("Escape")
+    expect(page.get_by_role("button", name="Web search")).to_have_attribute("aria-pressed", "true")  # the new chat

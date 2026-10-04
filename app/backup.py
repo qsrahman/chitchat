@@ -140,6 +140,7 @@ def _all(conn, build) -> list[dict]:
 def _document(conn) -> dict:
     return {"format": FORMAT, "version": VERSION, "exported_at": datetime.now(UTC).isoformat(),
             "custom_instructions": store.get_app_setting(conn, "custom_instructions"),
+            "defaults": store.get_defaults(conn),
             "conversations": _all(conn, _tree)}
 
 
@@ -203,6 +204,7 @@ class _Backup(BaseModel):
     model_config = ConfigDict(extra="ignore")
     conversations: list[_Chat] = Field(max_length=MAX_CHATS)
     custom_instructions: object = None  # text, or ignored
+    defaults: object = None  # the defaults for new chats (store.Defaults), or ignored
 
 
 def _parse(data: bytes) -> _Backup:
@@ -385,7 +387,26 @@ def _import(conn, data: bytes, files: _Files) -> dict:
         attachments.delete_files(files.dir or "", files.written)
         raise
     result["custom_instructions"] = _instructions(conn, backup.custom_instructions)
+    result["defaults"] = _defaults(conn, backup.defaults)
     return result
+
+
+def _defaults(conn, raw: object) -> bool:
+    """Take the backup's defaults for new chats if it has some and none are chosen here (nothing is overwritten).
+    Tools this version doesn't have are dropped, as in a chat's settings; anything else that doesn't fit is ignored."""
+    if not isinstance(raw, dict) or store.get_defaults(conn) != store.Defaults().model_dump():
+        return False
+    names = raw.get("tools")
+    known = [t for t in names if t in tools.NAMES] if isinstance(names, list) else []
+    try:
+        defaults = store.Defaults.model_validate(
+            {"model": raw.get("model"), "reasoning_effort": raw.get("reasoning_effort"), "tools": known})
+    except ValueError:
+        return False
+    if defaults == store.Defaults():
+        return False
+    store.set_defaults(conn, defaults)
+    return True
 
 
 def _instructions(conn, text: object) -> bool:
@@ -400,8 +421,8 @@ def _instructions(conn, text: object) -> bool:
 
 def import_chats(conn, data: bytes) -> dict:
     """Add the conversations in an exported JSON file. Returns {"imported", "skipped" (already here), "messages",
-    "attachments" (0: a JSON file has none), "custom_instructions" (taken or not)}. Raises ImportRejected, and
-    changes nothing, if the file isn't a valid export."""
+    "attachments" (0: a JSON file has none), "custom_instructions" and "defaults" (taken or not)}. Raises
+    ImportRejected, and changes nothing, if the file isn't a valid export."""
     return _import(conn, data, _Files(None, None))
 
 

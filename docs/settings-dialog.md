@@ -39,7 +39,7 @@ The first version left these out: the model came from `.env` only, and I did not
 | Thinking effort | dropdown: Auto or an effort | Used for a thinking model when the chat sets none |
 | Web search | switch (`role="switch"`, 32 x 20 px) | New chats start with it on. Disabled, with the reason, when the server has no search key |
 
-They save as they change, one at a time and each built from the last (two quick changes would otherwise undo each other: the save replaces all three), and a failed save says so inline and puts the control back. A new chat's tools are applied by the page (its settings are held until the first message; the new-chat screen follows a change at once), and by the server for a chat created with no settings. Not done: they are not in the backup file; the title model does not follow the default model; only web search is a switch (the other tools stay as the API set them, and are switched per chat from the tools menu).
+They save as they change, one at a time and each built from the last (two quick changes would otherwise undo each other: the save replaces all three), and a failed save says so inline and puts the control back. A new chat's tools are applied by the page (its settings are held until the first message; the new-chat screen follows a change at once), and by the server for a chat created with no settings. They are in the backup file (`docs/backup.md`), and the title model follows the default on a custom endpoint (`docs/round-10.md`). Not done: only web search is a switch (the other tools stay as the API set them, and are switched per chat from the tools menu).
 
 Settings now also opens on the tab it was last left on (kept in this browser's `localStorage`).
 

@@ -1,8 +1,14 @@
 // Importing a backup, and what the import says it did (in the Settings dialog's Data controls; the exports are plain
 // links there, the server builds the files); see docs/backup.md.
-import { $ } from './core.js'
+import { $, state } from './core.js'
 import { commitDelete } from './delete.js'
 import { refreshList } from './list.js'
+import {
+  loadDefaults,
+  newChatSettings,
+  refreshModels,
+  setSettings,
+} from './settings.js'
 
 const chats = (n) => `${n} chat${n === 1 ? '' : 's'}`
 
@@ -33,15 +39,22 @@ $('import-file').onchange = async (e) => {
     const files = result.attachments
       ? ` with ${result.attachments} file${result.attachments === 1 ? '' : 's'}`
       : ''
-    const instructions = result.custom_instructions
-      ? '; custom instructions added'
-      : ''
+    const instructions =
+      (result.custom_instructions ? '; custom instructions added' : '') +
+      (result.defaults ? '; defaults for new chats added' : '')
     setBackupStatus(
       result.imported
         ? `Imported ${chats(result.imported)}${files}${result.skipped ? `; ${result.skipped} already here` : ''}${instructions}.`
         : `Nothing new: ${chats(result.skipped)} already here${instructions}.`,
     )
     await refreshList()
+    if (result.defaults) {
+      // the page read the defaults at start: take the imported ones, for the dialog and for a new chat on screen
+      await loadDefaults()
+      await refreshModels()
+      if (!state.id)
+        setSettings({ ...state.settings, tools: newChatSettings().tools })
+    }
   } catch (err) {
     setBackupStatus(
       err instanceof TypeError ? "Couldn't reach the server." : err.message,

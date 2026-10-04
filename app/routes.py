@@ -236,7 +236,7 @@ def list_tools(request: Request):
 
 
 @router.get("/config")
-def server_config(request: Request):
+def server_config(request: Request, conn: Conn):
     """What the server is set up with, for the Settings dialog to show (read only: it comes from the environment or
     `.env`, and changing it means editing that and restarting). No secrets: a key is only reported as set or not,
     and the endpoint is its scheme and host, without a path or credentials."""
@@ -247,7 +247,7 @@ def server_config(request: Request):
         if endpoint and endpoint.hostname else ("custom" if endpoint else "OpenAI"),
         "custom_endpoint": bool(s.openai_base_url),
         "model": s.openai_model,
-        "title_model": s.title_model_name,
+        "title_model": s.title_model_for(store.get_defaults(conn)["model"] or s.openai_model),
         "web_search": bool(s.brave_api_key),
         "tools": [t.label for t in request.app.state.tools.values()],
         "compaction": s.compaction_enabled,
@@ -417,15 +417,16 @@ class Turn:
 def _make_turn(request: Request, conn: sqlite3.Connection, conv: dict, history: list[dict], reply_to: int,
                model: str | None = None):
     settings = request.app.state.settings
-    chosen: str = model or conv["settings"]["model"] or store.get_defaults(conn)["model"] or settings.openai_model
+    default = store.get_defaults(conn)["model"] or settings.openai_model
+    chosen: str = model or conv["settings"]["model"] or default
     options = _model_options(request, conn, conv, chosen)
     trimmed = 0
     if settings.history_tokens:  # room for the instructions and the reply, then as much history as fits
         instructions = context.estimate({"content": options.get("instructions")})
         reserve = instructions + (settings.openai_max_output_tokens or 2_000)
         history, trimmed = context.fit(history, settings.history_tokens - reserve)
-    return Turn(conn, request.app.state.llm, settings.title_model_name, conv, history, reply_to, chosen, options,
-                trimmed)
+    title_model = settings.title_model_for(default)
+    return Turn(conn, request.app.state.llm, title_model, conv, history, reply_to, chosen, options, trimmed)
 
 
 def _last_user(path: list[dict]) -> dict | None:
