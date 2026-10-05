@@ -46,9 +46,11 @@ async def test_configured_tools_are_listed(client, search_app):
     assert (await client.get("/api/tools")).json() == [{"name": "web_search", "label": "Web search", "hint": ""}]
 
 
-async def test_a_new_conversation_has_no_tools_on(client):
+async def test_a_new_conversation_has_every_tool_but_web_search_on(client, app):
+    app.state.tools = {"web_search": fake_search(), **app.state.tools}  # even when search is configured
     cid = await new_conv(client)
-    assert (await client.get(f"/api/conversations/{cid}")).json()["settings"]["tools"] == []
+    on = (await client.get(f"/api/conversations/{cid}")).json()["settings"]["tools"]
+    assert on == ["calculator", "search_chats", "fetch_url", "get_datetime", "read_chat", "read_attachment"]
 
 
 async def test_tools_are_validated_and_deduplicated(client):

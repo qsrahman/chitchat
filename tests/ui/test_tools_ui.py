@@ -310,3 +310,34 @@ def test_the_tools_list_scrolls_when_there_are_more_tools_than_room_and_every_on
     expect(last).to_be_in_viewport()  # focusing it scrolled the list to it
     page.keyboard.press("Space")
     expect(last).to_be_checked()
+
+
+# ---- on by default ----
+
+def test_a_new_chat_has_every_tool_but_web_search_on_until_the_user_chooses_otherwise(page, app_url):
+    page.request.put(f"{app_url}/api/defaults", data={})  # the shipped default (the fixture starts with none on)
+    open_app(page, app_url)
+    expect(tools_btn(page)).to_have_attribute("data-active", "")
+    open_menu(page)
+    for label in ("Calculator", "Search chats", "Read web pages", "Date and time", "Read chats", "Read attached files"):
+        expect(row(page, label).get_by_role("checkbox")).to_be_checked()
+    expect(row(page, "Web search").get_by_role("checkbox")).not_to_be_checked()
+    page.keyboard.press("Escape")
+    send(page, "hello")
+    expect(page.locator(".msg.assistant .body")).to_contain_text(
+        "[tools=calculator,search_chats,fetch_url,get_datetime,read_chat,read_attachment]")
+    assert saved_tools(page) == ["calculator", "search_chats", "fetch_url", "get_datetime", "read_chat",
+                                 "read_attachment"]
+
+
+def test_switching_a_tool_off_in_one_chat_leaves_the_next_chat_on_the_default(page, app_url):
+    page.request.put(f"{app_url}/api/defaults", data={})
+    open_app(page, app_url)
+    open_menu(page)
+    row(page, "Calculator").get_by_role("checkbox").uncheck()
+    page.keyboard.press("Escape")
+    send(page, "first")
+    expect(page.locator(".msg.assistant .body")).not_to_contain_text("calculator")
+    page.get_by_role("button", name="New chat").click()
+    open_menu(page)
+    expect(row(page, "Calculator").get_by_role("checkbox")).to_be_checked()

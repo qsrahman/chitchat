@@ -44,6 +44,11 @@ class ConversationSettings(BaseModel):
 DEFAULT_SETTINGS = ConversationSettings().model_dump()
 
 
+# The tools a new chat starts with until the user chooses otherwise: all but web search (which costs money per search
+# and needs a key). A tool is added here on purpose, not because it exists: a tool that can change things must not be.
+DEFAULT_TOOLS = ("calculator", "search_chats", "fetch_url", "get_datetime", "read_chat", "read_attachment")
+
+
 class Defaults(BaseModel):
     """What a conversation uses where its own settings say "default" (model, thinking effort), and the tools a new
     chat starts with. The server's environment (OPENAI_MODEL) is what an unset model falls back to."""
@@ -52,7 +57,7 @@ class Defaults(BaseModel):
 
     model: ModelName | None = None
     reasoning_effort: ReasoningEffort = None
-    tools: ToolNames = Field(default_factory=list)
+    tools: ToolNames = Field(default_factory=lambda: list(DEFAULT_TOOLS))
 
 
 def _now() -> str:

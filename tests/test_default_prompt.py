@@ -43,6 +43,7 @@ async def test_it_comes_first_then_custom_instructions_then_the_conversation_pro
 
 
 async def test_an_empty_default_sends_no_instructions_at_all(client, llm):
+    await client.put("/api/defaults", json={"tools": []})  # a tool adds its own guidance, so none are on here
     cid = await new_conv(client)
     await client.post(f"/api/conversations/{cid}/chat", json={"content": "hi"})
     assert llm.calls[-1]["options"]["instructions"] is None

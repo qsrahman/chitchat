@@ -2,15 +2,25 @@
 and the tools a new chat starts with."""
 import pytest
 
+from app import store, tools
 from tests.helpers import new_conv
+
+# What nothing chosen means: no model or effort of its own, and every tool but web search on.
+UNCHOSEN = {"model": None, "reasoning_effort": None, "tools": list(store.DEFAULT_TOOLS)}
 
 
 async def chat(client, cid, **body):
     await client.post(f"/api/conversations/{cid}/chat", json={"content": "hi", **body})
 
 
-async def test_nothing_is_set_until_it_is_chosen(client):
-    assert (await client.get("/api/defaults")).json() == {"model": None, "reasoning_effort": None, "tools": []}
+async def test_every_tool_but_web_search_is_on_until_it_is_chosen(client):
+    assert "web_search" not in store.DEFAULT_TOOLS
+    assert set(store.DEFAULT_TOOLS) == set(tools.NAMES) - {"web_search"}  # a new tool is decided on, here, on purpose
+    assert (await client.get("/api/defaults")).json() == UNCHOSEN
+
+
+async def test_nothing_else_is_set_until_it_is_chosen(client):
+    assert (await client.get("/api/defaults")).json() == UNCHOSEN
 
 
 async def test_defaults_are_saved_and_read_back(client):
@@ -18,7 +28,7 @@ async def test_defaults_are_saved_and_read_back(client):
     saved = (await client.put("/api/defaults", json=body)).json()
     assert saved == {"model": "gpt-5-mini", "reasoning_effort": "low", "tools": ["calculator"]}  # once each
     assert (await client.get("/api/defaults")).json() == saved
-    assert (await client.put("/api/defaults", json={})).json() == {"model": None, "reasoning_effort": None, "tools": []}
+    assert (await client.put("/api/defaults", json={})).json() == UNCHOSEN
 
 
 @pytest.mark.parametrize("body", [
@@ -26,7 +36,7 @@ async def test_defaults_are_saved_and_read_back(client):
 ])
 async def test_bad_defaults_are_refused(client, body):
     assert (await client.put("/api/defaults", json=body)).status_code == 422
-    assert (await client.get("/api/defaults")).json() == {"model": None, "reasoning_effort": None, "tools": []}
+    assert (await client.get("/api/defaults")).json() == UNCHOSEN
 
 
 async def test_a_default_model_is_used_where_the_chat_has_none_and_the_chat_can_still_choose(client, llm):
@@ -73,7 +83,7 @@ async def test_a_default_that_no_longer_validates_is_ignored_not_fatal(client, a
 
     with db.connect(app.state.settings.db_path) as conn:
         store.set_app_setting(conn, "defaults", '{"tools": ["a tool that was removed"]}')
-    assert (await client.get("/api/defaults")).json() == {"model": None, "reasoning_effort": None, "tools": []}
+    assert (await client.get("/api/defaults")).json() == UNCHOSEN
 
 
 async def test_a_new_chat_starts_with_the_default_tools_unless_it_brings_its_own_settings(client):
@@ -82,3 +92,11 @@ async def test_a_new_chat_starts_with_the_default_tools_unless_it_brings_its_own
     assert plain["settings"]["tools"] == ["calculator"]
     own = (await client.post("/api/conversations", json={"settings": {"tools": []}})).json()
     assert own["settings"]["tools"] == []
+
+
+async def test_a_new_chat_has_every_tool_but_web_search_on_and_switching_them_all_off_is_kept(client):
+    fresh = (await client.post("/api/conversations")).json()["settings"]["tools"]
+    assert fresh == list(store.DEFAULT_TOOLS) and "web_search" not in fresh
+    await client.put("/api/defaults", json={"tools": []})  # someone who wants none
+    assert (await client.post("/api/conversations")).json()["settings"]["tools"] == []
+    assert (await client.get("/api/defaults")).json()["tools"] == []  # not put back to the default

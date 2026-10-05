@@ -3,6 +3,7 @@ import asyncio
 import socket
 import threading
 import time
+import urllib.request
 
 import pytest
 import uvicorn
@@ -251,7 +252,13 @@ def app_url(tmp_path):
     thread.start()
     while not server.started:
         time.sleep(0.01)
-    yield f"http://127.0.0.1:{sock.getsockname()[1]}"
+    url = f"http://127.0.0.1:{sock.getsockname()[1]}"
+    # Every tool but web search is on in a new chat (store.DEFAULT_TOOLS). The browser tests start with none, so that
+    # a reply doesn't echo the tools and a test sees only what it switched on; the ones about the default say so.
+    request = urllib.request.Request(f"{url}/api/defaults", data=b'{"tools": []}', method="PUT",
+                                     headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(request).close()
+    yield url
     server.should_exit = True
     thread.join(timeout=5)
 

@@ -34,7 +34,8 @@ async def test_models_falls_back_to_the_default_when_the_endpoint_cannot_list(cl
 
 async def test_new_conversation_has_default_settings(client):
     cid = await new_conv(client)
-    assert (await client.get(f"/api/conversations/{cid}")).json()["settings"] == store.DEFAULT_SETTINGS
+    on = list(store.DEFAULT_TOOLS)  # a new chat starts with every tool but web search on (docs/tools.md)
+    assert (await client.get(f"/api/conversations/{cid}")).json()["settings"] == {**store.DEFAULT_SETTINGS, "tools": on}
 
 
 async def test_create_with_settings_and_replace_them(client):
@@ -102,6 +103,7 @@ async def test_custom_instructions_validation(client):
 # ---- settings reach the model ----
 
 async def test_turn_without_settings_sends_no_options(client, llm):
+    await client.put("/api/defaults", json={"tools": []})  # no tools chosen: the tools' instructions are not added
     await chat(client, await new_conv(client))
     assert llm.calls[-1]["model"] == "test-model"
     assert llm.calls[-1]["options"] == {"instructions": None, "temperature": None}

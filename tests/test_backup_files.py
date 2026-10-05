@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app import store
 from tests.helpers import PNG, make_pdf, new_conv, upload
 
 NOTES = b"plain text notes"
@@ -273,12 +274,13 @@ async def test_existing_defaults_are_never_overwritten_and_odd_ones_are_ignored(
     assert r.json()["defaults"] is False
     assert (await second.get("/api/defaults")).json()["model"] == "mine"
     odd_ones = ("x", 5, ["x"], {"model": 5}, {"reasoning_effort": "extreme"}, {"model": ""}, {},
-                {"tools": "calculator"}, {"tools": ["no such tool"]})
+                {"tools": "calculator"})  # a tools value that is not a list is ignored: the default stays
     for odd in odd_ones:
         r = await client.post("/api/import", files={"file": ("b.json", json.dumps(
             {"defaults": odd, "conversations": []}).encode())})
         assert r.status_code == 201 and r.json()["defaults"] is False
-    assert (await client.get("/api/defaults")).json() == {"model": None, "reasoning_effort": None, "tools": []}
+    assert (await client.get("/api/defaults")).json() == {
+        "model": None, "reasoning_effort": None, "tools": list(store.DEFAULT_TOOLS)}
 
 
 async def test_tools_this_version_does_not_have_are_dropped_from_imported_defaults(client):
@@ -287,3 +289,10 @@ async def test_tools_this_version_does_not_have_are_dropped_from_imported_defaul
     assert r.json()["defaults"] is True
     saved = (await client.get("/api/defaults")).json()
     assert saved == {"model": "m", "reasoning_effort": None, "tools": ["calculator"]}
+
+
+async def test_defaults_that_chose_only_a_tool_this_version_lacks_leave_no_tools_on(client):
+    document = {"defaults": {"tools": ["retired_tool"]}, "conversations": []}
+    r = await client.post("/api/import", files={"file": ("b.json", json.dumps(document).encode())})
+    assert r.json()["defaults"] is True  # what they chose, less what no longer exists: nothing
+    assert (await client.get("/api/defaults")).json()["tools"] == []

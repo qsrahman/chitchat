@@ -399,10 +399,10 @@ def _defaults(conn, raw: object) -> bool:
     if not isinstance(raw, dict) or store.get_defaults(conn) != store.Defaults().model_dump():
         return False
     names = raw.get("tools")
-    known = [t for t in names if t in tools.NAMES] if isinstance(names, list) else []
+    chosen = {"tools": [t for t in names if t in tools.NAMES]} if isinstance(names, list) else {}  # else the default
     try:
         defaults = store.Defaults.model_validate(
-            {"model": raw.get("model"), "reasoning_effort": raw.get("reasoning_effort"), "tools": known})
+            {"model": raw.get("model"), "reasoning_effort": raw.get("reasoning_effort"), **chosen})
     except ValueError:
         return False
     if defaults == store.Defaults():
