@@ -118,6 +118,58 @@ const TOOL_UI = {
       return list
     },
   },
+  get_datetime: {
+    running: () => 'Checking the time…',
+    done: (args, shown) => `${shown.now} · ${shown.timezone}`,
+    failed: (error) => `Date and time: ${error}`,
+    stopped: 'Checking the time stopped',
+    detail: (shown) => {
+      if (!shown.also?.length) return null
+      const list = document.createElement('ul')
+      list.append(...shown.also.map((line) => textEl('li', line)))
+      return list
+    },
+  },
+  read_chat: {
+    running: () => 'Reading a past chat…',
+    done: (args, shown) =>
+      `Read “${shown.title}” · messages ${shown.from} to ${shown.to} of ${shown.total}`,
+    failed: (error) => `Couldn't read the chat: ${error}`,
+    stopped: 'Reading the chat stopped',
+    detail: (shown) => {
+      // a chat in this app, so it opens in this tab
+      const link = Object.assign(textEl('a', shown.title), {
+        href: `#${encodeURIComponent(shown.id)}`,
+      })
+      const box = document.createElement('div')
+      box.append(link)
+      return box
+    },
+  },
+  read_attachment: {
+    running: (args) =>
+      args.name ? `Reading ${args.name}…` : 'Looking at the attached files…',
+    done: (args, shown) =>
+      shown.files
+        ? `Listed the attached files · ${plural(shown.files.length, 'file')}`
+        : `Read ${shown.name}${shown.offset ? ` from character ${shown.offset.toLocaleString()}` : ''}`,
+    failed: (error) => `Couldn't read the file: ${error}`,
+    stopped: 'Reading the file stopped',
+    detail: (shown) => {
+      if (shown.files) {
+        const list = document.createElement('ul')
+        list.append(...shown.files.map((name) => textEl('li', name)))
+        return list
+      }
+      const total = shown.total
+        ? ` of ${shown.total.toLocaleString()}${shown.offset + shown.characters < shown.total ? '; there is more' : ''}`
+        : ''
+      return textEl(
+        'p',
+        `${plural(shown.characters, 'character')} read${shown.offset ? ` from character ${shown.offset.toLocaleString()}` : ''}${total}`,
+      )
+    },
+  },
 }
 
 export function renderToolCall(el, call) {

@@ -400,6 +400,13 @@ def link_attachments(conn: sqlite3.Connection, cid: str, ids: list[str]) -> None
     conn.commit()
 
 
+def conversation_attachments(conn: sqlite3.Connection, cid: str) -> list[dict]:
+    """The files attached in a conversation (every version of every message), oldest first."""
+    rows = conn.execute("SELECT id, name, mime, kind, size FROM attachments WHERE conversation_id = ? "
+                        "ORDER BY created_at, rowid", (cid,))
+    return [dict(r) for r in rows]
+
+
 def attachment_ids(conn: sqlite3.Connection, cid: str) -> list[str]:
     return [r["id"] for r in conn.execute("SELECT id FROM attachments WHERE conversation_id = ?", (cid,))]
 

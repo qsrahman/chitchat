@@ -1,6 +1,6 @@
-# More tools: calculator, search_chats, fetch_url
+# More tools: calculator, search_chats, fetch_url, get_datetime, read_chat, read_attachment
 
-Three tools were added to the registry from phase 7 (`app/tools/`). They need no API key. Like web search they are off by default and switched on per conversation, and all of them are in the **Tools** menu (wrench icon, left of the text box), a checkbox each with a one-line hint. Web search used to have a globe of its own in the composer; it is in the menu now, so the composer has one tools control and every tool is named in words where it is chosen (`docs/ui-review.md`). `GET /api/tools` lists every usable tool as `{name, label, hint}`. The loop, the per-reply call cap (`MAX_TOOL_CALLS`), the guidance added to the instructions while a tool is on, and the UI line per call all work as described in `docs/phase-7.md`.
+Six tools were added to the registry from phase 7 (`app/tools/`). They need no API key. Like web search they are off by default and switched on per conversation, and all of them are in the **Tools** menu (wrench icon, left of the text box), a checkbox each with a one-line hint. Web search used to have a globe of its own in the composer; it is in the menu now, so the composer has one tools control and every tool is named in words where it is chosen (`docs/ui-review.md`). `GET /api/tools` lists every usable tool as `{name, label, hint}`. The loop, the per-reply call cap (`MAX_TOOL_CALLS`), the guidance added to the instructions while a tool is on, and the UI line per call all work as described in `docs/phase-7.md`.
 
 ## calculator
 Exact arithmetic: models are unreliable at long multiplication, percentages and compound interest, and the answer shows in the reply as `17 * 23 = 391`.
@@ -29,17 +29,38 @@ It is the one tool that makes this server connect to an address a model chose, s
 
 Not covered: pages that need JavaScript to show their content (you get what the server sent), logins and paywalls, scanned PDFs (no OCR), and a page over 1 MB of HTML (cut there, and it says so).
 
+## get_datetime
+The time of day, another timezone, and how long until or since a date: things the default prompt's date (to the day, in the server's time) cannot answer, and models are bad at ("how many days until...", "what time is it in Tokyo").
+- Arguments: `timezone` (an IANA name, or null for the server's own: where the person using a local app is), `days_from_now` (the date that many days ahead or back, ±36,500) and `until` (an ISO date or time: how long until or since it, in days, hours and minutes, and the calendar days). All three are required but may be null, which is what OpenAI's strict mode asks.
+- A date or time without a zone is read in the zone asked for; one with a zone (`...Z`, `+02:00`) is that instant. `days_from_now` keeps the wall-clock time, so a change of clocks in between is not counted as a day more or less.
+- `zoneinfo` and `datetime.fromisoformat` do the work, nothing is hand-parsed. A zone that doesn't exist (or isn't a valid key, such as `../etc`) is an error that says to use an IANA name. The clock is `clock._now`, replaced in tests.
+- In the UI: "Monday 5 October 2026, 14:03 · PKT, UTC+05:00", opening to the extra lines as text.
+
+## read_chat
+Opens one of the user's other saved conversations, which `search_chats` can only point to: the model quotes, continues or summarizes a past chat instead of guessing from a snippet. `search_chats` results now carry each conversation's id (`(id ..., date)`), which is what `read_chat` takes.
+- It reads the path the user last read (`store.list_messages`), not every version, as `[3] assistant: ...` lines with the files attached (`(attached: schema.sql)`), 12,000 characters at a time. It pages by message, like `fetch_url` pages by character: a part ends with "[The conversation continues: call read_chat again with from_message=N ...]", and the parts together are every message once (tested).
+- One message is cut at 4,000 characters with a note ("[message cut: 46,000 more characters]"), so a pasted file or a long answer can't fill a part alone.
+- Like `search_chats` it is per-conversation (`per_chat=True`): reading the chat it runs in is an error ("already in front of you"). An unknown id, a chat with no messages and a `from_message` past the end each say so. The id is only ever a bound parameter.
+- Past text can hold pasted web pages, so the result says it is information and must not be obeyed. In the UI the call links to the chat (the title as text, the href `#id`).
+
+## read_attachment
+Reads a file attached earlier in this conversation. Only the newest message's files go to the model with a turn (`docs/round-3.md`); older ones are a note saying so. With this tool on, the model can list the files of the chat and read one, in parts of 12,000 characters (`offset`, as for `fetch_url`), instead of asking the user to attach it again, and it can read the later part of a long PDF.
+- `name` null lists the files (name, kind, size, oldest first); a name (any case) reads that file, the newest of that name if there are several. A name that matches nothing is an error that lists the names, so the model corrects itself.
+- Text files and PDFs only: a PDF is read as text whatever `OPENAI_PDF_INPUT` says (`attachments.for_model` with `"text"`, the same code and cache as sending it). An image is an error: a tool result is text, and the model sees an image only while it is attached to the latest message. A file gone from disk is an error too (`attachments.UNAVAILABLE`).
+- It sees this conversation's files only (`store.conversation_attachments`), never another chat's: that is tested. File text is labelled as information, not instructions.
+
 ## Tests
-`tests/test_tools_local.py` (about 130 cases: the calculator's accepted and refused expressions and limits; chat search; fetch_url's address checks for 20+ non-public addresses, redirects into private places, ports, schemes, content types, size and time limits, pinning, malformed HTML), `tests/test_tool_calls.py` (listing, per-conversation switching, guidance), `tests/ui/test_tools_ui.py` (the menu and how each call reads). Live (`-m live`): the real model using the calculator, and a real fetch of `example.com` through the pinned connection.
+`tests/test_tools_local.py` (about 130 cases: the calculator's accepted and refused expressions and limits; chat search; fetch_url's address checks for 20+ non-public addresses, redirects into private places, ports, schemes, content types, size and time limits, pinning, malformed HTML), `tests/test_tools_reading.py` (get_datetime with a fixed clock, read_chat and read_attachment: order, paging, limits, errors, isolation between chats), `tests/test_tool_calls.py` (listing, per-conversation switching, guidance, the reading tools bound to a conversation), `tests/ui/test_tools_ui.py` (the menu, which now scrolls when seven tools with a hint each are taller than the room above the composer, and how each call reads). Live (`-m live`): the real model using the calculator, and a real fetch of `example.com` through the pinned connection.
 
 ## Future tools (noted, not built)
-Roughly in order of value. Each is a module in `app/tools/` plus its UI line in `static/tools-ui.js`, except where it says otherwise.
-- **`get_time`**: current date and time in any timezone (`zoneinfo`). The default prompt already gives the date, so this adds timezones and the time of day.
-- **`lookup_wikipedia` / `search_arxiv`**: short citable reference lookups from free APIs without keys.
-- **`weather`**: a forecast for a place (Open-Meteo needs no key); a good template for a small read-only API tool.
-- **`run_python`**: running code for data work. Needs a real sandbox; the practical choice is OpenAI's hosted `code_interpreter` (per-session cost, runs on their side). Model-written code must not run unisolated on this machine.
-- **Image generation**: needs same-origin image serving (the sanitizer strips `<img>`), a new event type, storage and a cost note.
-- **Local notes or files search**: a read-only, allowlisted folder indexed with FTS5, like `search_chats`.
-- **MCP servers**: OpenAI's hosted MCP tool needs a publicly reachable server; a local MCP client inside ChitChat is a larger design.
-- **Memory** ("remember that I prefer X"): writes to custom instructions, so it needs a visible approval step.
-- Anything with side effects (shell, file writes, email, calendar) needs a confirmation UI that does not exist yet, and should wait for it.
+Roughly in order of value, as decided on 2026-10-05 (when `get_datetime`, `read_chat` and `read_attachment` were built). Each is a module in `app/tools/` plus its UI line in `static/tools-ui.js`, except where it says otherwise. Anything keyless and read-only fits the way tools work today (off by default, per chat, untrusted output labelled); the ones that need more say what.
+1. **`run_python`**: running code for data work, exact maths, parsing and charts: the biggest capability jump left, and the only one that needs a real design. Model-written code must not run unisolated on this machine: either a sandbox of our own (a subprocess with no network, a timeout, memory and file limits, a temporary directory, and tests for escape attempts like the SSRF tests of `fetch_url`) or OpenAI's hosted `code_interpreter` (per-session cost, runs on their side, OpenAI only). Its own phase.
+2. **Notes or memory** (`remember`, `recall`): the model saves a short fact ("I use metric") that later chats can see. It overlaps with custom instructions, so it must be visible and editable in Settings and never silent; it changes what the model is told, so the user has to stay in control.
+3. **Unit conversion**: easy and keyless (`pint`-like tables or a small hand-written set). Currency needs live rates from an API and is left out unless wanted.
+4. **`weather`** (and similar one-shot lookups): Open-Meteo needs no key. Reachable through `web_search` already, so this is faster and steadier rather than new.
+5. **`lookup_wikipedia` / `search_arxiv`**: short citable reference lookups from free APIs without keys.
+6. **File output and image generation**: a generated CSV or Markdown file the user downloads (pairs with `run_python`, which needs somewhere to put results); image generation needs same-origin image serving (the sanitizer strips `<img>`), a new event type, storage and a cost note.
+7. **Local notes or files search**: a read-only, allowlisted folder indexed with FTS5, like `search_chats`.
+8. **Showing an older image again**: `read_attachment` refuses images (a tool result is text); a tool that re-attaches one to the next request would need `llm.py` to accept image parts in tool output.
+
+Left out on purpose until the app has sign-in (`PLAN.md` phase 9): anything with side effects or credentials (shell, file writes, email, calendar). A confirmation UI for tool calls does not exist either. MCP is a way to get many of the above at once with the same trust problem (looked into in the next commit).

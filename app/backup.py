@@ -83,6 +83,10 @@ def _tool_notes(call: dict) -> list[str]:
                 return [f"*Read* {_link(shown.get('title') or shown['url'], shown['url'])}"]
             case "search_chats":
                 return [f"*Searched your chats for* “{_line(shown['query'])}”"]
+            case "read_chat":
+                return [f"*Read the chat* “{_line(shown['title'])}”"]
+            case "read_attachment" if "name" in shown:
+                return [f"*Read the file* “{_line(shown['name'])}”"]
             case "calculator":
                 # as code, so the * and _ of a sum stay as typed
                 worked = _line(f"{shown['expression']} = {shown['result']}").replace("`", "")

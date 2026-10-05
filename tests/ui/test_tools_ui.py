@@ -30,13 +30,16 @@ def test_the_menu_lists_every_tool_in_the_order_the_server_gives_them(page, app_
     open_app(page, app_url)
     open_menu(page)
     rows = page.locator("#tools-menu .tool-row")
-    expect(rows).to_have_count(4)
+    expect(rows).to_have_count(7)
     expect(rows.nth(0)).to_contain_text("Web search")
     expect(rows.nth(1)).to_contain_text("Calculator")
     expect(rows.nth(1)).to_contain_text("Exact arithmetic")  # a hint each, where the tool has one
     expect(rows.nth(2)).to_contain_text("Search chats")
     expect(rows.nth(3)).to_contain_text("Read web pages")
-    for i in range(4):
+    expect(rows.nth(4)).to_contain_text("Date and time")
+    expect(rows.nth(5)).to_contain_text("Read chats")
+    expect(rows.nth(6)).to_contain_text("Read attached files")
+    for i in range(7):
         expect(rows.nth(i).get_by_role("checkbox")).not_to_be_checked()  # all off by default
 
 
@@ -248,3 +251,62 @@ def test_a_page_saved_before_pages_came_in_parts_still_shows(page, app_url):
     open_app(page, app_url)
     older = {"url": "https://example.com/p", "title": "Old", "characters": 900, "truncated": False}  # no offset, total
     expect(fetched(page, older)).to_have_text("900 characters read")
+
+
+def test_the_date_tool_shows_the_time_and_opens_to_the_extra_lines_as_text(page, app_url):
+    open_app(page, app_url)
+    send(page, "checktime")
+    summary = page.locator(".tool-call summary")
+    expect(summary).to_have_text("Checking the time…")
+    expect(summary).to_have_text("Monday 5 October 2026, 14:03 · PKT, UTC+05:00")
+    summary.click()
+    line = "Friday 25 December 2026, 00:00 (UTC+05:00) is in 80 days <b>9</b> hours"
+    expect(page.locator(".tool-body li")).to_have_text(line)
+    expect(page.locator(".tool-body b")).to_have_count(0)
+    page.reload()
+    expect(page.locator(".tool-call summary")).to_have_text("Monday 5 October 2026, 14:03 · PKT, UTC+05:00")
+
+
+def test_a_chat_read_links_to_that_chat_with_inert_text(page, app_url):
+    open_app(page, app_url)
+    send(page, "readchatx")
+    summary = page.locator(".tool-call summary")
+    expect(summary).to_have_text("Read “Plans <i>for</i> May” · messages 4 to 9 of 20")
+    summary.click()
+    link = page.locator(".tool-body a")
+    expect(link).to_have_text("Plans <i>for</i> May")
+    expect(link).to_have_attribute("href", "#abc123")
+    expect(page.locator(".tool-body i")).to_have_count(0)
+
+
+def test_a_file_read_names_the_file_and_where_it_stopped_and_a_listing_names_them_all(page, app_url):
+    open_app(page, app_url)
+    send(page, "readfilex")
+    summary = page.locator(".tool-call summary")
+    expect(summary).to_have_text("Reading notes.txt…")
+    expect(summary).to_have_text("Read <img src=x onerror=window.__xss=1>.txt from character 12,000")
+    summary.click()
+    expect(page.locator(".tool-body p")).to_have_text(
+        "12,000 characters read from character 12,000 of 30,000; there is more")
+    assert page.evaluate("window.__xss") is None and page.locator(".tool-call img").count() == 0
+
+    page.get_by_role("button", name="New chat").click()
+    send(page, "listfilesx")
+    summary = page.locator(".tool-call summary")
+    expect(summary).to_have_text("Looking at the attached files…")
+    expect(summary).to_have_text("Listed the attached files · 2 files")
+    summary.click()
+    expect(page.locator(".tool-body li")).to_have_text(["a <b>b</b>.txt", "c.pdf"])
+    expect(page.locator(".tool-body b")).to_have_count(0)
+
+
+def test_the_tools_list_scrolls_when_there_are_more_tools_than_room_and_every_one_is_reachable(page, app_url):
+    open_app(page, app_url)
+    open_menu(page)
+    assert page.locator("#tools-list").evaluate("e => e.scrollHeight > e.clientHeight")  # seven tools, a hint each
+    expect(page.locator("#tools-list input").first).to_be_focused()  # the menu puts the focus on the first row
+    last = row(page, "Read attached files").get_by_role("checkbox")
+    last.focus()
+    expect(last).to_be_in_viewport()  # focusing it scrolled the list to it
+    page.keyboard.press("Space")
+    expect(last).to_be_checked()

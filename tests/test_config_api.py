@@ -20,7 +20,8 @@ async def test_the_default_setup_is_openai_with_compaction_and_no_limit(tmp_path
     c = await config_for(tmp_path, openai_api_key="sk-secret", default_system_prompt="Be kind. {date}")
     assert c["endpoint"] == "OpenAI" and c["custom_endpoint"] is False
     assert c["compaction"] is True and c["history_tokens"] == 0 and c["max_tool_calls"] == 8
-    assert c["web_search"] is False and c["tools"] == ["Calculator", "Search chats", "Read web pages"]
+    assert c["web_search"] is False and c["tools"] == [
+        "Calculator", "Search chats", "Read web pages", "Date and time", "Read chats", "Read attached files"]
     assert c["default_instructions"] == "Be kind. {date}" and c["pdf_input"] == "text"
 
 

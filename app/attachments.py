@@ -17,6 +17,7 @@ LIMITS = {"image": 10 * MB, "pdf": 20 * MB, "text": 256 * 1024}  # bytes, per ki
 MAX_TEXT_CHARS = 200_000  # what the model gets from one text file or PDF
 IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 LABELS = {"image": "Images", "pdf": "PDFs", "text": "Text files"}
+UNAVAILABLE = "[This attachment is no longer available.]"
 
 
 class Rejected(Exception):
@@ -119,7 +120,7 @@ def for_model(attachment: dict, directory: str, pdf_input: str) -> dict:
                     text = text[:MAX_TEXT_CHARS] + "\n[Text truncated.]"
                 return {"kind": "text", "name": name, "text": text}
     except (OSError, Rejected):  # file gone from disk, or a PDF that can't be read: say so, don't fail the turn
-        return {"kind": "text", "name": name, "text": "[This attachment is no longer available.]"}
+        return {"kind": "text", "name": name, "text": UNAVAILABLE}
 
 
 def superseded(attachment: dict) -> dict:

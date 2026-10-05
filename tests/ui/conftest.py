@@ -143,6 +143,25 @@ class ScriptedLLM:
             found = [{"id": "abc123", "title": "Threads <i>and</i> locks", "snippet": "use a mutex <b>around</b> it"}]
             yield {**call, "status": "done", "display": {"query": "mutex", "results": found}}
             yield {"type": "delta", "text": "You discussed it in Threads."}
+        elif text in ("checktime", "readchatx", "readfilex", "listfilesx"):  # the date, chat and file tools
+            name, args, shown, answer = {
+                "checktime": ("get_datetime", {"timezone": None, "until": "2026-12-25"}, {
+                    "now": "Monday 5 October 2026, 14:03", "timezone": "PKT, UTC+05:00",
+                    "also": ["Friday 25 December 2026, 00:00 (UTC+05:00) is in 80 days <b>9</b> hours"]},
+                    "It is Monday afternoon."),
+                "readchatx": ("read_chat", {"chat_id": "abc123"}, {
+                    "id": "abc123", "title": "Plans <i>for</i> May", "from": 4, "to": 9, "total": 20}, "I read it."),
+                "readfilex": ("read_attachment", {"name": "notes.txt"}, {
+                    "name": "<img src=x onerror=window.__xss=1>.txt", "kind": "text", "characters": 12_000,
+                    "offset": 12_000, "total": 30_000}, "The file says hello."),
+                "listfilesx": ("read_attachment", {"name": None}, {"files": ["a <b>b</b>.txt", "c.pdf"]},
+                               "Two files."),
+            }[text]
+            call = {"type": "tool_call", "id": "call_r", "name": name, "arguments": args}
+            yield {**call, "status": "running"}
+            await asyncio.sleep(0.3)
+            yield {**call, "status": "done", "display": shown}
+            yield {"type": "delta", "text": answer}
         elif text in ("readpage", "readevil"):  # fetch_url; "readevil" returns a URL and a title that must stay inert
             url = "https://example.com/post" if text == "readpage" else "javascript:window.__xss=1"
             call = {"type": "tool_call", "id": "call_f", "name": "fetch_url", "arguments": {"url": url}}

@@ -197,6 +197,9 @@ def test_the_default_thinking_effort_is_used_by_a_thinking_model(page, app_url):
     d = open_prefs(page)
     d.get_by_label("Model", exact=True).select_option("gpt-5-mini")
     d.get_by_label("Thinking effort").select_option("high")
+    # the choices are saved as they are made; a message sent before the save lands would not see the effort
+    page.wait_for_function(
+        "async () => (await (await fetch('/api/defaults')).json()).reasoning_effort === 'high'")
     page.keyboard.press("Escape")
     send(page, "think")
     expect(page.locator(".msg.assistant .body")).to_contain_text("[effort=high]")

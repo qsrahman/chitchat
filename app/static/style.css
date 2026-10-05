@@ -437,6 +437,11 @@ main:not(.is-started) #title {
   max-height: min(20rem, 50dvh);
   overflow-y: auto;
 }
+/* Seven tools with a hint each are taller than the room above the composer of a new chat: the list scrolls. */
+#tools-list {
+  max-height: min(16rem, 40dvh);
+  overflow-y: auto;
+}
 .menu-item {
   display: flex;
   align-items: center;

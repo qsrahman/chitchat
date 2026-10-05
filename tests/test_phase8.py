@@ -207,3 +207,22 @@ async def test_markdown_export_says_what_the_tools_found(client, llm):
         "*Calculated* `2*3 = 6`\n\n"  # an outcome that failed, or whose details are not as expected, adds nothing
         "Answer\n"
     )
+
+
+async def test_markdown_export_names_the_chats_and_files_the_model_read(client, llm):
+    llm.events = [
+        {"type": "tool_call", "id": "a", "name": "read_chat", "status": "done", "arguments": {},
+         "display": {"id": "x", "title": "Plans\n# for May", "from": 1, "to": 3, "total": 3}},
+        {"type": "tool_call", "id": "b", "name": "read_attachment", "status": "done", "arguments": {},
+         "display": {"name": "notes.txt", "kind": "text", "characters": 5, "offset": 0, "total": 5}},
+        {"type": "tool_call", "id": "c", "name": "read_attachment", "status": "done", "arguments": {},
+         "display": {"files": ["notes.txt"]}},  # a listing names nothing worth a line
+        {"type": "tool_call", "id": "d", "name": "get_datetime", "status": "done", "arguments": {},
+         "display": {"now": "Monday", "timezone": "UTC", "also": []}},
+        {"type": "delta", "text": "Answer"}, {"type": "done"},
+    ]
+    cid = await titled(client, llm, "Reads", "go")
+    text = (await client.get(f"/api/conversations/{cid}/export")).text
+    assert text == (
+        "# Reads\n\n## You\n\ngo\n\n## Assistant (test-model)\n\n"
+        "*Read the chat* “Plans # for May”\n\n*Read the file* “notes.txt”\n\nAnswer\n")

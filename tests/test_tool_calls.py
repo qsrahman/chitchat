@@ -2,8 +2,9 @@ import asyncio
 
 import pytest
 
+from app import tools
 from app.tools import Tool, ToolResult
-from tests.helpers import new_conv, parse_sse
+from tests.helpers import new_conv, parse_sse, upload
 
 
 def fake_search(guidance="SEARCH GUIDANCE."):
@@ -35,7 +36,9 @@ async def messages(client, cid):
 
 async def test_tools_that_need_no_key_are_listed_without_configuration(client):
     listed = (await client.get("/api/tools")).json()
-    assert [t["name"] for t in listed] == ["calculator", "search_chats", "fetch_url"]  # web_search needs a key
+    # web_search needs a key
+    assert [t["name"] for t in listed] == [
+        "calculator", "search_chats", "fetch_url", "get_datetime", "read_chat", "read_attachment"]
     assert all(t["label"] and t["hint"] for t in listed)
 
 
@@ -191,3 +194,22 @@ async def test_the_registered_tools_really_run_through_the_tool_registry(app):
     t = app.state.tools
     assert (await t["calculator"].run({"expression": "6*7"})).display["result"] == "42"
     assert (await t["search_chats"].run({"query": "nothing"})).display["results"] == []
+
+
+async def test_the_reading_tools_know_which_conversation_they_run_in(client, app):
+    first = await create(client)
+    second = await create(client)
+    kept = (await upload(client, "kept.txt", b"in the first chat")).json()["id"]
+    await client.post(f"/api/conversations/{first}/chat", json={"content": "see file", "attachments": [kept]})
+    await client.post(f"/api/conversations/{second}/chat", json={"content": "a question about zebras"})
+    registry = app.state.tools
+    here = tools.bound_to(registry["read_attachment"], first)
+    assert "in the first chat" in (await here.run({"name": "kept.txt", "offset": None})).output
+    elsewhere = tools.bound_to(registry["read_attachment"], second)
+    assert (await elsewhere.run({"name": None, "offset": None})).display == {"files": []}  # not the other chat's
+    found = await tools.bound_to(registry["search_chats"], first).run({"query": "zebras"})
+    read = await tools.bound_to(registry["read_chat"], first).run(
+        {"chat_id": found.display["results"][0]["id"], "from_message": None})
+    assert "a question about zebras" in read.output
+    with pytest.raises(tools.ToolError, match="already in front of you"):
+        await tools.bound_to(registry["read_chat"], second).run({"chat_id": second, "from_message": None})
