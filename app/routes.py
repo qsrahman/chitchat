@@ -279,6 +279,7 @@ def server_config(request: Request, conn: Conn):
         "endpoint": _endpoint(s.openai_base_url) if s.openai_base_url else "OpenAI",
         "custom_endpoint": bool(s.openai_base_url),
         "model": s.openai_model,
+        "chosen_model": store.get_defaults(conn)["model"],  # the default chosen in Settings, over `model`
         "title_model": s.title_model_for(store.get_defaults(conn)["model"] or s.openai_model),
         "web_search": bool(s.brave_api_key),
         "tools": [t.label for t in request.app.state.tools.values()],

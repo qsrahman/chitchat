@@ -67,3 +67,50 @@ def test_it_stays_in_sync_with_the_settings_dialog(page, app_url):
     dialog.get_by_role("button", name="Save").click()
     expect(dialog).to_be_hidden()
     expect(effort(page)).to_have_value("medium")
+
+
+# ---- what Settings chose shows where the effort is chosen ----
+
+def choose_default_effort(page, effort_name="high"):
+    page.get_by_role("button", name="Settings", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Settings", exact=True)
+    dialog.get_by_label("Model", exact=True).select_option("gpt-5-mini")
+    dialog.get_by_label("Thinking effort").select_option(effort_name)
+    page.wait_for_function(
+        f"async () => (await (await fetch('/api/defaults')).json()).reasoning_effort === '{effort_name}'")
+    page.keyboard.press("Escape")
+
+
+def test_the_default_effort_from_settings_names_the_first_choice_in_the_composer(page, app_url):
+    open_app(page, app_url)
+    choose_default_effort(page)
+    expect(effort(page)).to_be_visible()  # the default model is now a thinking one
+    expect(effort(page).locator("option").first).to_have_text("Default (High)")
+    expect(page.locator("#effort-wrap")).to_have_attribute("title", "Thinking effort: Default (High)")
+    expect(page.locator("#effort-wrap")).not_to_have_attribute("data-active", "")  # not an override of its own
+    effort(page).select_option("low")
+    expect(page.locator("#effort-wrap")).to_have_attribute("data-active", "")
+
+
+def test_an_open_chat_that_follows_the_default_shows_a_new_default_at_once_and_none_goes_back_to_auto(page, app_url):
+    open_app(page, app_url)
+    choose_default_effort(page, "medium")
+    send(page, "think")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("[effort=medium]")  # what it really used
+    expect(effort(page).locator("option").first).to_have_text("Default (Medium)")
+    choose_default_effort(page, "low")
+    expect(effort(page).locator("option").first).to_have_text("Default (Low)")  # the open chat follows it
+    page.get_by_role("button", name="Settings", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Settings", exact=True)
+    dialog.get_by_label("Thinking effort").select_option("")  # Auto
+    page.wait_for_function(
+        "async () => (await (await fetch('/api/defaults')).json()).reasoning_effort === null")
+    page.keyboard.press("Escape")
+    expect(effort(page).locator("option").first).to_have_text("Auto")
+
+
+def test_the_chats_own_dialog_says_what_default_means_for_the_effort(page, app_url):
+    open_app(page, app_url)
+    choose_default_effort(page)
+    dialog = open_chat_settings(page)
+    expect(dialog.get_by_label("Reasoning effort").locator("option").first).to_have_text("Default (high)")

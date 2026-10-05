@@ -53,6 +53,18 @@ async def test_the_values_are_the_effective_ones(tmp_path):
     assert (c["max_tool_calls"], c["pdf_input"], c["log_level"], c["max_output_tokens"]) == (3, "file", "WARNING", 900)
 
 
+async def test_the_model_chosen_in_settings_is_reported_next_to_the_servers(tmp_path):
+    app = create_app(Settings(_env_file=None, db_path=str(tmp_path / "m.db"), attachments_dir=str(tmp_path / "f"),
+                              openai_model="env-model"))
+    app.state.llm = FakeLLM()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://x") as client:
+        first = (await client.get("/api/config")).json()
+        assert (first["model"], first["chosen_model"]) == ("env-model", None)
+        await client.put("/api/defaults", json={"model": "chosen"})
+        second = (await client.get("/api/config")).json()
+        assert (second["model"], second["chosen_model"]) == ("env-model", "chosen")
+
+
 async def test_the_title_model_shown_follows_the_default_chosen_in_settings(tmp_path):
     app = create_app(Settings(_env_file=None, db_path=str(tmp_path / "t.db"), attachments_dir=str(tmp_path / "f"),
                               openai_model="env-model", openai_base_url="http://localhost:11434/v1"))

@@ -1,11 +1,18 @@
 // The composer's controls: thinking effort and the tools menu.
 import { $, api, bus, state, textEl } from './core.js'
 import { showNote } from './composer.js'
-import { currentModel, modelInfo, saveSettings } from './settings.js'
+import {
+  capital,
+  currentModel,
+  defaultEffortLabel,
+  modelInfo,
+  saveSettings,
+} from './settings.js'
 
 // ---- thinking effort ----
 // A select in the composer, shown for models that take a reasoning effort (the others take a temperature, which
-// stays in the chat settings). "Auto" stores null: the model's own default.
+// stays in the chat settings). The first choice stores null: "Auto", or the default chosen in Settings (that is what
+// a chat that picks none gets, so it says which).
 const effortSelect = $('effort')
 
 function syncEffort() {
@@ -18,10 +25,11 @@ function syncEffort() {
     group.label = 'Thinking effort'
     group.append(
       new Option('Auto', ''),
-      ...efforts.map((e) => new Option(e[0].toUpperCase() + e.slice(1), e)),
+      ...efforts.map((e) => new Option(capital(e), e)),
     )
     effortSelect.replaceChildren(group)
   }
+  effortSelect.options[0].text = defaultEffortLabel('Auto')
   effortSelect.value = state.settings.reasoning_effort ?? ''
   effortSelect.title = `Thinking effort: ${effortSelect.selectedOptions[0].text}`
   $('effort-wrap').title = effortSelect.title

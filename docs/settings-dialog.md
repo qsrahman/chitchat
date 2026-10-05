@@ -41,6 +41,8 @@ The first version left these out: the model came from `.env` only, and I did not
 
 They save as they change, one at a time and each built from the last (two quick changes would otherwise undo each other: the save replaces all three), and a failed save says so inline and puts the control back. A new chat's tools are applied by the page (its settings are held until the first message; the new-chat screen follows a change at once), and by the server for a chat created with no settings. They are in the backup file (`docs/backup.md`), and the title model follows the default on a custom endpoint (`docs/round-10.md`). Not done: only web search is a switch (the other tools stay as the API set them, and are switched per chat from the tools menu, which now holds web search as well).
 
+**Where a default shows.** A change here is visible where the thing is chosen, not only in the dialog: the **model** in the header (and its menu's "default" tag) of every chat that follows the default, including the open one; the **thinking effort** as the first choice of the composer's select and of the chat's own dialog, "Default (High)" instead of "Auto" (not marked as an override: a chat that picks none gets it); **web search** as a row switched on in the Tools menu of the new chat on screen; and on the Server tab the model chosen (next to the server's, `OPENAI_MODEL`) and the tools switched on in new chats, read again each time the tab is shown. Before, the effort said "Auto" while the default applied, and the Server tab showed only the `.env` model.
+
 Settings now also opens on the tab it was last left on (kept in this browser's `localStorage`).
 
 ## Not done

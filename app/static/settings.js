@@ -70,6 +70,17 @@ export async function saveDefaults(change) {
   refreshModels() // the model that is "Default (...)" may have changed
 }
 
+export const capital = (/** @type {string} */ e) =>
+  e[0].toUpperCase() + e.slice(1)
+
+/** The thinking-effort choice that stores nothing, named for what it gives: `none` if no default effort is chosen in
+ * Settings, else "Default (High)". The composer and the chat's own dialog both show it, so what Settings says is
+ * visible where the effort is chosen. */
+export const defaultEffortLabel = (/** @type {string} */ none) =>
+  defaults.reasoning_effort
+    ? `Default (${capital(defaults.reasoning_effort)})`
+    : none
+
 export const newChatSettings = () => ({
   ...DEFAULT_SETTINGS,
   tools: [...defaults.tools],
@@ -120,7 +131,12 @@ export function openSettings() {
   const s = state.settings
   const dialog = $('settings-dialog')
   $('set-effort').replaceChildren(
-    new Option('Default', ''),
+    new Option(
+      defaults.reasoning_effort
+        ? `Default (${defaults.reasoning_effort})` // spelled as the choices below are
+        : 'Default',
+      '',
+    ),
     ...(modelInfo.efforts ?? []).map((e) => new Option(e, e)),
   )
   $('set-effort').value = s.reasoning_effort ?? ''

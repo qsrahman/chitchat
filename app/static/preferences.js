@@ -231,7 +231,14 @@ function rows(config) {
       'Connection',
       [
         ['Endpoint', config.endpoint, 'OPENAI_BASE_URL'],
-        ['Default model', config.model, 'OPENAI_MODEL'],
+        [
+          'Default model',
+          // what Settings chose (General, New chats) is what chats use; the server's is the fallback
+          config.chosen_model
+            ? `${config.chosen_model} (chosen in Settings; the server's is ${config.model})`
+            : config.model,
+          'OPENAI_MODEL',
+        ],
         ['Chat titles are written by', config.title_model, 'TITLE_MODEL'],
       ],
     ],
@@ -275,6 +282,15 @@ function rows(config) {
           'BRAVE_API_KEY',
         ],
         ['Tools you can switch on', config.tools.join(', ') || 'None', null],
+        [
+          'Switched on in new chats',
+          // the defaults for new chats (General): every tool but web search until the user chooses otherwise
+          state.tools
+            .filter((t) => defaults.tools.includes(t.name))
+            .map((t) => t.label)
+            .join(', ') || 'None',
+          null,
+        ],
         [
           'Tool calls in one reply',
           String(config.max_tool_calls),

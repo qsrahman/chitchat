@@ -142,6 +142,7 @@ interface ServerConfig {
   endpoint: string
   custom_endpoint: boolean
   model: string
+  chosen_model: string | null
   title_model: string
   web_search: boolean
   tools: string[]

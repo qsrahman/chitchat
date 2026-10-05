@@ -287,3 +287,36 @@ def test_on_a_short_window_the_panel_scrolls_inside_the_dialog(page, app_url):
     expect(d.get_by_role("tabpanel").locator(".pref-row").first).to_be_visible()  # the rows arrive from the server
     expect(d).to_be_in_viewport(ratio=1)
     assert d.locator(".prefs-panels").evaluate("e => e.scrollHeight > e.clientHeight")
+
+
+def test_the_server_tab_shows_the_model_and_tools_chosen_in_settings(page, app_url):
+    page.request.put(f"{app_url}/api/defaults", data={"tools": None})
+    open_app(page, app_url)
+    d = open_prefs(page, "Server")
+    row = lambda label: d.locator(f'.pref-row:has(.pref-label:text-is("{label}"))')  # noqa: E731
+    expect(row("Default model").locator("dd")).to_have_text("scripted-default")
+    expect(row("Switched on in new chats").locator("dd")).to_have_text(
+        "Calculator, Search chats, Read web pages, Date and time, Read chats, Read attached files")
+    d.get_by_role("tab", name="General").click()
+    d.get_by_label("Model", exact=True).select_option("alpha-model")
+    d.get_by_role("switch", name="Web search").check()
+    page.wait_for_function(
+        "async () => (await (await fetch('/api/defaults')).json()).tools.includes('web_search')")
+    d.get_by_role("tab", name="Server").click()  # read again each time the tab is shown
+    expect(row("Default model").locator("dd")).to_have_text(
+        "alpha-model (chosen in Settings; the server's is scripted-default)")
+    expect(row("Switched on in new chats").locator("dd")).to_contain_text("Web search, Calculator")
+
+
+def test_an_open_chat_that_follows_the_default_model_shows_a_new_default_in_the_header(page, app_url):
+    open_app(page, app_url)
+    send(page, "hello")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible()  # saved, on the default model
+    expect(page.get_by_role("button", name="Model: scripted-default")).to_be_visible()
+    d = open_prefs(page)
+    d.get_by_label("Model", exact=True).select_option("alpha-model")
+    page.keyboard.press("Escape")
+    # it follows, as it will on the next send
+    expect(page.get_by_role("button", name="Model: alpha-model")).to_be_visible()
+    send(page, "again")
+    expect(page.locator(".msg.assistant").last).to_contain_text("[model=alpha-model]")
