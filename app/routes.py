@@ -230,7 +230,9 @@ def get_defaults(conn: Conn):
 
 @router.put("/defaults")
 def put_defaults(body: Defaults, conn: Conn):
-    return store.set_defaults(conn, body)
+    """Change the defaults named in the body; the others stay. null puts one back to "not chosen" (for the tools that
+    is: every tool but web search)."""
+    return store.set_defaults(conn, body.model_dump(exclude_unset=True))
 
 
 @router.get("/models")

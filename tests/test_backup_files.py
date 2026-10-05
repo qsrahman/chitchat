@@ -296,3 +296,12 @@ async def test_defaults_that_chose_only_a_tool_this_version_lacks_leave_no_tools
     r = await client.post("/api/import", files={"file": ("b.json", json.dumps(document).encode())})
     assert r.json()["defaults"] is True  # what they chose, less what no longer exists: nothing
     assert (await client.get("/api/defaults")).json()["tools"] == []
+
+
+async def test_defaults_that_were_never_chosen_travel_as_never_chosen(client, second):
+    await client.put("/api/defaults", json={"reasoning_effort": "low"})  # something chosen, the tools not
+    document = (await client.get("/api/export")).json()
+    assert document["defaults"] == {"model": None, "reasoning_effort": "low", "tools": None}
+    await second.post("/api/import", files={"file": ("b.json", json.dumps(document).encode())})
+    got = (await second.get("/api/defaults")).json()
+    assert got == {"model": None, "reasoning_effort": "low", "tools": list(store.DEFAULT_TOOLS)}  # still the default

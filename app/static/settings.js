@@ -59,11 +59,13 @@ export async function loadDefaults() {
   }
 }
 
-/** @param {Defaults} next */
-export async function saveDefaults(next) {
+// Only what changed is sent: a default the user never chose stays "not chosen" (for the tools that means every tool
+// but web search), and would not if changing the model sent the tools as they happen to be.
+/** @param {Partial<Defaults>} change */
+export async function saveDefaults(change) {
   defaults = await api('/defaults', {
     method: 'PUT',
-    body: JSON.stringify(next),
+    body: JSON.stringify(change),
   })
   refreshModels() // the model that is "Default (...)" may have changed
 }

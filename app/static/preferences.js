@@ -119,8 +119,8 @@ function fillDefaults() {
 }
 bus.addEventListener('models', fillDefaults)
 
-// One save at a time, each built from what the one before saved: PUT replaces all of them, so two changes made in
-// quick succession would otherwise each start from the old values and the later one would undo the earlier.
+// One save at a time, each built from what the one before saved (the tools list is made from the saved list, so two
+// quick changes of web search would otherwise each start from the old one and the later would undo the earlier).
 let saving = Promise.resolve()
 /** @param {Partial<Defaults>} change */
 const saveDefault = (change) =>
@@ -130,7 +130,7 @@ const saveDefault = (change) =>
 async function storeDefault(change) {
   $('defaults-error').hidden = true
   try {
-    await saveDefaults({ ...defaults, ...change })
+    await saveDefaults(change)
     if (!state.id)
       setSettings({ ...state.settings, tools: newChatSettings().tools }) // the chat on screen is a new one
   } catch {

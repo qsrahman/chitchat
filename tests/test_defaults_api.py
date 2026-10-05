@@ -28,7 +28,8 @@ async def test_defaults_are_saved_and_read_back(client):
     saved = (await client.put("/api/defaults", json=body)).json()
     assert saved == {"model": "gpt-5-mini", "reasoning_effort": "low", "tools": ["calculator"]}  # once each
     assert (await client.get("/api/defaults")).json() == saved
-    assert (await client.put("/api/defaults", json={})).json() == UNCHOSEN
+    nothing = {"model": None, "reasoning_effort": None, "tools": None}  # null puts each back to "not chosen"
+    assert (await client.put("/api/defaults", json=nothing)).json() == UNCHOSEN
 
 
 @pytest.mark.parametrize("body", [
@@ -100,3 +101,39 @@ async def test_a_new_chat_has_every_tool_but_web_search_on_and_switching_them_al
     await client.put("/api/defaults", json={"tools": []})  # someone who wants none
     assert (await client.post("/api/conversations")).json()["settings"]["tools"] == []
     assert (await client.get("/api/defaults")).json()["tools"] == []  # not put back to the default
+
+
+async def test_only_what_is_sent_changes_the_rest_stays(client):
+    await client.put("/api/defaults", json={"model": "alpha", "reasoning_effort": "low", "tools": ["calculator"]})
+    after = (await client.put("/api/defaults", json={"reasoning_effort": "high"})).json()
+    assert after == {"model": "alpha", "reasoning_effort": "high", "tools": ["calculator"]}
+    assert (await client.put("/api/defaults", json={})).json() == after  # nothing named: nothing changes
+
+
+async def test_changing_the_model_does_not_make_the_tools_a_choice(client, monkeypatch):
+    await client.put("/api/defaults", json={"model": "alpha", "reasoning_effort": "high"})
+    monkeypatch.setattr(store, "DEFAULT_TOOLS", ("calculator",))  # a later version with another default list
+    assert (await client.get("/api/defaults")).json()["tools"] == ["calculator"]  # follows it: never frozen as a copy
+
+
+async def test_a_record_saved_before_tools_were_on_by_default_does_not_hold_them_off(client, app):
+    """Older versions wrote every field when one changed, so an empty list meant "never chosen" (this was someone's
+    database: effort set in Settings, tools: [] written along with it)."""
+    from contextlib import closing
+
+    from app import db
+
+    with closing(db.connect(app.state.settings.db_path)) as conn:
+        store.set_app_setting(conn, "defaults", '{"model":null,"reasoning_effort":"medium","tools":[]}')
+    got = (await client.get("/api/defaults")).json()
+    assert got == {"model": None, "reasoning_effort": "medium", "tools": list(store.DEFAULT_TOOLS)}
+    assert (await client.post("/api/conversations")).json()["settings"]["tools"] == list(store.DEFAULT_TOOLS)
+    with closing(db.connect(app.state.settings.db_path)) as conn:
+        store.set_app_setting(conn, "defaults", '{"model":null,"reasoning_effort":null,"tools":["calculator"]}')
+    assert (await client.get("/api/defaults")).json()["tools"] == ["calculator"]  # a real choice from then is kept
+
+
+async def test_none_chosen_now_is_kept_because_it_was_chosen(client):
+    await client.put("/api/defaults", json={"tools": []})
+    await client.put("/api/defaults", json={"model": "alpha"})  # saving something else does not undo it
+    assert (await client.get("/api/defaults")).json()["tools"] == []

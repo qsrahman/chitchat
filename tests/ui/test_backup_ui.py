@@ -209,7 +209,8 @@ def test_importing_a_chat_you_just_deleted_brings_it_back_and_it_stays(page, app
 
 
 def test_an_import_says_when_it_took_the_defaults_for_new_chats(page, app_url):
-    page.request.put(f"{app_url}/api/defaults", data={})  # none chosen (the fixture chose "no tools" for the tests)
+    # nothing chosen (the fixture chose "no tools" for the tests)
+    page.request.put(f"{app_url}/api/defaults", data={"tools": None})
     open_app(page, app_url)
     dialog = open_backup(page)
     document = {**chat_file(), "defaults": {"model": "alpha-model", "tools": ["web_search"]}}

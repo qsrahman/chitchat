@@ -57,7 +57,7 @@ class Defaults(BaseModel):
 
     model: ModelName | None = None
     reasoning_effort: ReasoningEffort = None
-    tools: ToolNames = Field(default_factory=lambda: list(DEFAULT_TOOLS))
+    tools: ToolNames | None = None  # None: not chosen, which is DEFAULT_TOOLS (see get_defaults)
 
 
 def _now() -> str:
@@ -132,16 +132,36 @@ def set_app_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.commit()
 
 
-def get_defaults(conn: sqlite3.Connection) -> dict:
+def stored_defaults(conn: sqlite3.Connection) -> dict:
+    """The defaults as the user chose them: {model, reasoning_effort, tools}, each None until chosen."""
     try:
-        return Defaults.model_validate_json(get_app_setting(conn, "defaults") or "{}").model_dump()
-    except ValueError:  # saved by an older version that had other choices (a tool that no longer exists)
+        raw = json.loads(get_app_setting(conn, "defaults") or "{}")
+        if raw.get("v") != 2 and raw.get("tools") == []:
+            # Saved before tools were on by default, when the Settings page wrote every field whatever was changed:
+            # an empty list there is "never chosen", not "none wanted".
+            del raw["tools"]
+        return Defaults.model_validate({k: raw[k] for k in ("model", "reasoning_effort", "tools") if k in raw}
+                                       ).model_dump()
+    except (ValueError, TypeError, AttributeError):  # unreadable, or a tool that no longer exists: not chosen
         return Defaults().model_dump()
 
 
-def set_defaults(conn: sqlite3.Connection, defaults: Defaults) -> dict:
-    set_app_setting(conn, "defaults", defaults.model_dump_json())
-    return defaults.model_dump()
+def defaults_chosen(conn: sqlite3.Connection) -> bool:
+    return any(v is not None for v in stored_defaults(conn).values())
+
+
+def get_defaults(conn: sqlite3.Connection) -> dict:
+    """What a new chat gets: the chosen defaults, and for the tools, DEFAULT_TOOLS until they are chosen."""
+    stored = stored_defaults(conn)
+    return {**stored, "tools": list(DEFAULT_TOOLS) if stored["tools"] is None else stored["tools"]}
+
+
+def set_defaults(conn: sqlite3.Connection, change: dict) -> dict:
+    """Change some of the defaults: the keys in `change` (a field set to None goes back to "not chosen"), the others
+    stay as they are. Returns get_defaults. "v" marks a record written by this logic (see stored_defaults)."""
+    merged = Defaults.model_validate({**stored_defaults(conn), **change}).model_dump()
+    set_app_setting(conn, "defaults", json.dumps({**merged, "v": 2}))
+    return get_defaults(conn)
 
 
 def delete_conversation(conn: sqlite3.Connection, cid: str) -> bool:

@@ -142,7 +142,7 @@ def _all(conn, build) -> list[dict]:
 def _document(conn) -> dict:
     return {"format": FORMAT, "version": VERSION, "exported_at": datetime.now(UTC).isoformat(),
             "custom_instructions": store.get_app_setting(conn, "custom_instructions"),
-            "defaults": store.get_defaults(conn),
+            "defaults": store.stored_defaults(conn),  # as chosen: tools null while they are the default
             "conversations": _all(conn, _tree)}
 
 
@@ -396,7 +396,7 @@ def _import(conn, data: bytes, files: _Files) -> dict:
 def _defaults(conn, raw: object) -> bool:
     """Take the backup's defaults for new chats if it has some and none are chosen here (nothing is overwritten).
     Tools this version doesn't have are dropped, as in a chat's settings; anything else that doesn't fit is ignored."""
-    if not isinstance(raw, dict) or store.get_defaults(conn) != store.Defaults().model_dump():
+    if not isinstance(raw, dict) or store.defaults_chosen(conn):
         return False
     names = raw.get("tools")
     chosen = {"tools": [t for t in names if t in tools.NAMES]} if isinstance(names, list) else {}  # else the default
@@ -407,7 +407,7 @@ def _defaults(conn, raw: object) -> bool:
         return False
     if defaults == store.Defaults():
         return False
-    store.set_defaults(conn, defaults)
+    store.set_defaults(conn, defaults.model_dump())
     return True
 
 

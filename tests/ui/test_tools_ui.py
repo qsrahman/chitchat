@@ -315,7 +315,8 @@ def test_the_tools_list_scrolls_when_there_are_more_tools_than_room_and_every_on
 # ---- on by default ----
 
 def test_a_new_chat_has_every_tool_but_web_search_on_until_the_user_chooses_otherwise(page, app_url):
-    page.request.put(f"{app_url}/api/defaults", data={})  # the shipped default (the fixture starts with none on)
+    # the shipped default (the fixture starts with none on)
+    page.request.put(f"{app_url}/api/defaults", data={"tools": None})
     open_app(page, app_url)
     expect(tools_btn(page)).to_have_attribute("data-active", "")
     open_menu(page)
@@ -331,7 +332,7 @@ def test_a_new_chat_has_every_tool_but_web_search_on_until_the_user_chooses_othe
 
 
 def test_switching_a_tool_off_in_one_chat_leaves_the_next_chat_on_the_default(page, app_url):
-    page.request.put(f"{app_url}/api/defaults", data={})
+    page.request.put(f"{app_url}/api/defaults", data={"tools": None})
     open_app(page, app_url)
     open_menu(page)
     row(page, "Calculator").get_by_role("checkbox").uncheck()
@@ -341,3 +342,36 @@ def test_switching_a_tool_off_in_one_chat_leaves_the_next_chat_on_the_default(pa
     page.get_by_role("button", name="New chat").click()
     open_menu(page)
     expect(row(page, "Calculator").get_by_role("checkbox")).to_be_checked()
+
+
+def test_changing_something_in_settings_does_not_turn_the_default_tools_off(page, app_url):
+    """The bug that made the menu look wrong: Settings used to save every default whatever was changed, tools included
+    (then an empty list), so after touching the thinking effort a new chat started with none on."""
+    page.request.put(f"{app_url}/api/defaults", data={"tools": None})
+    open_app(page, app_url)
+    page.get_by_role("button", name="Settings", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Settings", exact=True)
+    dialog.get_by_label("Model", exact=True).select_option("gpt-5-mini")
+    dialog.get_by_label("Thinking effort").select_option("high")
+    page.wait_for_function(
+        "async () => (await (await fetch('/api/defaults')).json()).reasoning_effort === 'high'")
+    page.keyboard.press("Escape")
+    page.reload()
+    open_menu(page)
+    expect(row(page, "Calculator").get_by_role("checkbox")).to_be_checked()
+    expect(row(page, "Read attached files").get_by_role("checkbox")).to_be_checked()
+    expect(row(page, "Web search").get_by_role("checkbox")).not_to_be_checked()
+
+
+def test_the_web_search_switch_in_settings_leaves_the_other_default_tools_on(page, app_url):
+    page.request.put(f"{app_url}/api/defaults", data={"tools": None})
+    open_app(page, app_url)
+    page.get_by_role("button", name="Settings", exact=True).click()
+    page.get_by_role("dialog", name="Settings", exact=True).get_by_role("switch", name="Web search").check()
+    page.wait_for_function(
+        "async () => (await (await fetch('/api/defaults')).json()).tools.includes('web_search')")
+    page.keyboard.press("Escape")
+    open_menu(page)
+    expect(row(page, "Web search").get_by_role("checkbox")).to_be_checked()  # the new chat on screen follows at once
+    expect(row(page, "Calculator").get_by_role("checkbox")).to_be_checked()
+    expect(row(page, "Read chats").get_by_role("checkbox")).to_be_checked()
