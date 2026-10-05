@@ -63,4 +63,4 @@ Roughly in order of value, as decided on 2026-10-05 (when `get_datetime`, `read_
 7. **Local notes or files search**: a read-only, allowlisted folder indexed with FTS5, like `search_chats`.
 8. **Showing an older image again**: `read_attachment` refuses images (a tool result is text); a tool that re-attaches one to the next request would need `llm.py` to accept image parts in tool output.
 
-Left out on purpose until the app has sign-in (`PLAN.md` phase 9): anything with side effects or credentials (shell, file writes, email, calendar). A confirmation UI for tool calls does not exist either. MCP is a way to get many of the above at once with the same trust problem (looked into in the next commit).
+Left out on purpose until the app has sign-in (`PLAN.md` phase 9): anything with side effects or credentials (shell, file writes, email, calendar). A confirmation UI for tool calls does not exist either. MCP is a way to get many of the above at once with the same trust problem: looked into in `docs/mcp.md` (feasible as a local client, about one phase, wanting sign-in and a confirmation UI first).
