@@ -66,6 +66,7 @@ def make(settings: Settings, client: httpx.AsyncClient | None = None) -> Tool | 
     return Tool(
         name="web_search",
         label="Web search",
+        hint="Look up current information on the web",
         description=(
             "Search the web for current or unfamiliar information, such as recent events, prices, versions "
             "or documentation. Returns numbered results with titles, URLs and snippets."

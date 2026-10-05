@@ -228,6 +228,14 @@ def test_new_chats_start_with_web_search_when_the_switch_is_on(page, app_url):
     expect(tools).not_to_have_attribute("data-active", "")
 
 
+def test_the_switch_has_room_for_its_knob(page, app_url):
+    open_app(page, app_url)
+    switch = open_prefs(page).get_by_role("switch", name="Web search")
+    # the track is 32x20 with nothing taken out of it: the text-field padding and border of `dialog input` are not its
+    expect(switch).to_have_css("padding", "0px")
+    assert switch.evaluate("el => [el.clientWidth, el.clientHeight]") == [32, 20]
+
+
 def test_a_failed_save_is_said_and_the_control_goes_back(page, app_url, expected_console_errors):
     open_app(page, app_url)
     expected_console_errors.append("net::ERR_FAILED")

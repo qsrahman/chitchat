@@ -33,7 +33,7 @@ def test_every_tool_is_named_and_the_schemas_satisfy_strict_mode():
     for tool in built.values():
         schema = tool.parameters
         assert set(schema["required"]) == set(schema["properties"]) and schema["additionalProperties"] is False
-        assert tool.guidance and tool.description and tool.label
+        assert tool.guidance and tool.description and tool.label and tool.hint
 
 
 async def test_the_request_to_brave():
