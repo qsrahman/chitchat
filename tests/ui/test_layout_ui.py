@@ -188,3 +188,18 @@ def test_drafts_are_kept_per_conversation_and_cleared_on_send(page, app_url):
 
     page.get_by_role("button", name="New chat").click()
     expect(field).to_have_value("draft for a new chat")
+
+
+# ---- tables on a phone ----
+
+def test_a_table_on_a_phone_keeps_its_words_whole_and_scrolls_sideways(page, app_url):
+    page.set_viewport_size({"width": 375, "height": 800})
+    open_app(page, app_url)
+    send(page, "narrowtable")
+    table = page.locator(".msg.assistant table")
+    expect(table).to_be_visible()
+    cells = table.locator("th, td")
+    widths = cells.evaluate_all("els => els.map((e) => e.getBoundingClientRect().width)")
+    assert min(widths) >= 90, widths  # a column of single letters was 30px wide
+    assert table.evaluate("e => e.scrollWidth > e.clientWidth")  # too wide for the screen: it scrolls
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")  # and the page does not

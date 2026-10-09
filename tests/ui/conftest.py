@@ -124,6 +124,11 @@ class ScriptedLLM:
                 "```python\n" + "result = " + " + ".join(f"value_{i}" for i in range(40)) + "\n```\n\n"
                 f"| {columns} |\n|{'---|' * 40}\n| {cells} |\n\n"
                 "$$" + " + ".join(f"x_{{{i}}}^{{2}}" for i in range(40)) + "$$")}
+        elif "narrowtable" in text:  # a table with a few columns of words, for a phone
+            yield {"type": "delta", "text": (
+                "| Feature | Stateless | Conversations | Cost | Notes |\n|---|---|---|---|---|\n"
+                "| Reasoning | Discarded each turn | Preserved between turns | Higher | Optional |\n"
+                "| Tools | Manual function calling | Built-in managed tools | Lower | Recommended |")}
         elif "urdu" in text:  # an Arabic-script paragraph, an English one, a list and code, in one reply
             yield {"type": "delta", "text": "السلام عليكم، هذه فقرة عربية.\n\nThis paragraph is English.\n\n"
                    "- بند أول\n- بند ثان\n\n```python\nprint('hi')\n```\n\n> اقتباس"}
