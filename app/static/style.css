@@ -2144,7 +2144,7 @@ dialog input[type='number'] {
     position: fixed;
     inset: 0 0 0 auto;
     z-index: var(--layer-3);
-    width: min(21rem, 92vw);
+    width: min(21rem, 100vw);
     padding: 10px;
     background: var(--bg);
   }
@@ -2209,4 +2209,7 @@ dialog input[type='number'] {
     flex: 1;
     min-width: 0;
   }
+}
+.find input::-webkit-search-cancel-button {
+  display: none; /* the bar has its own close button */
 }
