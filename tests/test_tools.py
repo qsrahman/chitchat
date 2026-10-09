@@ -112,3 +112,10 @@ async def test_an_empty_query_is_refused_before_any_request(args):
 
     with pytest.raises(tools.ToolError, match="empty"):
         await search_tool(never).run(args)
+
+
+def test_the_tools_that_find_pages_ask_for_the_exact_url_so_the_app_can_number_the_source():
+    """A reply's link becomes a numbered chip only if it is the address the tool found (static/sources.js)."""
+    settings = Settings(_env_file=None, brave_api_key="k")
+    for name in ("web_search", "fetch_url"):
+        assert "exact URL" in tools.build(settings)[name].guidance
