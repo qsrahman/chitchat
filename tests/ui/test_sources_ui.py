@@ -83,3 +83,30 @@ def test_the_panel_is_a_column_beside_the_conversation_on_a_wide_screen(page, ap
     sources_btn(page).click()
     panel, main = page.locator("#sources").bounding_box(), page.locator("main").bounding_box()
     assert panel["x"] >= main["x"] + main["width"] - 1 and panel["width"] > 300
+
+
+def test_a_link_spelled_differently_is_still_that_source(page, app_url):
+    # http for https, a leading www., no trailing slash, tracking parameters, a #fragment
+    open_app(page, app_url)
+    send(page, "findweb variant")
+    expect(chip(page)).to_have_text("2")
+    expect(sources_btn(page)).to_contain_text("2 sources")
+
+
+def test_a_page_read_after_a_redirect_is_the_source_the_search_found(page, app_url):
+    open_app(page, app_url)
+    send(page, "findweb redirect")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("It is 3.14")
+    expect(chip(page)).to_have_text("2")  # the reply links the page's new address
+    expect(sources_btn(page)).to_contain_text("2 sources")  # not a third source
+
+
+def test_the_marked_card_stays_marked_when_the_list_is_rebuilt(page, app_url):
+    open_app(page, app_url)
+    send(page, "findweb cite")
+    chip(page).click()
+    expect(page.locator("#source-2")).to_have_class("source-card is-hit")
+    send(page, "findweb cite again")  # the same pages found again: the list is rebuilt
+    expect(page.locator(".msg.assistant")).to_have_count(2)
+    expect(page.locator("#send")).to_be_disabled()
+    expect(page.locator("#source-2")).to_have_class("source-card is-hit")

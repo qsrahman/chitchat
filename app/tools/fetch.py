@@ -185,6 +185,8 @@ async def fetch_url(args: dict, *, client: httpx.AsyncClient | None = None, reso
     )
     shown = {"url": final, "title": title, "characters": len(text), "offset": offset, "total": len(page),
              "truncated": more or capped}
+    if url != final:
+        shown["requested"] = url  # the address the model was given: the page's source is cited by either one
     return ToolResult(output, shown)
 
 

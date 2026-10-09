@@ -102,7 +102,18 @@ class ScriptedLLM:
             else:
                 shown = {"query": "python version", "results": SEARCH_RESULTS}
                 yield {**call, "status": "done", **query, "display": shown}
-                link = "[the docs](https://docs.python.org/3/whatsnew/)" if "cite" in text else "[python.org](https://www.python.org/)"
+                if "redirect" in text:  # the page was read after a redirect: the reply may link either address
+                    page = {"url": "https://docs.python.org/3.14/whatsnew/", "title": "whatsnew",
+                            "requested": "https://docs.python.org/3/whatsnew/"}
+                    fetch = {"type": "tool_call", "id": "call_2", "name": "fetch_url",
+                             "arguments": {"url": page["requested"]}}
+                    yield {**fetch, "status": "done", "display": page}
+                link = {
+                    "variant": "[the docs](http://www.docs.python.org/3/whatsnew?utm_source=chat&fbclid=x#top)",
+                    "redirect": "[the docs](https://docs.python.org/3.14/whatsnew/)",
+                    "cite": "[the docs](https://docs.python.org/3/whatsnew/)",
+                }.get(next((w for w in ("variant", "redirect", "cite") if w in text), ""),
+                      "[python.org](https://www.python.org/)")
                 yield {"type": "delta", "text": f"It is **3.14**, per {link}."}
             yield {"type": "done"}
             return

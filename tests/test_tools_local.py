@@ -285,6 +285,8 @@ async def test_redirects_are_followed_and_each_hop_is_checked():
 
     result = await fetch("https://example.com/start", handler)
     assert result.display["url"] == "https://other.example/final"  # the page we actually read
+    assert result.display["requested"] == "https://example.com/start"  # the address the model was given
+    assert "requested" not in (await fetch("https://example.com/notes")).display  # no redirect, nothing to add
 
 
 async def test_relative_redirects_resolve_against_the_page():

@@ -8,31 +8,68 @@ const panel = $('sources')
 const button = $('sources-btn')
 const list = $('sources-list')
 
-/** @typedef {{url: string, title: string, description: string}} Source */
+/** @typedef {{url: string, title: string, description: string, keys?: string[]}} Source */
 
-/** @param {ToolCall} call @returns {Source[]} */
+/** @param {ToolCall} call @returns {(Source & {requested?: string})[]} */
 function foundBy(call) {
   const shown = /** @type {any} */ (call.display) // each tool's own shape (app/tools/)
   if (call.name === 'web_search')
     return (shown?.results ?? []).filter((r) => isWebUrl(r.url))
   if (call.name === 'fetch_url' && isWebUrl(shown?.url))
-    return [{ url: shown.url, title: shown.title || '', description: '' }]
+    return [
+      {
+        url: shown.url,
+        requested: isWebUrl(shown.requested) ? shown.requested : undefined,
+        title: shown.title || '',
+        description: '',
+      },
+    ]
   return []
 }
 
-// One page is one source however often it was found: the same address without its #fragment and trailing slash.
-const key = (url) => new URL(url).href.replace(/#.*/, '').replace(/\/$/, '')
+// Tracking parameters say where a visitor came from, not which page it is.
+const TRACKING = /^(utm_|fbclid$|gclid$|mc_[ce]id$|igshid$|ref$|ref_src$)/
+/**
+ * One page is one source however it is spelled: the same address up to http or https, a leading www., a default
+ * port, a trailing slash, a #fragment, tracking parameters and the order of the others.
+ * @param {string} url
+ */
+export function key(url) {
+  const u = new URL(url)
+  const params = [...u.searchParams].filter(([k]) => !TRACKING.test(k))
+  params.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  const query = params.map(([k, v]) => `${k}=${v}`).join('&')
+  const port = u.port && !['80', '443'].includes(u.port) ? `:${u.port}` : ''
+  return (
+    u.hostname.toLowerCase().replace(/^www\./, '') +
+    port +
+    u.pathname.replace(/\/$/, '') +
+    (query ? `?${query}` : '')
+  )
+}
 
-/** @returns {Source[]} in the order they were found */
+/** @returns {Source[]} in the order they were found; `keys` are all the addresses one of them goes by */
 export function allSources() {
+  /** @type {Map<string, Source>} */
   const found = new Map()
   for (const el of /** @type {NodeListOf<MessageEl>} */ (
     thread.querySelectorAll('.msg.assistant')
   ))
     for (const call of el._calls?.values() ?? [])
-      for (const r of foundBy(call))
-        if (!found.has(key(r.url))) found.set(key(r.url), r)
-  return [...found.values()]
+      for (const { requested, ...r } of foundBy(call)) {
+        // a page read after a redirect: it is the source the search found, under its new address as well
+        const known = [requested, r.url]
+          .filter((u) => u)
+          .map((u) => found.get(key(/** @type {string} */ (u))))
+          .find((s) => s)
+        const source = known ?? { ...r, keys: [] }
+        for (const u of [requested, r.url])
+          if (u && !found.has(key(u))) {
+            found.set(key(u), source)
+            source.keys?.push(key(u))
+          }
+      }
+  return [...new Set(found.values())]
 }
 
 // A colour for a site's letter, the same every time (no favicons: that would be a request to every site found).
@@ -47,7 +84,9 @@ const dot = (host) =>
 export function chipLinks(body) {
   const sources = allSources()
   if (!sources.length) return
-  const numbers = new Map(sources.map((s, i) => [key(s.url), i + 1]))
+  const numbers = new Map(
+    sources.flatMap((s, i) => (s.keys ?? []).map((k) => [k, i + 1])),
+  )
   for (const a of body.querySelectorAll('a[href]')) {
     const n = numbers.get(key(a.href))
     if (!n) continue
@@ -65,6 +104,9 @@ function show(open) {
   panel.hidden = !(open && any)
   button.setAttribute('aria-expanded', String(open && any))
 }
+
+/** @type {string | null} the source the last chip click pointed at: its card stays marked while the list is rebuilt */
+let hit = null
 
 let queued = false
 function refresh() {
@@ -84,6 +126,7 @@ function refresh() {
           id: `source-${i + 1}`,
         })
         card.dir = 'auto'
+        card.classList.toggle('is-hit', !!hit && !!s.keys?.includes(hit))
         const site = textEl('span', '')
         site.className = 'source-host'
         site.append(dot(host), `${i + 1} · ${host}`)
@@ -105,7 +148,10 @@ function refresh() {
 }
 
 bus.addEventListener('sources', refresh)
-bus.addEventListener('thread-reset', refresh)
+bus.addEventListener('thread-reset', () => {
+  hit = null
+  refresh()
+})
 button.addEventListener('click', () => show(panel.hidden))
 $('sources-close').addEventListener('click', () => {
   show(false)
@@ -127,6 +173,7 @@ thread.addEventListener('click', (e) => {
   )
   list.querySelectorAll('.is-hit').forEach((c) => c.classList.remove('is-hit'))
   if (!card) return
+  hit = allSources()[Number(chip.textContent) - 1]?.keys?.[0] ?? null
   card.classList.add('is-hit')
   card.scrollIntoView({ block: 'nearest' })
   card.focus()
