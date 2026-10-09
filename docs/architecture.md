@@ -18,6 +18,7 @@ Streaming uses FastAPI's own SSE support (`fastapi.sse.EventSourceResponse`): ea
 | `core.js` | DOM handles, the one `state` object, `DEFAULT_SETTINGS`, `api()`, icons and small builders, dialogs helper, the `bus` |
 | `messages.js` | the thread: building and rendering a message, the note, reasoning, scrolling, code-block copy |
 | `tools-ui.js` | `TOOL_UI` (how each tool's call reads) and `renderToolCall` |
+| `sources.js` | the Sources panel and the numbered chips: the pages the chat's search and page calls found (`docs/folio.md`) |
 | `chat.js` | a turn: SSE reading, `runTurn`, message actions (copy, edit, regenerate, retry), submit and Escape |
 | `composer.js` | the input box: send button state, auto-grow, drafts, attachments, the composer note |
 | `controls.js` | thinking effort select, tools menu |

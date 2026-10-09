@@ -11,6 +11,7 @@ import {
   state,
   thread,
 } from './core.js'
+import { chipLinks } from './sources.js'
 import { renderToolCall } from './tools-ui.js'
 
 // ---- scrolling ----
@@ -177,9 +178,10 @@ export function render(el) {
       reasoningOf(el).querySelector('.reasoning-body'),
       el._reasoning,
     )
-  if (el.classList.contains('assistant') && el._text)
+  if (el.classList.contains('assistant') && el._text) {
     renderMarkdownInto(body, el._text) // reuses what has not changed
-  else {
+    chipLinks(body)
+  } else {
     body._blocks = null // the content is replaced by something else: the next markdown render starts afresh
     if (!el.classList.contains('assistant')) body.textContent = el._text
     else if (el._reasoning || el.querySelector('.tool-call'))

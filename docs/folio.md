@@ -10,5 +10,13 @@ Chosen from the five mocks in `docs/ui-mockups.md` (the mock is `design/mockups/
 - `main` has a bounded grid column, so a very long title ellipsizes instead of widening the sheet.
 - `--muted` (light) and the code number colour were darkened to keep 4.5:1 on the new surfaces.
 
-## Not done yet
-The mock also has a Sources panel and numbered citation chips. The app does not capture web-search citations yet (`llm.py` would need a normalized `citation` event, stored in the message `meta` and kept by `backup.py`), so that is a separate step.
+## Sources panel and numbered chips (`app/static/sources.js`)
+- No backend change: web search and page reading already save what they found in the message's tool metadata (`display.results` of `web_search`, `display.url`/`title` of `fetch_url`), and backups keep it. `tools-ui.js` records each finished call on its message element (`_calls`) and sends a `sources` notice; `sources.js` reads the list from those, so it is always what the messages on screen carry (a different version of a reply shows its own).
+- One page is one source however often it was found (address without `#fragment` and trailing slash). Numbers follow the order found in the chat.
+- A link in a reply that points at a source becomes a chip showing its number (accessible name "Source 2: title"); other links stay links. The model already cites as markdown links (`app/tools/brave.py` guidance), so there is no new instruction. Click a chip to open the panel at its card; ctrl/cmd/shift-click still opens the link.
+- The header shows "N sources" with up to three site letters when the chat has any; it toggles the panel, a third grid column (a drawer over the page on a phone). Escape or the close button closes it.
+- Only web links are listed (`isWebUrl`), cards open in a new tab with `rel="noopener noreferrer"`, and there are no favicons: that would be a request to every site found. Each site gets a letter in a colour from its name.
+- Tests: `tests/ui/test_sources_ui.py`, and the panel is in the axe checks.
+
+## Not done
+The mock's "Searched the web" notes are the existing tool lines. Citations from OpenAI's own web search are not captured (the app uses Brave).

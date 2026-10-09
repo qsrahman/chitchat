@@ -121,6 +121,7 @@ interface MessageEl extends HTMLDivElement {
   _usage?: Usage
   _siblings?: number[]
   _attachments?: Attachment[]
+  _calls?: Map<string, ToolCall>
   _frame?: number | null
   _timer?: ReturnType<typeof setTimeout> | null
   _resumeAt?: number

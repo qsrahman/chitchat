@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import expect
 
 from tests.helpers import PNG
-from tests.ui.test_chat_ui import chat_menu, open_chat_settings, open_prefs, row_action
+from tests.ui.test_chat_ui import chat_menu, open_chat_settings, open_prefs, row_action, send
 
 AXE = (Path(__file__).parent / "assets" / "axe.min.js").read_text()
 
@@ -121,6 +121,14 @@ def test_the_tools_menu(page_with_axe):
     page.get_by_role("button", name="Tools", exact=True).click()
     expect(page.locator("#tools-menu")).to_be_visible()
     page.get_by_label("Calculator").check()
+    assert violations(page) == []
+
+
+def test_the_sources_panel_with_a_numbered_chip_in_the_reply(page_with_axe):
+    page = page_with_axe
+    send(page, "findweb cite")
+    page.locator("#sources-btn").click()
+    expect(page.locator("#source-1")).to_be_visible()
     assert violations(page) == []
 
 

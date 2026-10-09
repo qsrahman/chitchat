@@ -132,6 +132,17 @@
         </button>
         <h1 id="title" dir="auto">New chat</h1>
         <button
+          id="sources-btn"
+          type="button"
+          class="sources-btn"
+          aria-controls="sources"
+          aria-expanded="false"
+          hidden
+        >
+          <span class="site-dots" aria-hidden="true"></span>
+          <span class="count"></span>
+        </button>
+        <button
           id="chat-menu-btn"
           type="button"
           class="icon-btn"
@@ -281,6 +292,22 @@
         </p>
       </div>
     </main>
+    <aside id="sources" aria-label="Sources" hidden>
+      <div class="sources-head">
+        <h2>Sources</h2>
+        <button
+          id="sources-close"
+          type="button"
+          class="icon-btn"
+          aria-label="Close sources"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M5 5l10 10M15 5L5 15" />
+          </svg>
+        </button>
+      </div>
+      <div id="sources-list" tabindex="0"></div>
+    </aside>
 
     <dialog id="rename-dialog" closedby="any" aria-labelledby="rename-heading">
       <form method="dialog">

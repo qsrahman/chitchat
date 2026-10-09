@@ -1,11 +1,11 @@
 // How a tool call the model made reads in a reply: one line while it runs and when it is done, with details to open.
-import { bodyOf, textEl } from './core.js'
+import { bodyOf, bus, textEl } from './core.js'
 
 // ---- tool calls ----
 // A tool the model called shows as a line above the answer: "Searching the web for ..." while it runs, then
 // "Searched the web for ..." that opens to the results. How each tool reads is in TOOL_UI; others get a plain line.
-const hostOf = (url) => new URL(url).hostname.replace(/^www\./, '')
-const isWebUrl = (url) => {
+export const hostOf = (url) => new URL(url).hostname.replace(/^www\./, '')
+export const isWebUrl = (url) => {
   try {
     return ['http:', 'https:'].includes(new URL(url).protocol)
   } catch {
@@ -212,4 +212,9 @@ export function renderToolCall(el, call) {
   }
   row.querySelector('summary').textContent = summary
   row.querySelector('.tool-body').replaceChildren(...(detail ? [detail] : []))
+  if (call.status === 'done') {
+    // the Sources panel lists the pages the calls of every reply found (sources.js)
+    ;(el._calls ??= new Map()).set(call.id, call)
+    bus.dispatchEvent(new Event('sources'))
+  }
 }

@@ -102,7 +102,8 @@ class ScriptedLLM:
             else:
                 shown = {"query": "python version", "results": SEARCH_RESULTS}
                 yield {**call, "status": "done", **query, "display": shown}
-                yield {"type": "delta", "text": "It is **3.14**, per [python.org](https://www.python.org/)."}
+                link = "[the docs](https://docs.python.org/3/whatsnew/)" if "cite" in text else "[python.org](https://www.python.org/)"
+                yield {"type": "delta", "text": f"It is **3.14**, per {link}."}
             yield {"type": "done"}
             return
         elif "richreply" in text:  # one of everything the markdown renderer produces
