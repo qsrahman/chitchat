@@ -24,6 +24,7 @@ One file per phase or change, so the history of a decision sits next to the code
 | [branching.md](branching.md) | versions of a message, `2 / 3`, and where switching lands |
 | [tools.md](tools.md) | calculator, search_chats, fetch_url and its safety rules, the date, chat and file tools, and the tools still to build |
 | [mcp.md](mcp.md) | whether ChitChat can use MCP servers: two routes, what a spike showed, what it would take (not built) |
+| [cli.md](cli.md) | plugging a CLI in: as an HTTP client of the server, or in-process after moving the chat logic out of `routes.py` (noted, not built) |
 | [default-prompt.md](default-prompt.md) | the instructions the model always gets, and why |
 | [context-window.md](context-window.md) | long chats on a model without compaction |
 | [rendering.md](rendering.md) | markdown, math, code, reasoning text, sanitizing, the render time budget |
