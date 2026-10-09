@@ -1,4 +1,6 @@
 """Find in chat: Mod+F or the ⋯ menu, matches painted on the text with the CSS Custom Highlight API."""
+import re
+
 from playwright.sync_api import expect
 
 from tests.ui.test_chat_ui import chat_menu, open_app, send
@@ -105,6 +107,53 @@ def test_opening_another_chat_closes_it(page, app_url):
     page.get_by_role("button", name="New chat").click()
     expect(page.locator("#find")).to_be_hidden()
     assert painted(page, "find") == 0
+
+
+def test_a_match_runs_over_bold_and_italic_but_not_from_one_paragraph_into_the_next(page, app_url):
+    open_app(page, app_url)
+    send(page, "richreply")
+    expect(page.locator(".msg.assistant h1")).to_be_visible()
+    page.keyboard.press("ControlOrMeta+f")
+    find_box(page).fill("with bold, italic, inline code and a link")  # bold, italic, code and a link in one paragraph
+    expect(page.locator("#find-count")).to_have_text("1 of 1")
+    find_box(page).fill("heading a paragraph")  # the end of the heading and the start of the paragraph
+    expect(page.locator("#find-count")).to_have_text("No matches")
+
+
+def test_reasoning_is_searched_and_its_section_opens_for_the_match(page, app_url):
+    open_app(page, app_url)
+    send(page, "widereply")
+    expect(page.locator(".msg.assistant .math-block")).to_be_visible()
+    reasoning = page.locator(".msg.assistant .reasoning")
+    assert not reasoning.evaluate("e => e.open")  # closed once the reply is done
+    page.keyboard.press("ControlOrMeta+f")
+    find_box(page).fill("Thinking step 17 of")
+    expect(page.locator("#find-count")).to_have_text("1 of 1")
+    assert reasoning.evaluate("e => e.open")
+    expect(page.locator(".msg.assistant .reasoning-body")).to_be_visible()
+
+
+def test_a_tool_calls_results_are_searched_and_opened_too(page, app_url):
+    open_app(page, app_url)
+    send(page, "findweb")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("It is 3.14")
+    page.keyboard.press("ControlOrMeta+f")
+    find_box(page).fill("the latest release")  # a result's snippet, inside the closed tool line
+    expect(page.locator("#find-count")).to_have_text("1 of 1")
+    assert page.locator(".msg.assistant .tool-call").evaluate("e => e.open")
+
+
+def test_the_matches_follow_a_reply_that_is_still_streaming(page, app_url):
+    open_app(page, app_url)
+    send(page, "slow please")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("word2")
+    page.keyboard.press("ControlOrMeta+f")
+    find_box(page).fill("word")
+    first = page.locator("#find-count").inner_text()
+    page.wait_for_function("(first) => document.getElementById('find-count').textContent !== first", arg=first)
+    expect(page.locator("#find-count")).to_have_text(re.compile(r"^1 of \d+$"))  # still on the first
+    page.keyboard.press("Escape")  # closes the bar
+    page.keyboard.press("Escape")  # stops the reply
 
 
 def test_math_is_searched_by_what_you_read_not_by_its_tex(page, app_url):
