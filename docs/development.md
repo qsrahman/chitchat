@@ -28,6 +28,9 @@ uv run pytest -n 0 tests/ui/test_chat_ui.py -k retry
 
 `-m live` runs the tests that use real services (OpenAI or your local model, Brave, a real web page); they cost a little and are never part of the default run. Playwright needs `uv run playwright install chromium` once.
 
+## A flaky test that was a bug (the pane at the end)
+`test_a_reader_at_the_end_stays_there_when_the_message_box_grows` failed once in a busy full run (a 30 s timeout waiting for the end of the conversation) and passed on its own every time, also under CPU burners (12 of 12). It was not the test's timing but a race in `messages.js`: a reader at the end stays there through the resize observer, but the scroll handler decides "at the end" by the gap to the end, and a scroll event delivered after the message box had grown measured that gap against the smaller pane (100 px, past the 80 px that means "near") and took the reader to have scrolled up, so the observer left the pane where it was. The late event is the last scroll of a reply, which is how a slow machine makes it likely. The handler now ignores a scroll event while the pane's height differs from the one the observer last saw (the observer scrolls, then records it). `test_a_scroll_event_that_arrives_after_the_pane_shrank_...` sends that event in the same task as the growth, so the order is the one that failed, every time. It failed before the fix and passes after. No retry was added.
+
 ## Keeping things current
 | What | Command | Notes |
 |---|---|---|

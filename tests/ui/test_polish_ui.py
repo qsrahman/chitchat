@@ -212,6 +212,27 @@ def test_a_reader_at_the_end_stays_there_when_the_message_box_grows(page, app_ur
     expect(page.locator(".msg.assistant .actions button").first).to_be_in_viewport()  # not covered by the box
 
 
+def test_a_scroll_event_that_arrives_after_the_pane_shrank_does_not_unpin_a_reader_at_the_end(page, app_url):
+    """The last scroll of a reply can be delivered late, after the message box grew: measured against the smaller
+    pane the reader looks 100px from the end, "scrolled up", and the pane then stayed where it was. The event is
+    sent in the same task as the growth, before the pane's resize is noticed, which is the order that went wrong."""
+    page.set_viewport_size({"width": 1100, "height": 520})
+    open_app(page, app_url)
+    send(page, "long answer please")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=15000)
+    page.wait_for_function(SCROLLS)
+    assert gap_below(page) < 2
+    page.evaluate("""() => {
+        const box = document.getElementById('input')
+        box.value = 'one\\ntwo\\nthree\\nfour\\nfive\\nsix'
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+        document.getElementById('messages').dispatchEvent(new Event('scroll'))  // the late one
+    }""")
+    expect(page.locator(".composer")).to_have_class("composer is-multiline")
+    page.wait_for_function(AT_THE_END)
+    expect(page.locator(".msg.assistant .actions button").first).to_be_in_viewport()
+
+
 def test_a_reader_who_scrolled_up_is_left_where_they_are_when_the_box_grows(page, app_url):
     page.set_viewport_size({"width": 1100, "height": 520})
     open_app(page, app_url)

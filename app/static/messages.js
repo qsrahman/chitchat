@@ -20,7 +20,12 @@ const nearBottom = () =>
 export function scrollToBottom() {
   messagesEl.scrollTop = messagesEl.scrollHeight
 }
+// The pane's height as the resize observer last saw it. A scroll event delivered after the pane changed height (the
+// last scroll of a reply, arriving after the message box grew) would measure "how far from the end" against the new
+// height and call a reader at the end one who scrolled up: it waits for the observer, which scrolls and records.
+let paneHeight = messagesEl.clientHeight
 messagesEl.addEventListener('scroll', () => {
+  if (messagesEl.clientHeight !== paneHeight) return
   state.stick = nearBottom()
   $('jump').hidden = state.stick
 })
@@ -28,6 +33,7 @@ messagesEl.addEventListener('scroll', () => {
 // attachments (and the window resizes), which would otherwise cover the end of the last reply and its buttons.
 new ResizeObserver(() => {
   if (state.stick) scrollToBottom()
+  paneHeight = messagesEl.clientHeight
 }).observe(messagesEl)
 $('jump').onclick = () => {
   state.stick = true
