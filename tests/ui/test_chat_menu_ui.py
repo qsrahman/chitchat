@@ -116,6 +116,31 @@ def test_the_menu_stays_on_screen_on_a_phone(page, app_url):
     assert box["x"] >= 0 and box["x"] + box["width"] <= 375
 
 
+def test_an_open_menu_closes_when_the_window_is_resized_and_opens_again_in_place(page, app_url):
+    open_app(page, app_url)
+    saved_chat(page)
+    menu = page.get_by_role("menu", name="Chat actions")
+    chat_menu(page)  # opens it
+    expect(menu).to_be_visible()
+    page.set_viewport_size({"width": 375, "height": 700})
+    expect(menu).to_be_hidden()  # it was placed for the old window
+    page.get_by_role("button", name="Chat actions").click()
+    box = menu.bounding_box()
+    assert box["x"] >= 0 and box["x"] + box["width"] <= 375
+
+
+def test_the_tools_and_model_menus_close_on_a_resize_too(page, app_url):
+    open_app(page, app_url)
+    page.get_by_role("button", name="Tools", exact=True).click()
+    expect(page.locator("#tools-menu")).to_be_visible()
+    page.set_viewport_size({"width": 700, "height": 600})
+    expect(page.locator("#tools-menu")).to_be_hidden()
+    page.locator("#model-btn").click()
+    expect(page.locator("#model-menu")).to_be_visible()
+    page.set_viewport_size({"width": 900, "height": 600})
+    expect(page.locator("#model-menu")).to_be_hidden()
+
+
 def test_every_menu_row_is_a_44px_target_on_a_touch_screen(browser, app_url):
     context = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True)
     page = context.new_page()

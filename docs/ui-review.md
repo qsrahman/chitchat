@@ -52,3 +52,6 @@ Web search had a globe of its own in the composer, beside the **Tools** menu, an
 - **What it costs:** switching web search is two clicks instead of one. Settings, General, still starts new chats with web search on, which would have been the annoying case.
 
 Tests: `tests/ui/test_search_ui.py` (the choice is made in the menu, the label comes from the server, nothing in the composer when there are no tools, the menu fits on a phone) and `tests/ui/test_tools_ui.py` (every tool listed, the button shown or hidden with the list, the accent and the size).
+
+## Menus and a resized window
+The menus (chat, retry, tools, model) are popovers placed once, when they open, next to their button and kept inside the window. A window resized or a phone turned while one was open left it where it no longer fitted. `app.js` now closes every open popover on `resize`; opening it again places it for the new size. (A Playwright `set_viewport_size` is a resize, so the tests use it; `tests/ui/test_chat_menu_ui.py`.)

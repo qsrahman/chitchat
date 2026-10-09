@@ -80,6 +80,12 @@ bus.addEventListener('open', (e) =>
   openConversation(/** @type {CustomEvent} */ (e).detail),
 )
 $('new-chat').onclick = () => openConversation(null)
+// The menus are placed once, when they open (next to their button, kept inside the window): a resized window or a
+// turned phone would leave an open one where it no longer fits, so it closes and opens again in the right place.
+window.addEventListener('resize', () => {
+  for (const menu of document.querySelectorAll('[popover]:popover-open'))
+    /** @type {HTMLElement} */ (menu).hidePopover()
+})
 window.addEventListener('hashchange', () => {
   const id = location.hash.slice(1) || null
   if (id !== state.id) openConversation(id)
