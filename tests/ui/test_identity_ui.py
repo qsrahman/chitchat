@@ -3,7 +3,7 @@ from playwright.sync_api import expect
 
 from tests.ui.test_chat_ui import open_app, send
 
-TEAL = "rgb(15, 123, 108)"
+INK_BLUE = "rgb(45, 79, 135)"
 DANGER = "rgb(180, 35, 24)"
 TRANSPARENT = "rgba(0, 0, 0, 0)"
 
@@ -21,21 +21,21 @@ def wait_for_edge(page, color):
                   return e && getComputedStyle(e).borderLeftColor === c; }""", arg=color)
 
 
-def test_the_accent_is_teal_in_light_mode(page, app_url):
+def test_the_accent_is_ink_blue_in_light_mode(page, app_url):
     open_app(page, app_url)
-    assert send_color(page) == TEAL
+    assert send_color(page) == INK_BLUE
 
 
-def test_the_accent_is_a_lighter_teal_in_dark_mode(page, app_url):
+def test_the_accent_is_a_lighter_blue_in_dark_mode(page, app_url):
     page.emulate_media(color_scheme="dark")
     open_app(page, app_url)
-    assert send_color(page) == "rgb(95, 208, 188)"
+    assert send_color(page) == "rgb(147, 178, 238)"
 
 
 def test_the_reply_being_written_has_an_accent_edge_that_goes_when_it_is_done(page, app_url):
     open_app(page, app_url)
     send(page, "slow please")
-    wait_for_edge(page, TEAL)
+    wait_for_edge(page, INK_BLUE)
     expect(page.locator(".msg.assistant .body")).to_contain_text("word0")  # stopping before any text drops the reply
     page.keyboard.press("Escape")  # stop it
     wait_for_edge(page, TRANSPARENT)

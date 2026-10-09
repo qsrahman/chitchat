@@ -28,21 +28,23 @@ def test_the_thinking_select_moves_to_the_bottom_row_with_a_long_message(page, a
     assert abs(mode["y"] - send["y"]) < 8 and mode["x"] < send["x"]
 
 
-def test_the_greeting_is_plain_sans_text(page, app_url):
+def test_the_greeting_is_a_light_serif_heading(page, app_url):
     open_app(page, app_url)
     heading = page.get_by_role("heading", name="What are you working on?")
-    assert heading.evaluate("e => getComputedStyle(e).fontWeight") == "400"
+    assert heading.evaluate("e => getComputedStyle(e).fontWeight") == "300"
 
 
-def test_everything_uses_chatgpts_system_font_stack_including_replies(page, app_url):
+def test_replies_and_headings_are_serif_and_the_controls_are_sans(page, app_url):
     open_app(page, app_url)
     send(page, "hello")
     expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
-    for selector in ("body", "h1", "#input", ".msg.assistant .body", ".msg.user .body", "#send"):
+    for selector in ("h1", ".msg.assistant .body", "#title"):
         family = page.locator(selector).first.evaluate("e => getComputedStyle(e).fontFamily")
-        assert family.startswith('ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica'), (selector, family)
-        assert "Charter" not in family and "Georgia" not in family
+        assert family.startswith('"Iowan Old Style", Charter'), (selector, family)
+    for selector in ("body", "#input", ".msg.user .body", "#send"):
+        family = page.locator(selector).first.evaluate("e => getComputedStyle(e).fontFamily")
+        assert family.startswith('"Avenir Next", "Helvetica Neue"'), (selector, family)
 
 
 def test_the_model_menu_has_a_heading(page, app_url):

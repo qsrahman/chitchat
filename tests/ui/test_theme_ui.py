@@ -4,7 +4,7 @@ from playwright.sync_api import expect
 
 from tests.ui.test_chat_ui import open_app, open_prefs
 
-LIGHT, DARK = "rgb(252, 251, 250)", "rgb(27, 26, 25)"  # the page background (--surface)
+LIGHT, DARK = "rgb(236, 235, 229)", "rgb(19, 20, 23)"  # the page background (--bg, the desk behind the sheet)
 
 
 def appearance(page):
@@ -60,4 +60,4 @@ def test_a_dark_choice_on_a_light_system_gives_the_dark_color_scheme_and_shadows
     appearance(page).select_option("dark")
     assert page.evaluate("getComputedStyle(document.documentElement).colorScheme") == "dark"
     shadow = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--shadow-color').trim()")
-    assert shadow == "30 20% 2%"
+    assert shadow == "220 20% 2%"

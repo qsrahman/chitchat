@@ -1,56 +1,58 @@
 :root {
   color-scheme: light dark;
-  /* Warm graphite and paper, one deep teal accent. Light: paper page (--bg, also the sidebar), brighter sheet
-     (--surface) for the conversation. Dark: warm charcoal, never pure black. */
-  --bg: light-dark(#f3f1ee, #141312);
-  --surface: light-dark(#fcfbfa, #1b1a19);
+  /* Folio (design/mockups/folio.html): the conversation is a sheet of paper on a slightly darker desk (--bg, also
+     the sidebar). Answers are set in a serif, everything you operate in a quiet sans. One ink-blue accent. */
+  --bg: light-dark(#ecebe5, #131417);
+  --surface: light-dark(#fbfaf6, #1b1d22);
   --raised: light-dark(
     #ffffff,
-    #262422
-  ); /* the composer: lifted off the page */
-  --ink: light-dark(#201e1c, #ece9e5);
-  --muted: light-dark(#6a655f, #a39d96);
-  --line: light-dark(#e4e0da, #2f2c29);
-  --hover: light-dark(#eae6e0, #2a2724);
-  --accent: light-dark(#0f7b6c, #5fd0bc);
-  --on-accent: light-dark(#ffffff, #0f1412);
+    #23262c
+  ); /* the composer: lifted off the sheet */
+  --ink: light-dark(#1d1f24, #e9e8e3);
+  --muted: light-dark(#5c6068, #9b9ea6);
+  --line: light-dark(#dedcd3, #2d3038);
+  --hover: light-dark(#e3e1d9, #262930);
+  --accent: light-dark(#2d4f87, #93b2ee);
+  --accent-soft: light-dark(#e3e9f4, #26324a);
+  --on-accent: light-dark(#ffffff, #0f1420);
   --danger: light-dark(#b42318, #ff9087);
   --spark-1: var(
     --accent
   ); /* the send button's hover gradient: the accent, then three more hues */
-  --spark-2: light-dark(#3b5bdb, #8fa4ff);
+  --spark-2: light-dark(#0f7b6c, #5fd0bc);
   --spark-3: light-dark(#d6336c, #ff9bc2);
   --spark-4: light-dark(#e8801f, #ffc07a);
   --bubble: light-dark(
-    #ebe7e1,
-    #2a2724
-  ); /* sent messages and inline code: a step above the page */
-  --shadow-color: 30 10% 14%; /* Open Props' shadows take their hue from here: warm, to match */
+    #eceae2,
+    #262930
+  ); /* sent messages and inline code: a step above the sheet */
+  --shadow-color: 220 10% 14%; /* Open Props' shadows take their hue from here */
   --r-sm: var(--size-2); /* controls */
   --r-lg: var(--size-3); /* containers: menus, dialogs, code blocks, bubbles */
   --text-sm: 0.875rem; /* secondary text; --font-size-0 (.75rem) is for the smallest */
-  /* ChatGPT's own stack (read from chatgpt.com): no web font, the OS interface font: San Francisco on macOS and
-     iOS, Segoe UI on Windows */
   --sans:
-    ui-sans-serif, -apple-system, system-ui, 'Segoe UI', Helvetica,
-    'Apple Color Emoji', Arial, sans-serif, 'Segoe UI Emoji', 'Segoe UI Symbol';
+    'Avenir Next', 'Helvetica Neue', ui-sans-serif, system-ui, 'Segoe UI',
+    Helvetica, 'Apple Color Emoji', Arial, sans-serif, 'Segoe UI Emoji',
+    'Segoe UI Symbol';
+  /* the model's words and the chat title: OS fonts, no download */
+  --serif: 'Iowan Old Style', Charter, 'Palatino Linotype', Georgia, serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --col: 46rem;
   --measure: 62ch; /* the longest line of answer text; code, tables and math may run to the column */
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --shadow-color: 30 20% 2%;
+    --shadow-color: 220 20% 2%;
   }
 }
 /* The Appearance setting's choice (preferences.js) beats the system's; "system" sets no attribute. */
 :root[data-theme='light'] {
   color-scheme: light;
-  --shadow-color: 30 10% 14%;
+  --shadow-color: 220 10% 14%;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --shadow-color: 30 20% 2%;
+  --shadow-color: 220 20% 2%;
 }
 
 * {
@@ -72,7 +74,7 @@ body {
   height: 100dvh;
   display: grid;
   grid-template: minmax(0, 1fr) / 3.5rem minmax(0, 1fr);
-  background: var(--surface);
+  background: var(--bg);
   color: var(--ink);
   font: 15px/var(--font-lineheight-3) var(--sans);
   -webkit-font-smoothing: antialiased;
@@ -187,7 +189,6 @@ body.nav-open {
   overflow: hidden;
   padding: 8px;
   background: var(--bg);
-  border-right: 1px solid var(--line);
 }
 /* The edge you drag to change the width (nav.js). Only the open, wide sidebar has it. */
 #sidebar-resize {
@@ -221,7 +222,7 @@ body:not(.nav-open) #sidebar-resize {
   padding: 4px 4px 8px 10px;
 }
 .brand {
-  font-weight: var(--font-weight-7);
+  font: italic 600 1.35rem var(--serif);
   letter-spacing: -0.01em;
 }
 .side-item {
@@ -306,8 +307,9 @@ body:not(.nav-open) #sidebar-resize {
   background: var(--hover);
 }
 .conv:has([aria-current]) {
-  background: var(--hover);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+  font-weight: 600;
 }
 .conv a {
   flex: 1;
@@ -359,9 +361,14 @@ body:not(.nav-open) #sidebar-resize {
 /* main column */
 main {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template: auto minmax(0, 1fr) auto / minmax(0, 1fr);
   min-width: 0;
   position: relative;
+  margin: 10px 10px 10px 0;
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px var(--line);
+  overflow: hidden;
 }
 .topbar {
   display: flex;
@@ -369,15 +376,14 @@ main {
   gap: 8px;
   padding: 10px 16px;
   min-height: 52px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
 }
 #title {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--muted);
+  font: 600 1.05rem var(--serif);
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -601,9 +607,8 @@ a.menu-item {
 }
 #empty h1 {
   margin: 0;
-  font: var(--font-weight-4) var(--font-size-4)/var(--font-lineheight-2)
-    var(--sans);
-  letter-spacing: -0.01em;
+  font: 300 clamp(2rem, 4.6vw, 3rem) / 1.12 var(--serif);
+  letter-spacing: -0.015em;
   text-align: center;
   text-wrap: balance;
 }
@@ -707,7 +712,7 @@ main.is-started #recent {
   overflow-wrap: anywhere;
 }
 .msg.assistant .body {
-  font: 1rem/1.75 var(--sans);
+  font: 1.1rem/1.72 var(--serif);
   overflow-wrap: anywhere;
 }
 .msg.assistant .body :is(p, ul, ol, blockquote) {
@@ -958,7 +963,7 @@ main.is-started #recent {
 .hljs-attr,
 .hljs-attribute,
 .hljs-symbol {
-  color: light-dark(#a15c00, #f0b866);
+  color: light-dark(#8f5200, #f0b866);
 }
 .hljs-title,
 .hljs-section,
@@ -1170,7 +1175,7 @@ dialog[open]::backdrop {
   gap: 0 4px;
   padding: 8px;
   border: 1px solid var(--line);
-  border-radius: var(--size-6);
+  border-radius: 20px;
   background: var(--raised);
   /* Quiet in light, where Open Props' shadow-2 looked like a second outline next to the border */
   box-shadow:
@@ -1940,6 +1945,11 @@ dialog input[type='number'] {
   }
   #sidebar .nav-toggle {
     display: none;
+  }
+  main {
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
   #scrim {
     position: fixed;

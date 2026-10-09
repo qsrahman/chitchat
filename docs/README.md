@@ -16,6 +16,7 @@ One file per phase or change, so the history of a decision sits next to the code
 |---|---|
 | [settings-dialog.md](settings-dialog.md) | Settings: General (appearance, defaults for new chats), Personalization, Data controls, Server |
 | [ui-mockups.md](ui-mockups.md) | five mock UIs drawn from research on popular chatbots, to choose from (`design/mockups/`, not part of the app) |
+| [folio.md](folio.md) | the chosen look applied to the app: paper sheet on a desk, serif replies, ink-blue accent |
 | [ui-review.md](ui-review.md) | the ⋯ chat menu, "Instructions for this chat", recent chats, the resizable sidebar, and the two review passes behind them |
 | [backup.md](backup.md) | export and import, what travels (chats, versions, files, instructions, defaults) and what never overwrites |
 | [storage.md](storage.md) | sizes, deleting unused files and old archived chats |
