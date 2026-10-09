@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cite · ChitChat mock</title>
+<style>
+/* CITE: an answer engine. Each question is a titled section of a report: the steps taken, the sources found, then the
+   answer with domain chips on every claim, and what to ask next. Tools are the scope chips beside the box. */
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#f8f7f2, #171717);
+  --side: light-dark(#f1efe8, #1c1c1c);
+  --card: light-dark(#ffffff, #212121);
+  --ink: light-dark(#1b1d1f, #ececec);
+  --muted: light-dark(#6a6f73, #9b9b9b);
+  --line: light-dark(#e3e0d6, #2c2c2c);
+  --chip: light-dark(#eceae1, #292929);
+  --accent: light-dark(#157f80, #46c4bf);
+  --accent-soft: light-dark(#dcefec, #17393a);
+  --sans: "Inter", "Avenir Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: 15rem minmax(0, 1fr); background: var(--bg); color: var(--ink); font: 15.5px/1.6 var(--sans); }
+body.side-closed { grid-template-columns: 3.5rem minmax(0, 1fr); }
+body[data-view="new"] .v-chat, body[data-view="chat"] .v-new { display: none !important; }
+body[data-tab="sources"] .t-answer, body:not([data-tab="sources"]) .t-sources { display: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+.ic { display: inline-grid; place-items: center; }
+.ic svg { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ib { width: 32px; height: 32px; border-radius: 8px; display: inline-grid; place-items: center; color: var(--muted); }
+.ib:hover { background: var(--chip); color: var(--ink); }
+
+aside { background: var(--side); border-right: 1px solid var(--line); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.sh { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 10px; }
+.logo { font: 700 17px var(--sans); letter-spacing: -0.02em; display: flex; gap: 8px; align-items: center; }
+.logo i { width: 22px; height: 22px; border-radius: 6px; background: var(--accent); display: inline-block; position: relative; }
+.logo i::after { content: ""; position: absolute; inset: 6px; border: 2px solid var(--bg); border-radius: 50%; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; color: inherit; text-decoration: none; }
+.nav:hover { background: var(--chip); }
+.nav.new { font-weight: 600; }
+.nav.new i { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--bg); }
+aside h3 { display: flex; justify-content: space-between; align-items: center; font: 600 12px var(--sans); color: var(--muted); margin: 18px 10px 4px; }
+.sess { display: block; padding: 6px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess:hover { background: var(--chip); color: var(--ink); }
+.sess[aria-current] { color: var(--ink); background: var(--chip); }
+.side-foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 8px; }
+body.side-closed aside :is(.logo b, .nav span, h3, .sess, .nav:not(.new) + .nav) { display: none; }
+
+main { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.top { display: flex; align-items: center; gap: 4px; padding: 10px 18px; border-bottom: 1px solid transparent; }
+.crumb { font-size: 14px; color: var(--muted); margin-left: 6px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scroll { flex: 1; overflow-y: auto; padding-bottom: 28px; }
+.wrap { width: min(46rem, 100% - 40px); margin: 0 auto; }
+
+/* thread */
+.q { margin-top: 18px; padding-bottom: 6px; }
+.q h1 { font: 500 30px/1.25 var(--sans); letter-spacing: -0.02em; margin: 0 0 14px; }
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.tab { padding: 8px 0 10px; color: var(--muted); font-size: 14.5px; display: inline-flex; gap: 7px; align-items: center; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.on { color: var(--ink); border-color: var(--accent); }
+.tab em { font-style: normal; font-size: 12px; background: var(--chip); border-radius: 999px; padding: 0 7px; }
+.steps { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+.steps .ok { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: inline-grid; place-items: center; }
+.steps .ok .ic { font-size: 12px; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.sc { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; color: inherit; text-decoration: none; font-size: 13px; line-height: 1.4; }
+.sc:hover { border-color: var(--accent); }
+.sc .h { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+.sc .h i, .row i.fav { width: 14px; height: 14px; border-radius: 4px; display: inline-block; flex: none; }
+.sc b { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ans p { margin: 0 0 14px; }
+.ans ul { margin: 0 0 14px; padding-left: 20px; }
+.ans li { margin-bottom: 6px; }
+.ans code { font: 0.87em var(--mono); background: var(--chip); padding: 1px 6px; border-radius: 6px; }
+.dc { display: inline-flex; align-items: center; gap: 4px; vertical-align: 1px; margin-left: 4px; padding: 0 8px; height: 20px; border-radius: 999px; background: var(--chip); color: var(--muted); font-size: 11.5px; text-decoration: none; white-space: nowrap; }
+.dc:hover { background: var(--accent-soft); color: var(--accent); }
+.code { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); margin: 4px 0 16px; }
+.code .h { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px 6px 14px; background: var(--chip); color: var(--muted); font-size: 12.5px; }
+.code pre { margin: 0; padding: 12px 14px; font: 13px/1.65 var(--mono); overflow-x: auto; }
+.k { color: light-dark(#8a3fd0, #c9a2f5); } .s { color: light-dark(#0f7f4a, #8fd6a5); } .c { color: var(--muted); } .f { color: light-dark(#1d62d6, #8cb6f7); }
+.bar { display: flex; align-items: center; gap: 4px; padding: 8px 0 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.bar .favs { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px; border-radius: 999px; background: var(--chip); color: var(--ink); margin-right: 6px; }
+.bar .favs span.st { display: inline-flex; } .bar .favs i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--chip); margin-left: -5px; }
+.bar .favs i:first-child { margin-left: 0; }
+.bar .sp { flex: 1; }
+.bar .ver { display: inline-flex; align-items: center; margin: 0 6px; font-variant-numeric: tabular-nums; }
+.related h2 { font: 600 14px var(--sans); display: flex; gap: 8px; align-items: center; margin: 18px 0 4px; }
+.related a { display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
+.related a:hover { color: var(--accent); }
+.related a .ic { color: var(--accent); }
+.working { display: grid; gap: 6px; margin-top: 4px; color: var(--muted); font-size: 14px; }
+.working div { display: flex; align-items: center; gap: 10px; }
+.spin { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.caret { display: inline-block; width: 7px; height: 1em; background: var(--accent); vertical-align: -2px; margin-left: 2px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.rows .row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.rows .row i.fav { margin-top: 5px; width: 18px; height: 18px; border-radius: 5px; }
+.rows .row a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.rows .row small { display: block; color: var(--muted); font-size: 12.5px; }
+.rows .row p { margin: 3px 0 0; color: var(--muted); font-size: 14px; }
+
+/* the box */
+.dock { background: linear-gradient(transparent, var(--bg) 24%); padding: 14px 0 16px; }
+.box { width: min(46rem, 100% - 40px); margin: 0 auto; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px 12px 8px 16px; box-shadow: 0 6px 24px -14px #0006; position: relative; }
+.box:focus-within { border-color: var(--accent); }
+.box textarea { width: 100%; border: 0; outline: 0; resize: none; background: none; color: inherit; font: 16px/1.5 var(--sans); min-height: 26px; padding: 0; }
+.box .row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.scope { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--muted); }
+.scope.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); background: var(--accent-soft); }
+.scope:hover { color: var(--ink); }
+.scope.on:hover { color: var(--accent); }
+.go { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--bg); display: inline-grid; place-items: center; }
+.mdl { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+.mdl:hover { background: var(--chip); color: var(--ink); }
+
+/* new */
+.hero { width: min(44rem, 100% - 40px); margin: 0 auto; }
+.hero small { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+.hero h1 { font: 500 34px/1.2 var(--sans); letter-spacing: -0.02em; margin: 0 0 18px; }
+.quick { width: min(44rem, 100% - 40px); margin: 14px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qc { border-radius: 14px; padding: 14px 16px; background: var(--accent-soft); color: inherit; text-decoration: none; font-size: 14px; }
+.qc b { display: flex; gap: 8px; align-items: center; color: var(--accent); margin-bottom: 2px; }
+.qc:nth-child(2) { background: var(--chip); } .qc:nth-child(2) b { color: var(--ink); }
+.latest { width: min(44rem, 100% - 40px); margin: 22px auto 0; }
+.latest h2 { font: 600 13px var(--sans); color: var(--muted); margin: 0 0 4px; }
+.latest a { display: flex; justify-content: space-between; padding: 9px 2px; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
+.latest a span { color: var(--muted); font-size: 13px; }
+body[data-view="new"] main { justify-content: center; }
+body[data-view="new"] .top { position: absolute; inset: 0 0 auto; }
+body[data-view="new"] .dock { background: none; padding-top: 0; }
+
+.menu { position: absolute; z-index: 6; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 44px -16px #0007; padding: 6px; width: 19rem; }
+body:not([data-open="tools"]) #m-tools, body:not([data-open="model"]) #m-model, body:not([data-open="menu"]) #m-menu { display: none; }
+#m-tools { left: 8px; bottom: calc(100% + 8px); } #m-model { right: 8px; bottom: calc(100% + 8px); width: 15rem; }
+body[data-view="new"] #m-tools, body[data-view="new"] #m-model { bottom: auto; top: calc(100% + 8px); }
+#m-menu { right: 16px; top: 48px; width: 16rem; }
+.mi { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; width: 100%; text-align: left; font-size: 14px; }
+.mi:hover { background: var(--chip); } .mi .g { flex: 1; } .mi small { color: var(--muted); font-size: 12px; display: block; }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 2px; }
+.ck { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--muted); display: inline-grid; place-items: center; flex: none; }
+.ck.on { background: var(--accent); border-color: var(--accent); color: var(--bg); } .ck .ic { font-size: 11px; } .ck:not(.on) .ic { display: none; }
+.red { color: light-dark(#b3261e, #ff9a92); }
+@media (max-width: 860px) { body, body.side-closed { grid-template-columns: 0 minmax(0, 1fr); } aside { display: none; } .cards { grid-template-columns: 1fr; } .quick { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<aside>
+  <div class="sh"><span class="logo"><i></i><b>chitchat</b></span><button class="ib" data-toggle="side" aria-label="Collapse"><i data-i="sidebar"></i></button></div>
+  <a class="nav new" href="#" data-view-to="new"><i data-i="plus"></i><span>New thread</span></a>
+  <a class="nav" href="#"><i data-i="search"></i><span>Search threads</span></a>
+  <h3>Pinned</h3>
+  <a class="sess" href="#">Weekly planning</a>
+  <h3>Recent</h3>
+  <a class="sess" href="#" aria-current="page" data-view-to="chat">Python 3.14 template strings</a>
+  <a class="sess" href="#">Postgres backup plan</a>
+  <a class="sess" href="#">A weekend in Lisbon</a>
+  <a class="sess" href="#">Rust lifetimes, again</a>
+  <a class="sess" href="#">Cover letter, second draft</a>
+  <div class="side-foot">
+    <a class="nav" href="#"><i data-i="archive"></i><span>Archived</span></a>
+    <a class="nav" href="#"><i data-i="gear"></i><span>Settings</span></a>
+  </div>
+</aside>
+
+<main>
+  <div class="top">
+    <span class="crumb v-chat">Python 3.14 template strings</span><span class="crumb v-new"></span>
+    <button class="ib" aria-label="Share"><i data-i="share"></i></button>
+    <button class="ib" data-open="menu" aria-label="Chat actions"><i data-i="more"></i></button>
+  </div>
+
+  <div class="scroll v-chat">
+    <div class="wrap">
+      <section class="q">
+        <h1>What's new in Python 3.14, and what do template strings look like?</h1>
+        <div class="tabs">
+          <button class="tab on" onclick="document.body.dataset.tab='answer'"><i data-i="spark"></i> Answer</button>
+          <button class="tab" onclick="document.body.dataset.tab='sources'"><i data-i="link"></i> Sources <em>3</em></button>
+          <button class="tab"><i data-i="clock"></i> Steps <em>2</em></button>
+        </div>
+
+        <div class="t-answer">
+          <div class="steps"><span class="ok"><i data-i="check"></i></span> Completed 2 steps · searched the web, thought for 4 s <i data-i="down"></i></div>
+          <div class="cards">
+            <a class="sc" href="#"><span class="h"><i style="background:#3b7ddd"></i>docs.python.org</span><b>What's new in Python 3.14</b></a>
+            <a class="sc" href="#"><span class="h"><i style="background:#c25b3a"></i>peps.python.org</span><b>PEP 750 – Template Strings</b></a>
+            <a class="sc" href="#"><span class="h"><i style="background:#2f9e74"></i>realpython.com</span><b>Python 3.14: Cool New Features</b></a>
+          </div>
+          <div class="ans">
+            <p>Python 3.14 is mostly about <b>template strings</b>, a free-threaded build that is no longer experimental, and lazily evaluated annotations <a class="dc" href="#">python.org <span>+2</span></a></p>
+            <ul>
+              <li><b>t-strings</b> look like f-strings but give you a <code>Template</code> object, not a <code>str</code> <a class="dc" href="#">peps.python.org</a></li>
+              <li><b>Free threading</b> is supported rather than a build-time experiment <a class="dc" href="#">realpython.com</a></li>
+              <li><b>Deferred annotations</b> stop forward references from needing quotes.</li>
+            </ul>
+            <div class="code"><div class="h"><span>python</span><button class="ib" style="width:26px;height:26px"><i data-i="copy"></i></button></div>
+<pre><span class="k">name</span> = <span class="s">"Que"</span>
+page = <span class="f">t</span><span class="s">"&lt;h1&gt;Hello {name}&lt;/h1&gt;"</span>
+<span class="c"># page is a Template, not a str: you choose how to render it</span></pre></div>
+          </div>
+          <div class="bar">
+            <span class="favs"><span class="st"><i style="background:#3b7ddd"></i><i style="background:#c25b3a"></i><i style="background:#2f9e74"></i></span> 3 sources</span>
+            <span class="sp"></span>
+            <span>gpt-5.5 · 1.2K in · 567 out</span>
+            <span class="ver"><button class="ib" style="width:24px"><i data-i="left"></i></button>2/3<button class="ib" style="width:24px"><i data-i="right"></i></button></span>
+            <button class="ib" aria-label="Rewrite"><i data-i="refresh"></i></button>
+            <button class="ib" aria-label="Copy"><i data-i="copy"></i></button>
+            <button class="ib" aria-label="Wrong sources"><i data-i="thumbdown"></i></button>
+          </div>
+          <div class="related">
+            <h2><i data-i="chat"></i> Ask next</h2>
+            <a href="#">Make the t-string example escape HTML <i data-i="plus"></i></a>
+            <a href="#">How do t-strings differ from f-strings at runtime? <i data-i="plus"></i></a>
+            <a href="#">Is the free-threaded build ready for production? <i data-i="plus"></i></a>
+          </div>
+        </div>
+
+        <div class="t-sources rows">
+          <div class="row"><i class="fav" style="background:#3b7ddd"></i><div><small>docs.python.org</small><a href="#">What's new in Python 3.14</a><p>Summary of the release highlights: template strings, free threading, deferred annotations.</p></div></div>
+          <div class="row"><i class="fav" style="background:#c25b3a"></i><div><small>peps.python.org</small><a href="#">PEP 750 – Template Strings</a><p>A new string literal prefix, t, producing a Template that keeps the strings and the interpolations apart.</p></div></div>
+          <div class="row"><i class="fav" style="background:#2f9e74"></i><div><small>realpython.com</small><a href="#">Python 3.14: Cool New Features</a><p>A walk through the changes with examples and notes on upgrading.</p></div></div>
+        </div>
+      </section>
+
+      <section class="q" style="margin-top:30px;padding-top:22px;border-top:1px solid var(--line)">
+        <h1>Can you make it escape HTML?</h1>
+        <div class="working">
+          <div><span class="ok steps" style="margin:0"><span class="ok"><i data-i="check"></i></span></span> Reading the earlier answer</div>
+          <div><span class="spin"></span> Writing the answer<span class="caret"></span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="v-new">
+    <div class="hero"><small>Ask</small><h1>What do you want to know?</h1></div>
+  </div>
+
+  <div class="dock">
+    <div class="box">
+      <textarea rows="1" placeholder="Ask a follow-up…"></textarea>
+      <div class="row">
+        <button class="ib" aria-label="Attach"><i data-i="plus"></i></button>
+        <button class="scope on" data-open="tools"><i data-i="globe"></i> Web</button>
+        <button class="scope on"><i data-i="link"></i> Pages</button>
+        <button class="scope on"><i data-i="chat"></i> Chats</button>
+        <button class="scope on"><i data-i="book"></i> Files</button>
+        <button class="scope" data-open="tools" aria-label="All tools"><i data-i="wrench"></i> 6</button>
+        <span style="flex:1"></span>
+        <button class="mdl" data-open="model">gpt-5.5 <i data-i="down"></i></button>
+        <button class="go" aria-label="Send"><i data-i="send"></i></button>
+      </div>
+      <div class="menu" id="m-tools" data-keep-open>
+        <button class="mi"><span class="ck on"><i data-i="check"></i></span><span class="g">Calculator<small>Exact arithmetic</small></span></button>
+        <button class="mi"><span class="ck on"><i data-i="check"></i></span><span class="g">Search chats<small>Past conversations</small></span></button>
+        <button class="mi"><span class="ck on"><i data-i="check"></i></span><span class="g">Read web pages<small>Open a link from a result</small></span></button>
+        <button class="mi"><span class="ck on"><i data-i="check"></i></span><span class="g">Date and time</span></button>
+        <button class="mi"><span class="ck on"><i data-i="check"></i></span><span class="g">Read chats · Read attached files</span></button>
+        <hr>
+        <button class="mi"><span class="ck"><i data-i="check"></i></span><span class="g">Web search<small>Costs a little per search</small></span></button>
+      </div>
+      <div class="menu" id="m-model" data-keep-open>
+        <button class="mi"><i data-i="check"></i><span class="g">gpt-5.5</span><small>default</small></button>
+        <button class="mi"><i style="width:1.2em"></i><span class="g">gpt-5-mini</span><small>reasoning</small></button>
+        <button class="mi"><i style="width:1.2em"></i><span class="g">gpt-oss:120b</span></button>
+      </div>
+    </div>
+    <div class="quick v-new">
+      <a class="qc" href="#"><b><i data-i="search"></i> Search the web</b>Answers with sources, in a thread you can come back to.</a>
+      <a class="qc" href="#"><b><i data-i="book"></i> Work with a file</b>Attach a PDF or notes and ask about them.</a>
+    </div>
+    <div class="latest v-new">
+      <h2>Latest threads</h2>
+      <a href="#" data-view-to="chat">Python 3.14 template strings <span>12 min ago</span></a>
+      <a href="#">Postgres backup plan <span>Today</span></a>
+      <a href="#">A weekend in Lisbon <span>Today</span></a>
+    </div>
+  </div>
+
+  <div class="menu" id="m-menu" data-keep-open>
+    <button class="mi"><i data-i="sliders"></i> Instructions for this thread…</button>
+    <hr>
+    <button class="mi"><i data-i="pin"></i> Pin</button>
+    <button class="mi"><i data-i="pencil"></i> Rename…</button>
+    <button class="mi"><i data-i="download"></i> Download as Markdown</button>
+    <button class="mi"><i data-i="archive"></i> Archive</button>
+    <hr>
+    <button class="mi red"><i data-i="trash"></i> Delete…</button>
+  </div>
+</main>
+<script src="mock.js"></script>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Folio · ChitChat mock</title>
+<style>
+/* FOLIO: an editorial reading room. Serif for what the model writes, a quiet sans for everything you operate. The
+   page is a sheet of paper on a slightly darker desk; sources live in a side panel you open when you want to check. */
+:root {
+  color-scheme: light dark;
+  --desk: light-dark(#ecebe5, #131417);
+  --sheet: light-dark(#fbfaf6, #1b1d22);
+  --raised: light-dark(#ffffff, #23262c);
+  --ink: light-dark(#1d1f24, #e9e8e3);
+  --muted: light-dark(#666a73, #9b9ea6);
+  --line: light-dark(#dedcd3, #2d3038);
+  --tint: light-dark(#eceae2, #262930);
+  --accent: light-dark(#2d4f87, #93b2ee);
+  --accent-soft: light-dark(#e3e9f4, #26324a);
+  --serif: "Iowan Old Style", "Charter", "Palatino Linotype", Georgia, serif;
+  --sans: "Avenir Next", "Helvetica Neue", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: 15.5rem minmax(0, 1fr) 0; background: var(--desk); color: var(--ink); font: 15px/1.5 var(--sans); }
+body.sidebar-closed { grid-template-columns: 0 minmax(0, 1fr) 0; }
+body.panel-open { grid-template-columns: 15.5rem minmax(0, 1fr) 21rem; }
+body.sidebar-closed.panel-open { grid-template-columns: 0 minmax(0, 1fr) 21rem; }
+body[data-view="new"] .v-chat, body[data-view="chat"] .v-new { display: none !important; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+.ic { display: inline-grid; place-items: center; }
+.ic svg { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.btn-i { width: 34px; height: 34px; border-radius: 10px; display: inline-grid; place-items: center; color: var(--muted); }
+.btn-i:hover { background: var(--tint); color: var(--ink); }
+
+/* sidebar */
+aside { overflow: hidden; padding: 18px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.brand { font: italic 600 22px var(--serif); padding: 0 8px 12px; letter-spacing: -0.01em; }
+.new { text-decoration: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; color: var(--accent); font-weight: 600; }
+.new:hover { background: var(--accent-soft); }
+aside h3 { font: 600 12px var(--sans); color: var(--muted); margin: 16px 10px 4px; }
+.conv { display: block; padding: 7px 10px; border-radius: 9px; color: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14.5px; }
+.conv:hover { background: var(--tint); }
+.conv[aria-current] { background: var(--sheet); box-shadow: 0 0 0 1px var(--line); font-weight: 600; }
+.foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 2px; }
+.foot a { display: flex; gap: 10px; align-items: center; padding: 7px 10px; color: var(--muted); text-decoration: none; border-radius: 9px; }
+.foot a:hover { background: var(--tint); color: var(--ink); }
+
+/* the sheet */
+main { position: relative; display: flex; flex-direction: column; min-width: 0; margin: 10px 0; background: var(--sheet); border-radius: 18px 0 0 18px; box-shadow: 0 0 0 1px var(--line); overflow: hidden; }
+body.sidebar-closed main { border-radius: 0 0 0 0; margin: 0; }
+header { display: flex; align-items: center; gap: 6px; padding: 10px 14px; min-height: 52px; }
+.title { font: 600 17px var(--serif); margin-left: 6px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srcs { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.srcs:hover { color: var(--ink); background: var(--tint); }
+.dots { display: inline-flex; }
+.dots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--sheet); margin-left: -6px; font: 700 9px/14px var(--sans); text-align: center; color: #fff; font-style: normal; }
+.dots i:first-child { margin-left: 0; }
+.scroll { flex: 1; overflow-y: auto; padding: 8px 0 24px; }
+.col { width: min(43rem, 100% - 40px); margin: 0 auto; }
+
+/* messages */
+.me { display: flex; justify-content: flex-end; margin: 26px 0 22px; }
+.me p { margin: 0; max-width: 82%; background: var(--tint); padding: 11px 16px; border-radius: 16px 16px 4px 16px; white-space: pre-wrap; }
+.note { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13.5px; color: var(--muted); }
+.note .ic { font-size: 14px; }
+.note b { font-weight: 500; color: var(--ink); }
+.prose { font: 17.5px/1.72 var(--serif); }
+.prose p { margin: 0 0 14px; }
+.prose ul { margin: 0 0 14px; padding-left: 22px; }
+.prose li { margin-bottom: 6px; }
+.prose code { font: 0.86em var(--mono); background: var(--tint); padding: 1px 6px; border-radius: 6px; }
+.cite { display: inline-block; vertical-align: 2px; margin-left: 3px; padding: 0 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font: 600 11.5px/18px var(--sans); text-decoration: none; }
+.code { margin: 6px 0 16px; border-radius: 12px; background: light-dark(#14161a, #121317); color: #e8e6e0; overflow: hidden; font: 13.5px/1.6 var(--mono); }
+.code header { min-height: 0; padding: 7px 12px 7px 16px; background: #00000026; color: #9a9ca4; font: 12px var(--sans); justify-content: space-between; }
+.code pre { margin: 0; padding: 14px 16px; overflow-x: auto; }
+.k { color: #c8a6f0; } .s { color: #a6d49a; } .c { color: #7d8390; } .f { color: #8fb8f2; }
+.actions { display: flex; align-items: center; gap: 2px; margin: 4px 0 28px -8px; color: var(--muted); font-size: 12.5px; }
+.vers { display: inline-flex; align-items: center; gap: 2px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.meta { margin-left: 10px; font-family: var(--sans); }
+.caret { display: inline-block; width: 8px; height: 1.05em; background: var(--accent); vertical-align: -3px; margin-left: 2px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* composer */
+.composer-wrap { padding: 0 0 18px; position: relative; }
+.composer { position: relative; width: min(43rem, 100% - 40px); margin: 0 auto; background: var(--raised); border-radius: 20px; box-shadow: 0 0 0 1px var(--line), 0 10px 30px -12px #0003; padding: 14px 14px 10px 18px; }
+.composer textarea { width: 100%; border: 0; outline: 0; resize: none; background: none; color: inherit; font: 16px/1.5 var(--sans); min-height: 28px; padding: 0; }
+.composer .row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; color: var(--muted); }
+.chip:hover { background: var(--tint); color: var(--ink); }
+.chip.on { color: var(--accent); background: var(--accent-soft); }
+.spacer { flex: 1; }
+.send { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--sheet); display: inline-grid; place-items: center; }
+.fine { text-align: center; font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* new chat */
+.hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding-bottom: 6vh; }
+.hero h1 { font: 300 clamp(34px, 4.6vw, 50px)/1.12 var(--serif); letter-spacing: -0.015em; text-align: center; margin: 0 0 26px; }
+.hero h1 em { color: var(--accent); }
+.recent { width: min(43rem, 100% - 40px); margin: 22px auto 0; }
+.recent h2 { font: 600 12px var(--sans); color: var(--muted); margin: 0 0 6px 14px; }
+.recent a { display: flex; justify-content: space-between; gap: 16px; padding: 9px 14px; border-radius: 10px; color: inherit; text-decoration: none; font: 16px var(--serif); }
+.recent a:hover { background: var(--tint); }
+.recent a span { color: var(--muted); font: 13px var(--sans); }
+
+/* sources panel */
+.panel { overflow: hidden; padding: 0; min-width: 0; }
+.panel > div { padding: 12px 16px; width: 21rem; }
+.panel h2 { font: 600 17px var(--serif); margin: 8px 0 14px; display: flex; justify-content: space-between; align-items: center; }
+.card { display: block; padding: 14px; margin-bottom: 10px; background: var(--sheet); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); color: inherit; text-decoration: none; }
+.card:hover { box-shadow: 0 0 0 1px var(--accent); }
+.card .host { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.card .host i { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+.card strong { display: block; font: 600 16px/1.3 var(--serif); margin: 8px 0 4px; }
+.card p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+/* menus */
+.menu { position: absolute; z-index: 5; background: var(--raised); border-radius: 14px; box-shadow: 0 0 0 1px var(--line), 0 18px 40px -12px #0005; padding: 6px; min-width: 15rem; }
+body:not([data-open="tools"]) #m-tools, body:not([data-open="model"]) #m-model, body:not([data-open="menu"]) #m-menu { display: none; }
+#m-tools { left: 8px; bottom: calc(100% + 8px); width: 20rem; }
+#m-model { right: 8px; bottom: calc(100% + 8px); width: 17rem; }
+body[data-view="new"] #m-tools, body[data-view="new"] #m-model { bottom: auto; top: calc(100% + 8px); }
+#m-menu { right: 14px; top: 50px; }
+.menu .it { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; width: 100%; text-align: left; }
+.menu .it:hover { background: var(--tint); }
+.menu .it small { display: block; color: var(--muted); font-size: 12px; }
+.menu .it .grow { flex: 1; }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
+.menu .danger { color: light-dark(#b3261e, #ff9a92); }
+.sw { width: 30px; height: 18px; border-radius: 9px; background: var(--line); position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+.sw.on { background: var(--accent); } .sw.on::after { left: 14px; }
+/* a new chat is one group in the middle of the sheet */
+body[data-view="new"] main { justify-content: center; }
+body[data-view="new"] main > header { position: absolute; inset: 0 0 auto; }
+body[data-view="new"] .hero { flex: none; padding: 0; }
+@media (max-width: 900px) { body, body.panel-open { grid-template-columns: 0 minmax(0, 1fr) 0; } main { margin: 0; border-radius: 0; } .srcs span:not(.dots) { display: none; } }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand">ChitChat</div>
+  <a class="new" href="#" data-view-to="new"><i data-i="pencil"></i> New chat</a>
+  <h3>Pinned</h3>
+  <a class="conv" href="#">Weekly planning</a>
+  <h3>Today</h3>
+  <a class="conv" href="#" aria-current="page" data-view-to="chat">Python 3.14 template strings</a>
+  <a class="conv" href="#">Postgres backup plan</a>
+  <a class="conv" href="#">A weekend in Lisbon</a>
+  <h3>Yesterday</h3>
+  <a class="conv" href="#">Rust lifetimes, again</a>
+  <a class="conv" href="#">Cover letter, second draft</a>
+  <div class="foot">
+    <a href="#"><i data-i="archive"></i> Archived chats</a>
+    <a href="#" data-open="settings"><i data-i="gear"></i> Settings</a>
+  </div>
+</aside>
+
+<main>
+  <header>
+    <button class="btn-i" data-toggle="sidebar" aria-label="Toggle sidebar"><i data-i="sidebar"></i></button>
+    <div class="title v-chat">Python 3.14 template strings</div>
+    <div class="title v-new" style="font-weight:400;color:var(--muted)">New chat</div>
+    <button class="srcs v-chat" data-toggle="panel"><span class="dots"><i style="background:#3b7ddd">p</i><i style="background:#c25b3a">P</i><i style="background:#2f9e74">R</i></span><span>3 sources</span></button>
+    <button class="btn-i" data-open="menu" aria-label="Chat actions"><i data-i="more"></i></button>
+  </header>
+
+  <!-- ===== a conversation ===== -->
+  <div class="scroll v-chat">
+    <div class="col">
+      <div class="me"><p>What's new in Python 3.14? Show me a tiny example of the new template strings.</p></div>
+
+      <div class="note"><i data-i="clock"></i> <span>Thought for 4 s</span> <i data-i="down"></i></div>
+      <div class="note"><i data-i="globe"></i> <span>Searched the web for <b>“Python 3.14 release notes”</b> · 3 results</span> <i data-i="down"></i></div>
+
+      <div class="prose">
+        <p>Python 3.14 is mostly about three things: <b>template strings</b>, a free-threaded build that is no longer experimental, and annotations that are evaluated lazily<a class="cite" href="#" data-toggle="panel">1</a>.</p>
+        <ul>
+          <li><b>t-strings</b> (PEP 750) look like f-strings but give you a <code>Template</code> object, not a <code>str</code><a class="cite" href="#" data-toggle="panel">2</a>.</li>
+          <li><b>Free threading</b> is supported rather than a build-time experiment<a class="cite" href="#" data-toggle="panel">3</a>.</li>
+          <li><b>Deferred annotations</b> stop forward references from needing quotes.</li>
+        </ul>
+        <p>Here is the smallest useful example:</p>
+        <div class="code"><header><span>python</span><button class="btn-i" style="width:26px;height:26px;color:#9a9ca4"><i data-i="copy"></i></button></header>
+<pre><span class="k">name</span> = <span class="s">"Que"</span>
+page = <span class="f">t</span><span class="s">"&lt;h1&gt;Hello {name}&lt;/h1&gt;"</span>
+<span class="c"># page is a Template, not a str: you choose how to render it</span></pre></div>
+      </div>
+      <div class="actions">
+        <button class="btn-i" aria-label="Copy"><i data-i="copy"></i></button>
+        <button class="btn-i" aria-label="Regenerate"><i data-i="refresh"></i></button>
+        <button class="btn-i" aria-label="Try another model"><i data-i="down"></i></button>
+        <span class="vers"><button class="btn-i" style="width:26px"><i data-i="left"></i></button>2 / 3<button class="btn-i" style="width:26px"><i data-i="right"></i></button></span>
+        <span class="meta">gpt-5.5 · 1.2K in · 567 out</span>
+      </div>
+
+      <div class="me"><p>Can you make it escape HTML?</p></div>
+      <div class="prose"><p>Sure. A small renderer that escapes every interpolation, so <code>{name}</code> can never inject markup<span class="caret"></span></p></div>
+    </div>
+  </div>
+
+  <!-- ===== a new chat ===== -->
+  <div class="hero v-new">
+    <h1>Good afternoon, <em>Que</em>.</h1>
+  </div>
+
+  <div class="composer-wrap">
+    <div class="composer">
+      <textarea rows="1" placeholder="Ask anything"></textarea>
+      <div class="row">
+        <button class="btn-i" aria-label="Attach" style="width:30px;height:30px"><i data-i="plus"></i></button>
+        <button class="chip on" data-open="tools"><i data-i="wrench"></i> Tools · 6</button>
+        <button class="chip"><i data-i="globe"></i> Search</button>
+        <span class="spacer"></span>
+        <button class="chip" data-open="model">gpt-5.5 <i data-i="down"></i></button>
+        <button class="send" aria-label="Send"><i data-i="send"></i></button>
+      </div>
+    <div class="menu" id="m-tools" data-keep-open>
+      <button class="it"><i data-i="calc"></i><span class="grow">Calculator<small>Exact arithmetic</small></span><span class="sw on"></span></button>
+      <button class="it"><i data-i="chat"></i><span class="grow">Search chats<small>Look in your past conversations</small></span><span class="sw on"></span></button>
+      <button class="it"><i data-i="link"></i><span class="grow">Read web pages<small>Open a link from a result</small></span><span class="sw on"></span></button>
+      <button class="it"><i data-i="clock"></i><span class="grow">Date and time<small>Any timezone, days until</small></span><span class="sw on"></span></button>
+      <button class="it"><i data-i="book"></i><span class="grow">Read chats · Read files</span><span class="sw on"></span></button>
+      <hr>
+      <button class="it"><i data-i="globe"></i><span class="grow">Web search<small>Costs a little per search</small></span><span class="sw"></span></button>
+    </div>
+    <div class="menu" id="m-model" data-keep-open>
+      <button class="it"><i data-i="check"></i><span class="grow">gpt-5.5</span><small>default</small></button>
+      <button class="it"><i style="width:1.15em"></i><span class="grow">gpt-5-mini</span><small>reasoning</small></button>
+      <button class="it"><i style="width:1.15em"></i><span class="grow">gpt-oss:120b</span></button>
+      <hr>
+      <button class="it"><i data-i="sliders"></i><span class="grow">Instructions for this chat…</span></button>
+    </div>
+      </div>
+    <div class="recent v-new">
+      <h2>Pick up where you left off</h2>
+      <a href="#" data-view-to="chat">Python 3.14 template strings <span>12 min ago</span></a>
+      <a href="#">Postgres backup plan <span>Today</span></a>
+      <a href="#">A weekend in Lisbon <span>Today</span></a>
+    </div>
+    <div class="fine v-chat">ChitChat can be wrong. Check the sources.</div>
+
+</div>
+  <div class="menu" id="m-menu" data-keep-open>
+    <button class="it"><i data-i="sliders"></i> Instructions for this chat…</button>
+    <hr>
+    <button class="it"><i data-i="pin"></i> Pin</button>
+    <button class="it"><i data-i="pencil"></i> Rename…</button>
+    <hr>
+    <button class="it"><i data-i="download"></i> Download as Markdown</button>
+    <button class="it"><i data-i="download"></i> Download as JSON</button>
+    <hr>
+    <button class="it"><i data-i="archive"></i> Archive</button>
+    <button class="it danger"><i data-i="trash"></i> Delete…</button>
+  </div>
+</main>
+
+<div class="panel">
+  <div>
+    <h2>Sources <button class="btn-i" data-toggle="panel" aria-label="Close"><i data-i="close"></i></button></h2>
+    <a class="card" href="#"><span class="host"><i style="background:#3b7ddd"></i>docs.python.org</span><strong>What's new in Python 3.14</strong><p>Summary of the release highlights: template strings, free threading, deferred annotations.</p></a>
+    <a class="card" href="#"><span class="host"><i style="background:#c25b3a"></i>peps.python.org</span><strong>PEP 750 – Template Strings</strong><p>A new string literal prefix, t, producing a Template that preserves the strings and the interpolations.</p></a>
+    <a class="card" href="#"><span class="host"><i style="background:#2f9e74"></i>realpython.com</span><strong>Python 3.14: Cool New Features</strong><p>A walk through the changes with examples and notes on upgrading.</p></a>
+  </div>
+</div>
+<script src="mock.js"></script>
+</body>
+</html>

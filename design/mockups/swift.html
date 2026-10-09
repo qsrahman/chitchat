@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swift · ChitChat mock</title>
+<style>
+/* SWIFT: built for speed and the keyboard. Almost no chrome: a tinted desk, one inset panel, a command palette on
+   Cmd+K, slash commands in the box, prompts you can start from. Every control shows its shortcut. */
+:root {
+  color-scheme: light dark;
+  --desk: light-dark(#f1e8ef, #1f121c);
+  --panel: light-dark(#fbf7fa, #2a1a27);
+  --raised: light-dark(#ffffff, #35212f);
+  --ink: light-dark(#2a1b27, #f6eff4);
+  --muted: light-dark(#85708a, #b49cb2);
+  --line: light-dark(#e6d7e1, #43303c);
+  --rose: light-dark(#c02d6b, #ff6fa6);
+  --rose-soft: light-dark(#f9dfea, #4a2339);
+  --sans: "Avenir Next", "Proxima Nova", "Helvetica Neue", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: 15rem minmax(0, 1fr); background: var(--desk); color: var(--ink); font: 15px/1.55 var(--sans); }
+body.nav-closed { grid-template-columns: 0 minmax(0, 1fr); }
+body[data-view="new"] .v-chat, body[data-view="chat"] .v-new { display: none !important; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+.ic { display: inline-grid; place-items: center; }
+.ic svg { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+kbd { font: 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; background: var(--raised); }
+.ib { width: 32px; height: 32px; border-radius: 9px; display: inline-grid; place-items: center; color: var(--muted); }
+.ib:hover { background: var(--rose-soft); color: var(--rose); }
+
+nav { padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; min-width: 0; }
+.logo { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; font: 800 22px var(--sans); letter-spacing: -0.03em; }
+.logo b { font-weight: 800; } .logo b span { color: var(--rose); }
+.newbtn { margin-top: 6px; display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-radius: 10px; background: var(--rose-soft); color: var(--rose); font-weight: 650; border: 1px solid color-mix(in srgb, var(--rose) 30%, transparent); }
+.newbtn:hover { background: color-mix(in srgb, var(--rose) 22%, var(--desk)); }
+.find { display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin: 4px 0 8px; border-radius: 8px; color: var(--muted); font-size: 13.5px; border-bottom: 1px solid var(--line); }
+nav h3 { font: 600 11.5px var(--sans); color: var(--muted); margin: 12px 10px 3px; }
+.t { display: block; padding: 6px 10px; border-radius: 8px; color: inherit; text-decoration: none; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t:hover { background: color-mix(in srgb, var(--rose) 10%, transparent); }
+.t[aria-current] { background: var(--panel); box-shadow: inset 2px 0 0 var(--rose); font-weight: 600; }
+.nfoot { margin-top: auto; display: flex; gap: 2px; align-items: center; color: var(--muted); font-size: 13.5px; padding: 6px 4px; }
+.nfoot .u { margin-left: 8px; }
+
+main { position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--panel); border-radius: 18px 0 0 0; margin-top: 8px; box-shadow: -1px -1px 0 var(--line); overflow: hidden; }
+body.nav-closed main { border-radius: 0; margin: 0; }
+.top { display: flex; align-items: center; gap: 4px; padding: 8px 10px 4px; }
+.top .ttl { flex: 1; font-weight: 600; font-size: 14.5px; margin-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 9px; font-size: 13px; color: var(--muted); }
+.chip:hover { background: var(--rose-soft); color: var(--rose); }
+.scroll { flex: 1; overflow-y: auto; }
+.col { width: min(46rem, 100% - 36px); margin: 0 auto; padding-bottom: 24px; }
+
+/* new chat */
+.hero { width: min(44rem, 100% - 36px); margin: 0 auto; flex: 1; display: flex; flex-direction: column; justify-content: center; padding-bottom: 10vh; }
+.hero h1 { font: 650 30px/1.2 var(--sans); letter-spacing: -0.02em; margin: 0 0 18px; }
+.cats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.cat { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); font-weight: 600; font-size: 14px; }
+.cat:hover, .cat.on { background: var(--rose-soft); border-color: color-mix(in srgb, var(--rose) 40%, var(--line)); color: var(--rose); }
+.plist a { display: block; padding: 11px 10px; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
+.plist a:hover { background: color-mix(in srgb, var(--rose) 8%, transparent); }
+.plist a:last-child { border-bottom: 0; }
+.plist small { color: var(--muted); margin-left: 8px; }
+
+/* messages */
+.me { display: flex; justify-content: flex-end; margin: 22px 0 18px; }
+.me p { margin: 0; max-width: 80%; background: var(--rose-soft); padding: 10px 16px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--rose) 22%, transparent); }
+.used { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+.used .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 8px; background: var(--raised); border: 1px solid var(--line); font-size: 12.5px; }
+.used .fav { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.ans p { margin: 0 0 12px; }
+.ans ul { margin: 0 0 12px; padding-left: 22px; } .ans li { margin-bottom: 5px; }
+.ans code { font: 0.88em var(--mono); background: var(--raised); border: 1px solid var(--line); padding: 0 6px; border-radius: 6px; }
+.code { border: 1px solid var(--line); border-radius: 12px; background: var(--raised); overflow: hidden; margin: 6px 0 14px; }
+.code .h { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 4px 14px; border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
+.code pre { margin: 0; padding: 12px 14px; font: 13px/1.65 var(--mono); overflow-x: auto; }
+.k { color: light-dark(#a8236a, #ff8fbd); } .s { color: light-dark(#0f7f4a, #8fd6a5); } .c { color: var(--muted); } .f { color: light-dark(#5a3fc0, #b9a6ff); }
+.tools { display: flex; align-items: center; gap: 2px; color: var(--muted); margin: 2px 0 6px -6px; font-size: 12.5px; }
+.tools .ib { width: 28px; height: 28px; } .tools .sp { flex: 1; } .tools .mono { font: 11.5px var(--mono); }
+.vs { display: inline-flex; align-items: center; font: 12px var(--mono); }
+.caret { display: inline-block; width: 8px; height: 1.05em; background: var(--rose); border-radius: 2px; vertical-align: -3px; animation: blink 0.9s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* composer */
+.dock { padding: 0 14px; }
+.box { width: min(48rem, 100%); margin: 0 auto; background: var(--raised); border: 1px solid var(--line); border-bottom: 0; border-radius: 16px 16px 0 0; padding: 12px 14px 10px; position: relative; box-shadow: 0 -8px 30px -18px #0006; }
+.box:focus-within { border-color: color-mix(in srgb, var(--rose) 55%, var(--line)); }
+.box textarea { width: 100%; border: 0; outline: 0; resize: none; background: none; color: inherit; font: 16px/1.5 var(--sans); min-height: 28px; padding: 0; }
+.box .r { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.model { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 9px; font-size: 13px; }
+.model:hover { background: var(--rose-soft); }
+.model .caps { display: inline-flex; gap: 4px; color: var(--muted); font-size: 12px; }
+.go { width: 36px; height: 36px; border-radius: 11px; background: var(--rose); color: #fff; display: inline-grid; place-items: center; }
+.go:hover { filter: brightness(1.08); }
+
+/* palette + menus */
+.scrim { position: fixed; inset: 0; background: #0006; z-index: 9; display: none; align-items: flex-start; justify-content: center; padding-top: 14vh; backdrop-filter: blur(2px); }
+body[data-open="palette"] .scrim { display: flex; }
+.pal { width: min(36rem, 92vw); background: var(--raised); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 30px 70px -20px #000a; overflow: hidden; }
+.pal .in { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.pal .in input { flex: 1; border: 0; outline: 0; background: none; color: var(--ink); font: 16px var(--sans); }
+.pal h4 { font: 600 11.5px var(--sans); color: var(--muted); margin: 10px 16px 4px; }
+.pal a { display: flex; align-items: center; gap: 12px; padding: 9px 16px; color: inherit; text-decoration: none; }
+.pal a:hover, .pal a.sel { background: var(--rose-soft); }
+.pal a .g { flex: 1; } .pal a small { color: var(--muted); }
+.pal .end { padding: 8px 16px; border-top: 1px solid var(--line); display: flex; gap: 14px; color: var(--muted); font-size: 12px; }
+.menu { position: absolute; z-index: 6; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 44px -14px #000a; padding: 5px; width: 20rem; }
+body:not([data-open="tools"]) #m-tools, body:not([data-open="model"]) #m-model, body:not([data-open="menu"]) #m-menu { display: none; }
+#m-tools { left: 0; bottom: calc(100% + 8px); } #m-model { left: 90px; bottom: calc(100% + 8px); width: 16rem; }
+#m-menu { right: 10px; top: 46px; width: 16rem; }
+.mi { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; width: 100%; text-align: left; font-size: 14px; }
+.mi:hover { background: var(--rose-soft); } .mi .g { flex: 1; } .mi kbd, .mi small { color: var(--muted); font-size: 12px; }
+.mi .slash { font: 600 13px var(--mono); color: var(--rose); width: 4.6rem; }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+.menu h5 { font: 600 11px var(--sans); color: var(--muted); margin: 6px 10px 2px; }
+.red { color: light-dark(#b3261e, #ff9a92); }
+body[data-view="new"] .scroll { display: none; }
+@media (max-width: 860px) { body, body.nav-closed { grid-template-columns: 0 minmax(0, 1fr); } nav { display: none; } main { margin: 0; border-radius: 0; } }
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo"><b>chit<span>chat</span></b><button class="ib" data-toggle="nav" aria-label="Sidebar"><i data-i="sidebar"></i></button></div>
+  <button class="newbtn" data-view-to="new">New chat <kbd>⌘⇧O</kbd></button>
+  <div class="find" data-open="palette"><i data-i="search"></i> Search chats <kbd style="margin-left:auto">⌘K</kbd></div>
+  <h3>Pinned</h3>
+  <a class="t" href="#">Weekly planning</a>
+  <h3>Today</h3>
+  <a class="t" href="#" aria-current="page" data-view-to="chat">Python 3.14 template strings</a>
+  <a class="t" href="#">Postgres backup plan</a>
+  <a class="t" href="#">A weekend in Lisbon</a>
+  <h3>Yesterday</h3>
+  <a class="t" href="#">Rust lifetimes, again</a>
+  <a class="t" href="#">Cover letter, second draft</a>
+  <div class="nfoot"><button class="ib" aria-label="Archived"><i data-i="archive"></i></button><button class="ib" aria-label="Settings"><i data-i="gear"></i></button><span class="u">Que</span><span style="flex:1"></span><button class="ib" data-theme-toggle aria-label="Theme"><i data-i="moon"></i></button></div>
+</nav>
+
+<main>
+  <div class="top">
+    <button class="ib" data-toggle="nav" aria-label="Sidebar"><i data-i="sidebar"></i></button>
+    <div class="ttl v-chat">Python 3.14 template strings</div><div class="ttl v-new" style="color:var(--muted);font-weight:500">New chat</div>
+    <button class="chip" data-open="palette"><i data-i="command"></i> <kbd>⌘K</kbd></button>
+    <button class="chip v-chat"><i data-i="download"></i></button>
+    <button class="ib" data-open="menu" aria-label="Chat actions"><i data-i="more"></i></button>
+  </div>
+
+  <div class="scroll v-chat">
+    <div class="col">
+      <div class="me"><p>What's new in Python 3.14? Show me a tiny example of the new template strings.</p></div>
+      <div class="used">
+        <span class="tag"><i data-i="brain"></i> Thought 4 s</span>
+        <span class="tag"><i data-i="globe"></i> Searched “Python 3.14 release notes”</span>
+        <span class="tag"><i class="fav" style="background:#3b7ddd"></i> python.org</span>
+        <span class="tag"><i class="fav" style="background:#c25b3a"></i> peps.python.org</span>
+        <span class="tag"><i class="fav" style="background:#2f9e74"></i> realpython.com</span>
+      </div>
+      <div class="ans">
+        <p>Python 3.14 is mostly about three things: <b>template strings</b>, a free-threaded build that is no longer experimental, and lazily evaluated annotations.</p>
+        <ul>
+          <li><b>t-strings</b> (PEP 750) look like f-strings but give you a <code>Template</code> object, not a <code>str</code>.</li>
+          <li><b>Free threading</b> is supported rather than a build-time experiment.</li>
+          <li><b>Deferred annotations</b> stop forward references from needing quotes.</li>
+        </ul>
+        <div class="code"><div class="h"><span>example.py</span><button class="chip" style="height:24px"><i data-i="copy"></i> Copy</button></div>
+<pre><span class="k">name</span> = <span class="s">"Que"</span>
+page = <span class="f">t</span><span class="s">"&lt;h1&gt;Hello {name}&lt;/h1&gt;"</span>
+<span class="c"># page is a Template, not a str: you choose how to render it</span></pre></div>
+      </div>
+      <div class="tools">
+        <button class="ib" aria-label="Copy"><i data-i="copy"></i></button>
+        <button class="ib" aria-label="Retry"><i data-i="refresh"></i></button>
+        <button class="chip" style="height:26px;padding:0 8px"><i data-i="down"></i> Try another model</button>
+        <span class="vs"><button class="ib" style="width:24px"><i data-i="left"></i></button>2/3<button class="ib" style="width:24px"><i data-i="right"></i></button></span>
+        <span class="sp"></span><span class="mono">gpt-5.5 · 1.2K in · 567 out</span>
+      </div>
+
+      <div class="me"><p>Can you make it escape HTML?</p></div>
+      <div class="ans"><p>Sure. A small renderer that escapes every interpolation, so <code>{name}</code> can never inject markup<span class="caret"></span></p></div>
+    </div>
+  </div>
+
+  <div class="hero v-new">
+    <h1>How can I help you, Que?</h1>
+    <div class="cats">
+      <button class="cat on"><i data-i="globe"></i> Look up</button>
+      <button class="cat"><i data-i="book"></i> Read</button>
+      <button class="cat"><i data-i="calc"></i> Work out</button>
+      <button class="cat"><i data-i="clock"></i> Plan</button>
+    </div>
+    <div class="plist">
+      <a href="#" data-view-to="chat">What's new in Python 3.14?<small>continue · 12 min ago</small></a>
+      <a href="#">Find the latest on free-threaded Python and summarize it</a>
+      <a href="#">Compare two libraries from their documentation pages</a>
+      <a href="#">How many days until the end of the quarter?</a>
+    </div>
+  </div>
+
+  <div class="dock">
+    <div class="box">
+      <textarea rows="1" placeholder="Type your message here…   (/ for commands)"></textarea>
+      <div class="r">
+        <button class="ib" aria-label="Attach"><i data-i="plus"></i></button>
+        <button class="model" data-open="model">gpt-5.5 <span class="caps"><i data-i="eye"></i><i data-i="brain"></i><i data-i="globe"></i></span> <i data-i="down"></i></button>
+        <button class="chip" data-open="tools"><i data-i="wrench"></i> / 6</button>
+        <span style="flex:1"></span>
+        <kbd>↵ send</kbd>
+        <button class="go" aria-label="Send"><i data-i="send"></i></button>
+      </div>
+      <div class="menu" id="m-tools" data-keep-open>
+        <h5>Commands</h5>
+        <button class="mi"><span class="slash">/calc</span><span class="g">Exact arithmetic</span><small>on</small></button>
+        <button class="mi"><span class="slash">/chats</span><span class="g">Search your past chats</span><small>on</small></button>
+        <button class="mi"><span class="slash">/read</span><span class="g">Read a web page</span><small>on</small></button>
+        <button class="mi"><span class="slash">/time</span><span class="g">Date and time</span><small>on</small></button>
+        <button class="mi"><span class="slash">/chat</span><span class="g">Open a past chat</span><small>on</small></button>
+        <button class="mi"><span class="slash">/file</span><span class="g">Read an earlier file</span><small>on</small></button>
+        <hr>
+        <button class="mi"><span class="slash" style="color:var(--muted)">/web</span><span class="g">Search the web</span><small>off</small></button>
+      </div>
+      <div class="menu" id="m-model" data-keep-open>
+        <button class="mi"><i data-i="check"></i><span class="g">gpt-5.5</span><small>default</small></button>
+        <button class="mi"><i style="width:1.15em"></i><span class="g">gpt-5-mini</span><small>reasoning</small></button>
+        <button class="mi"><i style="width:1.15em"></i><span class="g">gpt-oss:120b</span></button>
+        <hr>
+        <button class="mi"><i data-i="sliders"></i><span class="g">Instructions for this chat</span><kbd>⌘,</kbd></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="menu" id="m-menu" data-keep-open>
+    <button class="mi"><i data-i="sliders"></i><span class="g">Instructions…</span><kbd>⌘,</kbd></button>
+    <hr>
+    <button class="mi"><i data-i="pin"></i><span class="g">Pin</span></button>
+    <button class="mi"><i data-i="pencil"></i><span class="g">Rename…</span><kbd>F2</kbd></button>
+    <button class="mi"><i data-i="download"></i><span class="g">Download as Markdown</span></button>
+    <button class="mi"><i data-i="archive"></i><span class="g">Archive</span></button>
+    <hr>
+    <button class="mi red"><i data-i="trash"></i><span class="g">Delete…</span></button>
+  </div>
+</main>
+
+<div class="scrim" data-open="palette"><div class="pal" data-keep-open onclick="event.stopPropagation()">
+  <div class="in"><i data-i="search"></i><input placeholder="Search chats and actions…" aria-label="Search"><kbd>esc</kbd></div>
+  <h4>Chats</h4>
+  <a href="#" class="sel" data-view-to="chat"><i data-i="chat"></i><span class="g">Python 3.14 template strings</span><small>12 min ago</small></a>
+  <a href="#"><i data-i="chat"></i><span class="g">Postgres backup plan</span><small>11:40</small></a>
+  <a href="#"><i data-i="chat"></i><span class="g">A weekend in Lisbon</span><small>09:15</small></a>
+  <h4>Actions</h4>
+  <a href="#" data-view-to="new"><i data-i="plus"></i><span class="g">New chat</span><kbd>⌘⇧O</kbd></a>
+  <a href="#"><i data-i="brain"></i><span class="g">Switch model…</span><kbd>⌘/</kbd></a>
+  <a href="#"><i data-i="wrench"></i><span class="g">Turn tools on or off…</span></a>
+  <a href="#"><i data-i="moon"></i><span class="g">Toggle dark mode</span></a>
+  <a href="#"><i data-i="gear"></i><span class="g">Settings</span><kbd>⌘,</kbd></a>
+  <div class="end"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+</div></div>
+<script src="mock.js"></script>
+</body>
+</html>

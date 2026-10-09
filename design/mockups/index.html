@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choose a look · ChitChat mocks</title>
+<style>
+:root { color-scheme: light dark; --bg: light-dark(#f4f4f2, #141415); --card: light-dark(#ffffff, #1d1d1f); --ink: light-dark(#1a1a1c, #ececee); --muted: light-dark(#66666d, #9d9da6); --line: light-dark(#dcdcd7, #2c2c30); --accent: light-dark(#1f5fd1, #7fa8ff); --soft: light-dark(#e8effc, #1d2a44); --sans: -apple-system, "Avenir Next", system-ui, sans-serif; }
+:root[data-theme="light"] { color-scheme: light; } :root[data-theme="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+header.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.in { max-width: 80rem; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; } h1 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.ctl { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--card); }
+.seg button { font: inherit; font-size: 13px; padding: 5px 12px; border: 0; background: none; color: var(--muted); cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border: 0; } .seg button[aria-pressed="true"] { background: var(--soft); color: var(--accent); font-weight: 600; }
+.pick { margin-left: auto; font-size: 14px; display: flex; gap: 10px; align-items: center; }
+.pick b { color: var(--accent); }
+.pick button { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+main { max-width: 80rem; margin: 0 auto; padding: 22px 24px 60px; }
+.lede { max-width: 52rem; color: var(--muted); margin: 0 0 22px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(34rem, 100%), 1fr)); gap: 22px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+.card[data-picked="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.shot { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--line); border-bottom: 1px solid var(--line); }
+.shot iframe { position: absolute; left: 0; top: 0; width: 1280px; height: 800px; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
+.shot a { position: absolute; inset: 0; z-index: 1; }
+.info { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.info h2 { margin: 0; font-size: 21px; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.info h2 span { font-size: 13px; font-weight: 400; color: var(--muted); }
+.info p { margin: 0; } .tag { color: var(--muted); font-size: 14px; }
+dl { margin: 0; display: grid; grid-template-columns: 6.6rem 1fr; gap: 6px 12px; font-size: 14px; }
+dt { color: var(--muted); } dd { margin: 0; }
+.eff { display: inline-block; padding: 0 8px; border-radius: 999px; background: var(--soft); color: var(--accent); font-size: 12.5px; font-weight: 600; }
+.btns { margin-top: auto; display: flex; gap: 8px; padding-top: 6px; }
+.btns a, .btns button { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; cursor: pointer; }
+.btns .choose { background: var(--accent); border-color: var(--accent); color: light-dark(#fff, #0d1424); font-weight: 600; margin-left: auto; }
+.btns .choose[aria-pressed="true"] { background: var(--soft); color: var(--accent); }
+section.research { margin-top: 44px; }
+section.research h2 { font-size: 22px; margin: 0 0 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12.5px; color: var(--muted); font-weight: 600; background: color-mix(in srgb, var(--line) 35%, var(--card)); }
+tr:last-child td { border-bottom: 0; } td:first-child { font-weight: 600; white-space: nowrap; }
+.fine { color: var(--muted); font-size: 13px; max-width: 56rem; }
+ul.src { color: var(--muted); font-size: 13.5px; padding-left: 20px; } ul.src a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <h1>Choose a look for ChitChat<small>Five mock UIs, built from research on popular chatbots. They are static: nothing here talks to a model.</small></h1>
+  <div class="ctl">Screen <span class="seg" id="view"><button aria-pressed="true" data-v="chat">Chat</button><button aria-pressed="false" data-v="new">New chat</button></span></div>
+  <div class="ctl">Colors <span class="seg" id="theme"><button aria-pressed="true" data-v="">System</button><button aria-pressed="false" data-v="light">Light</button><button aria-pressed="false" data-v="dark">Dark</button></span></div>
+  <div class="ctl">Open <span class="seg" id="open"><button aria-pressed="true" data-v="">Nothing</button><button aria-pressed="false" data-v="tools">Tools</button><button aria-pressed="false" data-v="menu">Chat menu</button></span></div>
+  <div class="pick" id="pick"></div>
+</div></header>
+
+<main>
+  <p class="lede">Every mock shows the same conversation (a web search, reasoning, a code block, sources, token counts, versions, a reply still streaming) and the same features ChitChat has: the tools menu, the model picker, the chat menu with its instructions, pinned chats. Click a preview to open it full size and try the buttons; <b>Choose</b> marks your pick, and then tell me which one to build.</p>
+  <div class="grid" id="grid"></div>
+
+  <section class="research">
+    <h2>What the research found</h2>
+    <p class="fine">Looked at on 2026-10-09 in a browser (signed out: the signed-in screens of Claude, Copilot and Le Chat were not reachable, and Le Chat's bot check was left alone), plus third-party teardowns and the docs of the open-source UIs. Sizes are what the page computed, not guesses.</p>
+    <table>
+      <thead><tr><th>Product</th><th>What it does that is worth taking</th><th>Seen</th></tr></thead>
+      <tbody>
+        <tr><td>ChitChat today</td><td>ChatGPT's layout: icon rail sidebar, bubbles for you, plain text for the model, a pill composer, a ⋯ menu per chat.</td><td>The app itself</td></tr>
+        <tr><td>ChatGPT</td><td>The reference: collapsible thread list, composer pill with attach and mode, canvas as a second pane, model picker at the top.</td><td>Measured earlier (cards 16px radius, 16px rows, 32×20 switches)</td></tr>
+        <tr><td>Claude</td><td>A serif for what is written and a quiet sans for controls; a side panel for artifacts; Projects. The signed-out page uses a 56px serif at weight 300 on near-black (#151515).</td><td>Login page; the app from public descriptions</td></tr>
+        <tr><td>Gemini</td><td>A very light greeting (36px, weight 320), a tall pill composer with the model chip and the microphone inside it, tonal surfaces instead of borders, an icon-only rail, "Show thinking" as a chip, sources as chips.</td><td>Measured: #0f0f0f, Google Sans Flex</td></tr>
+        <tr><td>Perplexity</td><td>Answer first: the question as the heading, a "completed steps" row, source cards before the answer, domain chips with +N on claims, a sources tab or panel, follow-up questions, "wrong sources" as its own feedback. Scope chips (Search, Computer) in the composer.</td><td>Measured: #161616 / #1d1d1d, 16px composer radius, 640px wide; teardowns</td></tr>
+        <tr><td>T3 Chat</td><td>Speed as design: a tinted dark (#21141e), one inset rounded panel, category pills over a list of starter prompts, a model chip with capability icons, ⌘K, a wide "New Chat" button.</td><td>Measured</td></tr>
+        <tr><td>Grok</td><td>Almost no chrome: one line of heading, a composer that says "/" for slash commands, a single mode selector (Fast), a round send button.</td><td>Measured</td></tr>
+        <tr><td>Open WebUI, LibreChat</td><td>For people who tune: a right-hand panel with the system prompt, temperature and effort, presets, switching the model in the middle of a chat, branching and comparing replies.</td><td>Docs and reviews</td></tr>
+        <tr><td>Copilot, Le Chat</td><td>Not seen beyond a sign-in page (Copilot's is a cream page with a serif and an italic word) and a bot check.</td><td>Sign-in wall</td></tr>
+      </tbody>
+    </table>
+    <p class="fine" style="margin-top:14px">Sources: <a href="https://aiuxplayground.com/teardowns/perplexity/citations" style="color:var(--accent)">aiuxplayground.com on Perplexity's citations</a>, <a href="https://intuitionlabs.ai/articles/conversational-ai-ui-comparison-2025" style="color:var(--accent)">intuitionlabs.ai on conversational UIs</a>, <a href="https://docs.openwebui.com/alternatives/librechat.md" style="color:var(--accent)">Open WebUI's comparison with LibreChat</a>, and the products' own pages.</p>
+  </section>
+</main>
+
+<script>
+const MOCKS = [
+  { id: 'folio', name: 'Folio', file: 'folio.html', tag: 'An editorial reading room.',
+    from: 'Claude, and the long-form reading of a book',
+    takes: 'Serif for what the model writes, sans for what you operate; a sheet of paper on a darker desk; a Sources panel that opens beside the answer; numbered citation chips on the claims.',
+    fits: 'Answers with sources and code are what ChitChat is for, and this treats them as reading. The tools stay quiet in one chip.',
+    cost: 'Calmest of the five, least dense. Wants a serif choice (system serifs only, no font files).',
+    effort: 'M', work: 'New CSS, a sources panel built from the web search results already saved with a reply.' },
+  { id: 'canvas', name: 'Canvas', file: 'canvas.html', tag: 'Soft, tonal and friendly.',
+    from: 'Gemini',
+    takes: 'A big light greeting, a tall pill composer with everything inside it, no borders (tone and large radii instead), "Show thinking" and "Searched the web" as chips, sources as chips, reply actions always visible.',
+    fits: 'Friendliest for new users and for a phone: large targets, few words. The recent chats become tiles on the new-chat screen.',
+    cost: 'Roomy, so fewer messages on a screen. The gradient is a signature you either like or not.',
+    effort: 'M', work: 'New CSS; an avatar on replies; the tiles; the chips already exist in some form.' },
+  { id: 'cite', name: 'Cite', file: 'cite.html', tag: 'An answer engine.',
+    from: 'Perplexity',
+    takes: 'Each question is a titled section; steps, source cards, then the answer with domain chips; tabs for Answer, Sources and Steps; "Ask next" suggestions; the tools as scope chips beside the box.',
+    fits: 'ChitChat has web search, page reading and chat search: this makes the tools the centre of the page instead of a menu.',
+    cost: 'The biggest change to how a message is built; a chat of small talk looks odd as titled sections. "Ask next" needs a model call per reply, or it is left out.',
+    effort: 'L', work: 'Restructure messages into question sections, a tabs view, domain chips from the saved sources.' },
+  { id: 'bench', name: 'Bench', file: 'bench.html', tag: 'A workbench for tuning.',
+    from: 'Open WebUI and LibreChat',
+    takes: 'Three panes: history, conversation, controls; every message labelled with who and when; a trace of tool calls; a context meter; temperature, effort and system prompt always visible; versions as tabs.',
+    fits: 'ChitChat already has per-chat settings, token counts, versions and "another model": here they are on show, not behind menus.',
+    cost: 'Dense, 14px, built for a wide screen; the controls panel collapses but a phone gets a poorer fit. Less welcoming.',
+    effort: 'L', work: 'A controls panel (most of the settings code exists), a message gutter, a context estimate from the server.' },
+  { id: 'swift', name: 'Swift', file: 'swift.html', tag: 'Keyboard first, almost no chrome.',
+    from: 'T3 Chat and Grok',
+    takes: 'A tinted dark with one inset panel; ⌘K for chats and actions; slash commands in the box (/calc, /read, /web) instead of a tools menu; starter prompts by category; shortcuts shown on every control.',
+    fits: 'The app is local and used a lot: speed matters more than introductions. Slash commands make tools one keystroke.',
+    cost: 'The palette and slash commands are new code and need an accessibility pass; the plum tint is a strong look.',
+    effort: 'M', work: 'A command palette module, slash parsing in the composer, new CSS.' },
+]
+const state = { view: 'chat', theme: '', open: '', pick: localStorage.getItem('chitchat-mock-pick') || '' }
+const grid = document.getElementById('grid')
+const url = (m) => `${m.file}?view=${state.view}${state.theme ? `&theme=${state.theme}` : ''}${state.open ? `&open=${state.open}` : ''}`
+for (const m of MOCKS) {
+  const card = document.createElement('article')
+  card.className = 'card'; card.id = m.id
+  card.innerHTML = `
+    <div class="shot"><iframe title="${m.name}" loading="lazy" tabindex="-1"></iframe><a href="" target="_blank" aria-label="Open ${m.name} full size"></a></div>
+    <div class="info">
+      <h2>${m.name} <span>${m.tag}</span></h2>
+      <dl>
+        <dt>Inspired by</dt><dd>${m.from}</dd>
+        <dt>Takes from it</dt><dd>${m.takes}</dd>
+        <dt>Why it fits</dt><dd>${m.fits}</dd>
+        <dt>The catch</dt><dd>${m.cost}</dd>
+        <dt>To build</dt><dd><span class="eff">${m.effort === 'M' ? 'Medium' : 'Large'}</span> ${m.work}</dd>
+      </dl>
+      <div class="btns"><a href="" target="_blank">Open full size</a><button class="choose" aria-pressed="false">Choose ${m.name}</button></div>
+    </div>`
+  grid.append(card)
+  m.card = card
+  card.querySelector('.choose').onclick = () => { state.pick = state.pick === m.id ? '' : m.id; localStorage.setItem('chitchat-mock-pick', state.pick); render() }
+}
+function fit() {
+  document.querySelectorAll('.shot').forEach((s) => { s.querySelector('iframe').style.transform = `scale(${s.clientWidth / 1280})` })
+}
+function render() {
+  for (const m of MOCKS) {
+    const href = url(m)
+    const frame = m.card.querySelector('iframe')
+    if (frame.dataset.src !== href) { frame.dataset.src = href; frame.src = href }
+    m.card.querySelectorAll('a[href]').forEach((a) => (a.href = href))
+    m.card.dataset.picked = String(state.pick === m.id)
+    const b = m.card.querySelector('.choose'); b.setAttribute('aria-pressed', String(state.pick === m.id)); b.textContent = state.pick === m.id ? `Chosen: ${m.name}` : `Choose ${m.name}`
+  }
+  const picked = MOCKS.find((m) => m.id === state.pick)
+  document.getElementById('pick').innerHTML = picked ? `Your pick: <b>${picked.name}</b> <button id="copy">Copy “go with ${picked.name}”</button>` : '<span style="color:var(--muted)">Nothing chosen yet</span>'
+  const copy = document.getElementById('copy'); if (copy) copy.onclick = () => navigator.clipboard?.writeText(`go with ${picked.name}`).then(() => (copy.textContent = 'Copied'))
+  fit()
+}
+for (const id of ['view', 'theme', 'open']) {
+  document.getElementById(id).addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return
+    state[id] = b.dataset.v
+    document.querySelectorAll(`#${id} button`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    if (id === 'theme') { if (state.theme) document.documentElement.dataset.theme = state.theme; else delete document.documentElement.dataset.theme }
+    render()
+  })
+}
+new ResizeObserver(fit).observe(grid)
+render()
+</script>
+</body>
+</html>

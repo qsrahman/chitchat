@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bench · ChitChat mock</title>
+<style>
+/* BENCH: a workbench for people who tune things. Three panes (history, conversation, controls), the numbers on show
+   (tokens, context, tools), every message labelled with who wrote it and when. Dense on purpose: 14px, thin rules. */
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#f3f4f6, #0e1217);
+  --panel: light-dark(#ffffff, #141a21);
+  --raised: light-dark(#f8f9fb, #1a212a);
+  --line: light-dark(#dde1e7, #243040);
+  --ink: light-dark(#18202c, #d8dee6);
+  --muted: light-dark(#6a7584, #8793a3);
+  --amber: light-dark(#a8670a, #f0b04a);
+  --amber-soft: light-dark(#fbefd6, #3a2c12);
+  --sel: light-dark(#e6edf7, #1f2c3d);
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: grid; grid-template: 40px minmax(0, 1fr) / 14.5rem minmax(0, 1fr) 20.5rem; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
+body.hist-closed { grid-template-columns: 0 minmax(0, 1fr) 20.5rem; }
+body.ctl-closed { grid-template-columns: 14.5rem minmax(0, 1fr) 0; }
+body.hist-closed.ctl-closed { grid-template-columns: 0 minmax(0, 1fr) 0; }
+body[data-view="new"] .v-chat, body[data-view="chat"] .v-new { display: none !important; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+.ic { display: inline-grid; place-items: center; }
+.ic svg { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.ib { width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--muted); }
+.ib:hover, .ib.on { background: var(--sel); color: var(--ink); }
+kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--muted); background: var(--raised); }
+
+/* top bar spans all */
+.tb { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.tb .path { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; min-width: 0; }
+.tb .path b { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sel { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); font-size: 13px; }
+.sel:hover { border-color: var(--muted); }
+.sel .mono { color: var(--amber); }
+.sp { flex: 1; }
+
+/* history */
+.hist { background: var(--panel); border-right: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.hist .s { padding: 8px; }
+.hist input { width: 100%; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); color: inherit; padding: 0 9px; font: 13px var(--sans); outline: 0; }
+.hist input:focus { border-color: var(--amber); }
+.hist h3 { font: 600 11px var(--mono); color: var(--muted); margin: 10px 12px 3px; letter-spacing: 0.04em; }
+.h { display: flex; justify-content: space-between; gap: 8px; padding: 5px 12px; color: inherit; text-decoration: none; font-size: 13px; border-left: 2px solid transparent; }
+.h span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h .mono { color: var(--muted); font-size: 11px; flex: none; }
+.h:hover { background: var(--raised); }
+.h[aria-current] { background: var(--sel); border-left-color: var(--amber); }
+.hist .foot { margin-top: auto; border-top: 1px solid var(--line); padding: 6px; display: flex; gap: 2px; }
+
+/* conversation */
+.conv { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+.log { flex: 1; overflow-y: auto; }
+.msg { display: grid; grid-template-columns: 7.2rem minmax(0, 1fr); gap: 0 14px; padding: 14px 20px 12px; border-bottom: 1px solid var(--line); max-width: 62rem; }
+.msg.assistant { background: var(--panel); }
+.who { font: 11.5px/1.4 var(--mono); color: var(--muted); padding-top: 3px; }
+.who b { display: block; font-weight: 600; color: var(--ink); font-size: 12px; }
+.who .role-a { color: var(--amber); }
+.txt p { margin: 0 0 10px; }
+.txt ul { margin: 0 0 10px; padding-left: 20px; }
+.txt code { font: 12.5px var(--mono); background: var(--raised); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+.trace { border: 1px solid var(--line); border-radius: 6px; background: var(--raised); margin: 0 0 10px; font: 12px var(--mono); }
+.trace .t { display: grid; grid-template-columns: 1.1rem 7rem minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 10px; }
+.trace .t + .t { border-top: 1px solid var(--line); }
+.trace .ok { color: var(--amber); } .trace .q { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); } .trace .ms { color: var(--muted); }
+.code { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin: 0 0 10px; background: var(--raised); }
+.code .ch { display: flex; justify-content: space-between; align-items: center; padding: 3px 4px 3px 10px; border-bottom: 1px solid var(--line); color: var(--muted); font: 11.5px var(--mono); }
+.code pre { margin: 0; padding: 10px 12px; font: 12.5px/1.6 var(--mono); overflow-x: auto; }
+.k { color: light-dark(#8a3fd0, #c9a2f5); } .s { color: light-dark(#0f7f4a, #8fd6a5); } .c { color: var(--muted); } .f { color: light-dark(#1d62d6, #8cb6f7); }
+.foot-line { display: flex; align-items: center; gap: 12px; color: var(--muted); font: 11.5px var(--mono); flex-wrap: wrap; }
+.foot-line .n { color: var(--amber); }
+.vtabs { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.vtabs button { padding: 1px 9px; font: 11.5px var(--mono); color: var(--muted); border-right: 1px solid var(--line); }
+.vtabs button:last-child { border: 0; } .vtabs .on { background: var(--sel); color: var(--ink); }
+.caret { display: inline-block; width: 7px; height: 14px; background: var(--amber); vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.att { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 5px; font: 11.5px var(--mono); color: var(--muted); }
+
+/* composer */
+.cmp { border-top: 1px solid var(--line); background: var(--panel); padding: 10px 14px 8px; }
+.cmp textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); color: inherit; resize: none; outline: 0; font: 14px/1.5 var(--sans); padding: 9px 12px; min-height: 52px; }
+.cmp textarea:focus { border-color: var(--amber); }
+.cmp .r { display: flex; align-items: center; gap: 6px; margin-top: 6px; position: relative; }
+.tg { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; color: var(--muted); }
+.tg.on { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 50%, var(--line)); background: var(--amber-soft); }
+.run { height: 28px; padding: 0 12px; border-radius: 6px; background: var(--amber); color: light-dark(#fff, #1a1203); font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.run kbd { background: #0002; border-color: #0003; color: inherit; }
+
+/* controls */
+.ctl { background: var(--panel); border-left: 1px solid var(--line); overflow: auto; min-width: 0; }
+.ctl > div { width: 20.5rem; }
+.sec { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.sec h4 { margin: 0 0 8px; font: 600 11px var(--mono); letter-spacing: 0.04em; color: var(--muted); display: flex; justify-content: space-between; }
+.sec h4 em { font-style: normal; color: var(--amber); }
+.field { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); color: inherit; padding: 6px 9px; font: 13px var(--sans); outline: 0; }
+textarea.field { resize: none; min-height: 64px; }
+.range { display: flex; align-items: center; gap: 10px; }
+.range .tr { flex: 1; height: 4px; border-radius: 2px; background: var(--line); position: relative; }
+.range .tr i { position: absolute; left: 0; top: 0; bottom: 0; width: 35%; background: var(--amber); border-radius: 2px; }
+.range .tr i::after { content: ""; position: absolute; right: -6px; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--panel); border: 2px solid var(--amber); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { padding: 4px 0; font: 12px var(--mono); color: var(--muted); border-right: 1px solid var(--line); }
+.seg button:last-child { border: 0; } .seg .on { background: var(--amber-soft); color: var(--amber); }
+.tl { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+.tl .g { flex: 1; } .tl .mono { color: var(--muted); }
+.sw { width: 26px; height: 14px; border-radius: 7px; background: var(--line); position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.sw.on { background: var(--amber); } .sw.on::after { left: 14px; background: #fff; }
+.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; display: flex; }
+.meter i { display: block; } .meter .a { background: var(--amber); width: 14%; } .meter .b { background: color-mix(in srgb, var(--amber) 45%, var(--line)); width: 9%; }
+.kv { display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--muted); padding: 2px 0; } .kv b { color: var(--ink); font-weight: 500; }
+.note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+/* new chat */
+.start { max-width: 46rem; width: 100%; margin: 0 auto; padding: 8vh 24px 0; }
+.start h1 { font: 600 20px var(--sans); margin: 0 0 4px; } .start p { margin: 0 0 18px; color: var(--muted); }
+.tbl { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; margin-bottom: 18px; }
+.tbl .tr { display: grid; grid-template-columns: 1.4rem 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; text-decoration: none; color: inherit; }
+.tbl .tr + .tr { border-top: 1px solid var(--line); } .tbl .tr:hover { background: var(--raised); }
+.tbl .tr .mono { color: var(--muted); }
+.tbl .hd { font: 600 11px var(--mono); color: var(--muted); padding: 7px 12px; background: var(--raised); border-bottom: 1px solid var(--line); letter-spacing: 0.04em; }
+
+/* menus */
+.menu { position: absolute; z-index: 8; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 16px 40px -12px #0008; padding: 4px; width: 19rem; }
+body:not([data-open="tools"]) #m-tools, body:not([data-open="model"]) #m-model, body:not([data-open="menu"]) #m-menu { display: none; }
+#m-tools { left: 0; bottom: 34px; } #m-model { left: 16rem; top: 36px; width: 17rem; position: fixed; }
+#m-menu { position: fixed; right: 12px; top: 38px; width: 16rem; }
+.mi { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border-radius: 5px; width: 100%; text-align: left; font-size: 13px; }
+.mi:hover { background: var(--sel); } .mi .g { flex: 1; } .mi .mono { color: var(--muted); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+.red { color: light-dark(#b3261e, #ff9a92); }
+@media (max-width: 1000px) { body, body.hist-closed, body.ctl-closed { grid-template-columns: 0 minmax(0, 1fr) 0; } .msg { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="tb">
+  <button class="ib on" data-toggle="hist" aria-label="History"><i data-i="sidebar"></i></button>
+  <div class="path"><span>Workspace</span><span>/</span><b class="v-chat">Python 3.14 template strings</b><b class="v-new">New chat</b></div>
+  <span class="sp"></span>
+  <button class="sel" data-open="model"><i data-i="brain"></i> <span class="mono">gpt-5.5</span> <i data-i="down"></i></button>
+  <button class="sel" title="Run the same prompt on a second model"><i data-i="plus"></i> Compare</button>
+  <kbd>⌘K</kbd>
+  <button class="ib" data-open="menu" aria-label="Chat actions"><i data-i="more"></i></button>
+  <button class="ib on" data-toggle="ctl" aria-label="Controls"><i data-i="sliders"></i></button>
+</div>
+
+<aside class="hist">
+  <div class="s"><input placeholder="Search chats  /" aria-label="Search"></div>
+  <div style="padding:0 8px"><button class="sel" style="width:100%;justify-content:center" data-view-to="new"><i data-i="plus"></i> New chat <kbd>⌘⇧O</kbd></button></div>
+  <h3>PINNED</h3>
+  <a class="h" href="#"><span>Weekly planning</span><span class="mono">Mon</span></a>
+  <h3>TODAY</h3>
+  <a class="h" href="#" aria-current="page" data-view-to="chat"><span>Python 3.14 template strings</span><span class="mono">14:02</span></a>
+  <a class="h" href="#"><span>Postgres backup plan</span><span class="mono">11:40</span></a>
+  <a class="h" href="#"><span>A weekend in Lisbon</span><span class="mono">09:15</span></a>
+  <h3>YESTERDAY</h3>
+  <a class="h" href="#"><span>Rust lifetimes, again</span><span class="mono">Sun</span></a>
+  <a class="h" href="#"><span>Cover letter, second draft</span><span class="mono">Sun</span></a>
+  <div class="foot"><button class="ib" aria-label="Archived"><i data-i="archive"></i></button><button class="ib" aria-label="Settings"><i data-i="gear"></i></button><span class="sp"></span><span class="mono" style="color:var(--muted);align-self:center;padding-right:6px">5 chats</span></div>
+</aside>
+
+<main class="conv">
+  <div class="log v-chat">
+    <div class="msg user">
+      <div class="who"><b>you</b>14:02:11</div>
+      <div class="txt"><p style="margin:0">What's new in Python 3.14? Show me a tiny example of the new template strings.</p></div>
+    </div>
+    <div class="msg assistant">
+      <div class="who"><b class="role-a">gpt-5.5</b>14:02:19<br>v2 of 3</div>
+      <div class="txt">
+        <div class="trace">
+          <div class="t"><span class="ok"><i data-i="brain"></i></span><span>reasoning</span><span class="q">4 s · summary available</span><span class="ms">▸</span></div>
+          <div class="t"><span class="ok"><i data-i="globe"></i></span><span>web_search</span><span class="q">"Python 3.14 release notes" → 3 results</span><span class="ms">0.9 s ▸</span></div>
+        </div>
+        <p>Python 3.14 is mostly about three things: <b>template strings</b>, a free-threaded build that is no longer experimental, and lazily evaluated annotations <span class="mono" style="color:var(--amber)">[1]</span>.</p>
+        <ul>
+          <li><b>t-strings</b> (PEP 750) look like f-strings but give you a <code>Template</code>, not a <code>str</code> <span class="mono" style="color:var(--amber)">[2]</span>.</li>
+          <li><b>Free threading</b> is supported rather than a build-time experiment <span class="mono" style="color:var(--amber)">[3]</span>.</li>
+          <li><b>Deferred annotations</b> stop forward references from needing quotes.</li>
+        </ul>
+        <div class="code"><div class="ch"><span>python</span><button class="ib" style="width:22px;height:22px"><i data-i="copy"></i></button></div>
+<pre><span class="k">name</span> = <span class="s">"Que"</span>
+page = <span class="f">t</span><span class="s">"&lt;h1&gt;Hello {name}&lt;/h1&gt;"</span>
+<span class="c"># page is a Template, not a str: you choose how to render it</span></pre></div>
+        <div class="foot-line">
+          <span class="vtabs"><button>v1 · gpt-5-mini</button><button class="on">v2 · gpt-5.5</button><button>v3</button></span>
+          <span><span class="n">1,234</span> in</span><span><span class="n">567</span> out</span><span><span class="n">300</span> reasoning</span>
+          <span style="flex:1"></span>
+          <button class="ib" aria-label="Copy"><i data-i="copy"></i></button><button class="ib" aria-label="Regenerate"><i data-i="refresh"></i></button><button class="ib" aria-label="Another model"><i data-i="down"></i></button>
+        </div>
+      </div>
+    </div>
+    <div class="msg user">
+      <div class="who"><b>you</b>14:03:40</div>
+      <div class="txt"><p style="margin:0">Can you make it escape HTML?</p><span class="att"><i data-i="file"></i> notes.md · 2 kB</span></div>
+    </div>
+    <div class="msg assistant">
+      <div class="who"><b class="role-a">gpt-5.5</b>14:03:41<br>streaming</div>
+      <div class="txt"><p style="margin:0">Sure. A small renderer that escapes every interpolation, so <code>{name}</code> can never inject markup<span class="caret"></span></p></div>
+    </div>
+  </div>
+
+  <div class="log v-new">
+    <div class="start">
+      <h1>New chat</h1>
+      <p>Model <span class="mono" style="color:var(--amber)">gpt-5.5</span> · 6 tools on · no instructions. Change any of it in the controls on the right.</p>
+      <div class="tbl"><div class="hd">CONTINUE</div>
+        <a class="tr" href="#" data-view-to="chat"><i data-i="chat"></i><span>Python 3.14 template strings</span><span class="mono">14:02</span></a>
+        <a class="tr" href="#"><i data-i="chat"></i><span>Postgres backup plan</span><span class="mono">11:40</span></a>
+        <a class="tr" href="#"><i data-i="chat"></i><span>A weekend in Lisbon</span><span class="mono">09:15</span></a>
+      </div>
+      <div class="tbl"><div class="hd">STARTERS</div>
+        <a class="tr" href="#"><i data-i="book"></i><span>Summarize an attached file</span><span class="mono">read_attachment</span></a>
+        <a class="tr" href="#"><i data-i="globe"></i><span>Research a question with sources</span><span class="mono">web_search</span></a>
+        <a class="tr" href="#"><i data-i="calc"></i><span>Work out a calculation exactly</span><span class="mono">calculator</span></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="cmp">
+    <textarea placeholder="Message gpt-5.5…   (⌘↵ to send, / for tools)"></textarea>
+    <div class="r">
+      <button class="ib" aria-label="Attach"><i data-i="plus"></i></button>
+      <button class="tg on" data-open="tools"><i data-i="wrench"></i> 6 tools</button>
+      <button class="tg"><i data-i="globe"></i> web</button>
+      <span class="mono" style="color:var(--muted)">context 7.4K / 32K</span>
+      <span class="sp"></span>
+      <button class="run">Send <kbd>⌘↵</kbd></button>
+      <div class="menu" id="m-tools" data-keep-open>
+        <button class="mi"><span class="sw on"></span><span class="g">calculator</span><span class="mono">exact maths</span></button>
+        <button class="mi"><span class="sw on"></span><span class="g">search_chats</span><span class="mono">past chats</span></button>
+        <button class="mi"><span class="sw on"></span><span class="g">fetch_url</span><span class="mono">read a page</span></button>
+        <button class="mi"><span class="sw on"></span><span class="g">get_datetime</span><span class="mono">time, zones</span></button>
+        <button class="mi"><span class="sw on"></span><span class="g">read_chat</span><span class="mono">open a chat</span></button>
+        <button class="mi"><span class="sw on"></span><span class="g">read_attachment</span><span class="mono">earlier files</span></button>
+        <hr>
+        <button class="mi"><span class="sw"></span><span class="g">web_search</span><span class="mono">costs per call</span></button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<aside class="ctl"><div>
+  <div class="sec"><h4>MODEL <em>default</em></h4>
+    <div class="field" style="display:flex;justify-content:space-between"><span class="mono">gpt-5.5</span><i data-i="down"></i></div>
+    <p class="note">The model for this chat. “default” follows Settings; pick another to pin it.</p></div>
+  <div class="sec"><h4>SYSTEM PROMPT <span class="mono" style="font-size:11px">0 / 10,000</span></h4>
+    <textarea class="field" placeholder="Optional. Comes after your custom instructions."></textarea></div>
+  <div class="sec"><h4>TEMPERATURE <em>default</em></h4>
+    <div class="range"><span class="tr"><i></i></span><span class="mono">0.7</span></div>
+    <h4 style="margin-top:14px">REASONING EFFORT <em>auto</em></h4>
+    <div class="seg"><button class="on">auto</button><button>low</button><button>med</button><button>high</button></div></div>
+  <div class="sec"><h4>TOOLS THIS CHAT <em>6 of 7</em></h4>
+    <div class="tl"><span class="sw on"></span><span class="g">calculator</span><span class="mono">0 calls</span></div>
+    <div class="tl"><span class="sw on"></span><span class="g">search_chats</span><span class="mono">0</span></div>
+    <div class="tl"><span class="sw on"></span><span class="g">fetch_url</span><span class="mono">0</span></div>
+    <div class="tl"><span class="sw on"></span><span class="g">get_datetime</span><span class="mono">0</span></div>
+    <div class="tl"><span class="sw on"></span><span class="g">read_chat</span><span class="mono">0</span></div>
+    <div class="tl"><span class="sw on"></span><span class="g">read_attachment</span><span class="mono">0</span></div>
+    <div class="tl"><span class="sw"></span><span class="g">web_search</span><span class="mono">1 earlier</span></div></div>
+  <div class="sec"><h4>CONTEXT</h4>
+    <div class="meter"><i class="a"></i><i class="b"></i></div>
+    <div class="kv" style="margin-top:6px"><span>history</span><b>4.5K</b></div><div class="kv"><span>instructions + tools</span><b>2.9K</b></div><div class="kv"><span>window</span><b>32,000</b></div>
+    <p class="note">Older turns are left out past the window on a custom endpoint.</p></div>
+  <div class="sec"><h4>USAGE THIS CHAT</h4>
+    <div class="kv"><span>input</span><b>1,234</b></div><div class="kv"><span>output</span><b>567</b></div><div class="kv"><span>of which reasoning</span><b>300</b></div></div>
+</div></aside>
+
+<div class="menu" id="m-model" data-keep-open>
+  <button class="mi"><i data-i="check"></i><span class="g mono">gpt-5.5</span><span class="mono">default</span></button>
+  <button class="mi"><i style="width:1.15em"></i><span class="g mono">gpt-5-mini</span><span class="mono">reasoning</span></button>
+  <button class="mi"><i style="width:1.15em"></i><span class="g mono">gpt-oss:120b</span></button>
+</div>
+<div class="menu" id="m-menu" data-keep-open>
+  <button class="mi"><i data-i="pin"></i><span class="g">Pin</span></button>
+  <button class="mi"><i data-i="pencil"></i><span class="g">Rename…</span></button>
+  <button class="mi"><i data-i="download"></i><span class="g">Download as Markdown</span></button>
+  <button class="mi"><i data-i="download"></i><span class="g">Download as JSON</span></button>
+  <button class="mi"><i data-i="archive"></i><span class="g">Archive</span></button>
+  <hr>
+  <button class="mi red"><i data-i="trash"></i><span class="g">Delete…</span></button>
+</div>
+<script src="mock.js"></script>
+</body>
+</html>
