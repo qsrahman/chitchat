@@ -651,18 +651,36 @@ main:not(.is-started) #empty {
 /* The latest chats under the composer of a new chat. */
 #recent {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   width: min(var(--col), 100% - 32px);
   margin-inline: auto;
   padding: 0 8px;
 }
+#recent h2 {
+  margin: 4px 0 4px 14px;
+  font: 600 0.78rem var(--sans);
+  color: var(--muted);
+}
 #recent a {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
   padding: 8px 14px;
   border-radius: var(--r-sm);
-  color: var(--muted);
+  color: var(--ink);
   text-decoration: none;
+  font: 1rem var(--serif);
+}
+#recent a span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+#recent time {
+  flex: none;
+  color: var(--muted);
+  font: 0.8125rem var(--sans);
 }
 #recent a:hover {
   background: var(--hover);
@@ -2127,6 +2145,16 @@ dialog input[type='number'] {
     background: var(--bg);
   }
   .sources-btn .count {
+    display: none;
+  }
+  .sources-btn {
+    padding: 4px 8px 4px 6px;
+  }
+  /* the title keeps room: model name, then the chat's name, then the buttons */
+  .model-btn {
+    max-width: 6rem;
+  }
+  .site-dots i:nth-child(n + 3) {
     display: none;
   }
 }

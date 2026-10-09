@@ -1,6 +1,15 @@
 // The sidebar's list of conversations: paging, search, and the rename, pin and archive that the chat menu (chat-menu.js)
 // calls. Delete is in delete.js, the drawer in nav.js, the shortcuts in shortcuts.js, and backup and import in backup.js.
-import { $, ICONS, api, bus, iconButton, showDialog, state } from './core.js'
+import {
+  $,
+  ICONS,
+  api,
+  bus,
+  iconButton,
+  showDialog,
+  state,
+  textEl,
+} from './core.js'
 import { jumpTo } from './messages.js'
 import { closeNavIfOverlay } from './nav.js'
 
@@ -130,6 +139,21 @@ export function hideChat(id, render = true) {
   if (render) renderList()
 }
 
+// "12 minutes ago", "yesterday", "3 days ago"; past a week, the date.
+const ago = (iso) => {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  const say = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return say.format(-minutes, 'minute')
+  if (minutes < 60 * 24) return say.format(-Math.round(minutes / 60), 'hour')
+  if (minutes < 60 * 24 * 7)
+    return say.format(-Math.round(minutes / 1440), 'day')
+  return new Date(iso).toLocaleDateString('en', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 // Under the composer on the new-chat screen: the latest few chats, one click from picking up where you left off.
 const RECENT = 3
 function renderRecent() {
@@ -139,13 +163,15 @@ function renderRecent() {
   const nav = $('recent')
   nav.hidden = !shown.length
   nav.replaceChildren(
+    textEl('h2', 'Pick up where you left off'),
     ...shown.map((c) => {
       const link = Object.assign(document.createElement('a'), {
         href: `#${c.id}`,
-        textContent: c.title,
-        dir: 'auto',
         title: c.title,
       })
+      const title = textEl('span', c.title)
+      title.dir = 'auto'
+      link.append(title, textEl('time', ago(c.updated_at)))
       return link
     }),
   )

@@ -1,4 +1,6 @@
 """Details of how a conversation reads: the line under a reply, the disclosure marker, the spacing."""
+import re
+
 from playwright.sync_api import expect
 
 from tests.ui.test_chat_ui import chat_menu, open_app, send
@@ -75,7 +77,10 @@ def test_the_new_chat_screen_lists_the_latest_chats_and_nothing_when_there_are_n
     seed(page, app_url, ["one", "two", "three", "four"])
     page.reload()
     recent = page.get_by_role("navigation", name="Recent chats")
-    expect(recent.get_by_role("link")).to_have_text(["four", "three", "two"])  # newest first, three of them
+    expect(recent.get_by_role("link")).to_have_text(
+        [re.compile("^four"), re.compile("^three"), re.compile("^two")])  # newest first, three of them
+    expect(recent.get_by_role("link").first.locator("time")).to_have_text("just now")
+    expect(recent.get_by_role("heading", name="Pick up where you left off")).to_be_visible()
     recent.get_by_role("link", name="three").click()
     expect(page.locator("#title")).to_have_text("three")
     expect(recent).to_be_hidden()  # a conversation is open: the list is for the empty screen
@@ -90,7 +95,7 @@ def test_the_recent_chats_do_not_include_archived_ones_or_follow_the_archive_vie
     page.request.patch(f"{app_url}/api/conversations/{shelved}", data={"archived": True})
     page.reload()
     recent = page.get_by_role("navigation", name="Recent chats")
-    expect(recent.get_by_role("link")).to_have_text(["kept"])
+    expect(recent.get_by_role("link")).to_have_text([re.compile("^kept")])
     page.get_by_role("button", name="Archived chats").click()
     expect(recent).to_be_hidden()  # the list is showing the archive: no "recent" to offer
 

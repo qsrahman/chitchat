@@ -10,6 +10,11 @@ Chosen from the five mocks in `docs/ui-mockups.md` (the mock is `design/mockups/
 - `main` has a bounded grid column, so a very long title ellipsizes instead of widening the sheet.
 - `--muted` (light) and the code number colour were darkened to keep 4.5:1 on the new surfaces.
 
+## Checked by eye (light mode and a 375px phone)
+- The new-chat screen's "Pick up where you left off" list is serif with the age on the right ("4 hours ago", "yesterday"; the date past a week). Found on the way: a long title stretched the grid column and pushed the ages out of view (the list's column is now `minmax(0, 1fr)`).
+- On a phone the header was too tight with the Sources button: the chat title shrank to one letter. The model name now stops at 6rem, the button shows only the site letters (two of them) and the title keeps about 75px with sources, 135px without.
+- Left out of the mock on purpose: the time-of-day greeting (it needs the user's name, which the app doesn't have, and the heading is what every test and screen reader finds), a Search chip in the composer (web search is already one switch in the Tools menu and in Settings; a second place to flip it would need to stay in step with both), and the "can be wrong" footnote under the composer.
+
 ## Sources panel and numbered chips (`app/static/sources.js`)
 - No backend change: web search and page reading already save what they found in the message's tool metadata (`display.results` of `web_search`, `display.url`/`title` of `fetch_url`), and backups keep it. `tools-ui.js` records each finished call on its message element (`_calls`) and sends a `sources` notice; `sources.js` reads the list from those, so it is always what the messages on screen carry (a different version of a reply shows its own).
 - One page is one source however often it was found (address without `#fragment` and trailing slash). Numbers follow the order found in the chat.
