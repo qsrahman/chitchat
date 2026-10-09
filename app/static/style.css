@@ -2213,3 +2213,7 @@ dialog input[type='number'] {
 .find input::-webkit-search-cancel-button {
   display: none; /* the bar has its own close button */
 }
+/* the bar floats over the top of the thread: room for it while it is open, so the first message is not under it */
+main:has(#find:not([hidden])) #thread {
+  padding-top: 64px;
+}

@@ -17,15 +17,35 @@ import { renderToolCall } from './tools-ui.js'
 // ---- scrolling ----
 const nearBottom = () =>
   messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80
+// The size of the pane and of what is in it, as this code last scrolled or looked. A scroll event measures "how far
+// from the end" now, so one delivered after either changed (the last scroll of a reply arriving after the message
+// box grew, or after something tall appeared without a scroll) would call a reader at the end one who scrolled
+// up, and the reply would stop being followed. Such an event is not read: the resize observer, or the next render,
+// scrolls and records the new size.
+let seen = { height: 0, content: 0 }
+const look = () => {
+  seen = { height: messagesEl.clientHeight, content: messagesEl.scrollHeight }
+}
 export function scrollToBottom() {
   messagesEl.scrollTop = messagesEl.scrollHeight
+  look()
 }
-// The pane's height as the resize observer last saw it. A scroll event delivered after the pane changed height (the
-// last scroll of a reply, arriving after the message box grew) would measure "how far from the end" against the new
-// height and call a reader at the end one who scrolled up: it waits for the observer, which scrolls and records.
-let paneHeight = messagesEl.clientHeight
+look()
 messagesEl.addEventListener('scroll', () => {
-  if (messagesEl.clientHeight !== paneHeight) return
+  if (
+    messagesEl.clientHeight !== seen.height ||
+    messagesEl.scrollHeight !== seen.content
+  ) {
+    // only the verdict "scrolled up" is doubtful: exactly at the end is at the end whatever changed
+    if (
+      messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <
+      2
+    )
+      state.stick = true
+    look()
+    $('jump').hidden = state.stick
+    return
+  }
   state.stick = nearBottom()
   $('jump').hidden = state.stick
 })
@@ -33,7 +53,7 @@ messagesEl.addEventListener('scroll', () => {
 // attachments (and the window resizes), which would otherwise cover the end of the last reply and its buttons.
 new ResizeObserver(() => {
   if (state.stick) scrollToBottom()
-  paneHeight = messagesEl.clientHeight
+  else look()
 }).observe(messagesEl)
 $('jump').onclick = () => {
   state.stick = true

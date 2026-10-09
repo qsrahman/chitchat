@@ -163,3 +163,18 @@ def test_math_is_searched_by_what_you_read_not_by_its_tex(page, app_url):
     page.keyboard.press("ControlOrMeta+f")
     find_box(page).fill("is the sum")
     expect(page.locator("#find-count")).to_have_text("1 of 1")
+
+
+def test_the_bar_does_not_cover_the_first_message(page, app_url):
+    two_replies(page, app_url)
+    page.locator("#messages").evaluate("e => { e.scrollTop = 0 }")
+    first = page.locator(".msg.user").first
+    before = first.bounding_box()
+    page.keyboard.press("ControlOrMeta+f")
+    expect(find_box(page)).to_be_focused()
+    bar = page.locator("#find").bounding_box()
+    assert first.bounding_box()["y"] >= bar["y"] + bar["height"], (first.bounding_box(), bar)
+    assert before["y"] < bar["y"] + bar["height"]  # it would have been under the bar
+    page.keyboard.press("Escape")
+    page.locator("#messages").evaluate("e => { e.scrollTop = 0 }")
+    assert abs(first.bounding_box()["y"] - before["y"]) < 2  # and the room is given back

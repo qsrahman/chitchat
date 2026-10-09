@@ -233,6 +233,25 @@ def test_a_scroll_event_that_arrives_after_the_pane_shrank_does_not_unpin_a_read
     expect(page.locator(".msg.assistant .actions button").first).to_be_in_viewport()
 
 
+def test_a_scroll_event_after_the_content_grew_does_not_stop_a_reply_being_followed(page, app_url):
+    """The same race with the content growing, not the pane: something taller than 80 px appears without a scroll
+    (a late layout change, an image, a section opening) and a scroll event that was already on its way is measured
+    after it. A reader who never touched the scrollbar must still be taken to the end as the reply goes on."""
+    page.set_viewport_size({"width": 1100, "height": 520})
+    open_app(page, app_url)
+    send(page, "long answer please")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("Paragraph 20 of")
+    page.evaluate("""() => {
+        const grown = document.createElement('div')
+        grown.style.height = '400px'
+        document.getElementById('thread').append(grown)
+        document.getElementById('messages').dispatchEvent(new Event('scroll'))  // the late one
+        grown.remove()
+    }""")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=15000)  # the reply is done
+    page.wait_for_function(AT_THE_END)
+
+
 def test_a_reader_who_scrolled_up_is_left_where_they_are_when_the_box_grows(page, app_url):
     page.set_viewport_size({"width": 1100, "height": 520})
     open_app(page, app_url)
