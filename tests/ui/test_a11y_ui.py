@@ -132,6 +132,16 @@ def test_the_sources_panel_with_a_numbered_chip_in_the_reply(page_with_axe):
     assert violations(page) == []
 
 
+def test_find_in_chat_with_matches_painted(page_with_axe):
+    page = page_with_axe
+    send(page, "findweb cite")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("It is 3.14")
+    page.keyboard.press("ControlOrMeta+f")
+    page.get_by_role("searchbox", name="Find in chat").fill("python")
+    expect(page.locator("#find-count")).not_to_have_text("")
+    assert violations(page) == []
+
+
 def test_attachments_ready_and_failed(page_with_axe):
     page = page_with_axe
     page.locator("#file-input").set_input_files([

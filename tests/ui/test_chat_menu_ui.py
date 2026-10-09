@@ -28,8 +28,8 @@ def test_the_items_are_grouped_and_a_new_chat_has_only_its_instructions(page, ap
     saved_chat(page)
     menu = chat_menu(page)
     expect(menu.get_by_role("menuitem")).to_have_text([
-        "Instructions for this chat…", "Pin", "Rename…", "Download as Markdown", "Download as JSON", "Archive",
-        "Delete…"])
+        "Instructions for this chat…", "Find in chat", "Pin", "Rename…", "Download as Markdown", "Download as JSON",
+        "Archive", "Delete…"])
     expect(menu.get_by_role("separator")).to_have_count(3)
 
 
@@ -58,6 +58,8 @@ def test_the_keyboard_opens_moves_and_closes_it_and_the_button_says_so(page, app
     expect(menu).to_be_visible()
     expect(button).to_have_attribute("aria-expanded", "true")
     expect(menu.get_by_role("menuitem").first).to_be_focused()
+    page.keyboard.press("ArrowDown")
+    expect(menu.get_by_role("menuitem", name="Find in chat")).to_be_focused()
     page.keyboard.press("ArrowDown")
     expect(menu.get_by_role("menuitem", name="Pin")).to_be_focused()
     page.keyboard.press("End")
@@ -122,7 +124,7 @@ def test_every_menu_row_is_a_44px_target_on_a_touch_screen(browser, app_url):
     heights = lambda menu: menu.locator("[role=menuitem], .tool-row").evaluate_all(  # noqa: E731
         "rows => rows.map((r) => Math.round(r.getBoundingClientRect().height))")
     menu = chat_menu(page)
-    assert len(heights(menu)) == 7 and min(heights(menu)) >= 44
+    assert len(heights(menu)) == 8 and min(heights(menu)) >= 44
     page.keyboard.press("Escape")
     page.get_by_role("button", name=re.compile("^Model")).click()
     model_menu = page.get_by_role("menu", name="Choose a model")

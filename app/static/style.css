@@ -2162,3 +2162,51 @@ dialog input[type='number'] {
     display: none;
   }
 }
+
+/* find in chat (find.js): a bar at the top right of the sheet, and the matches painted on the text */
+.find {
+  position: absolute;
+  top: 52px;
+  right: 16px;
+  z-index: var(--layer-2);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow:
+    0 0 0 1px var(--line),
+    var(--shadow-3);
+}
+.find input {
+  width: 11rem;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+#find-count {
+  min-width: 4.5rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-align: end;
+  white-space: nowrap;
+}
+::highlight(find) {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+::highlight(find-current) {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+@media (max-width: 760px) {
+  .find {
+    left: 16px;
+  }
+  .find input {
+    flex: 1;
+    min-width: 0;
+  }
+}

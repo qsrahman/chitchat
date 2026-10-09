@@ -24,6 +24,7 @@ import './chat-menu.js'
 import './delete.js'
 import './model-menu.js'
 import './retry-menu.js'
+import './find.js'
 import './sources.js'
 import './preferences.js'
 import './shortcuts.js'
@@ -35,7 +36,7 @@ async function openConversation(id) {
   state.id = id
   state.stick = true
   thread.replaceChildren()
-  bus.dispatchEvent(new Event('sources')) // none now
+  bus.dispatchEvent(new Event('thread-reset')) // sources and find start over
   clearPending()
   main.classList.remove('is-started')
   closeNavIfOverlay()

@@ -159,6 +159,56 @@
         </button>
       </header>
 
+      <div
+        id="find"
+        class="find"
+        role="search"
+        aria-label="Find in chat"
+        hidden
+      >
+        <input
+          id="find-input"
+          type="search"
+          placeholder="Find in chat"
+          aria-label="Find in chat"
+          autocomplete="off"
+        />
+        <span id="find-count" role="status"></span>
+        <button
+          id="find-prev"
+          type="button"
+          class="icon-btn"
+          aria-label="Previous match"
+          title="Previous (Shift+Enter)"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M5 12l5-5 5 5" />
+          </svg>
+        </button>
+        <button
+          id="find-next"
+          type="button"
+          class="icon-btn"
+          aria-label="Next match"
+          title="Next (Enter)"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M5 8l5 5 5-5" />
+          </svg>
+        </button>
+        <button
+          id="find-close"
+          type="button"
+          class="icon-btn"
+          aria-label="Close find"
+          title="Close (Escape)"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M5 5l10 10M15 5L5 15" />
+          </svg>
+        </button>
+      </div>
+
       <div id="messages" role="log" aria-label="Messages" tabindex="-1">
         <div id="empty">
           <h1>What are you working on?</h1>

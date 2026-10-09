@@ -105,6 +105,7 @@ function refresh() {
 }
 
 bus.addEventListener('sources', refresh)
+bus.addEventListener('thread-reset', refresh)
 button.addEventListener('click', () => show(panel.hidden))
 $('sources-close').addEventListener('click', () => {
   show(false)

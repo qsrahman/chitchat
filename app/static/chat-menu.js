@@ -2,6 +2,7 @@
 // archive and delete. One menu for two buttons, the ⋯ in the header (the open chat) and the ⋯ on a sidebar row (that
 // chat). It is a popover placed from here: CSS anchor positioning is not widely available.
 import { $, ICONS, api, bus, icon, state } from './core.js'
+import { openFind } from './find.js'
 import { renameConv, setFlags } from './list.js'
 import { menuKeys } from './model-menu.js'
 import { openSettings } from './settings.js'
@@ -29,6 +30,9 @@ function groups(c, open) {
             icon: ICONS.sliders,
             run: openSettings,
           },
+          ...(c
+            ? [{ label: 'Find in chat', icon: ICONS.search, run: openFind }]
+            : []),
         ]
       : [],
     c

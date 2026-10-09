@@ -16,7 +16,8 @@ export const composer = /** @type {HTMLElement} */ (
 )
 
 // Notices between modules that shouldn't import each other: "settings" (the open conversation's settings changed),
-// "models" (the model list was refreshed) and "open" (open the conversation in event.detail, null for a new chat).
+// "models" (the model list was refreshed), "open" (open the conversation in event.detail, null for a new chat),
+// "thread-reset" (the thread was emptied for another chat) and "sources" (a reply's tool call finished).
 export const bus = new EventTarget()
 
 // The web search tool, by its name in app/tools/: the tools menu and the default for new chats switch it on.
@@ -64,6 +65,7 @@ export const ICONS = {
   more: 'M5 10m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M10 10m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M15 10m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
   sliders:
     'M3 6h8M15 6h2M3 14h2M9 14h8M11 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M5 14a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+  search: 'M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3zM13.5 13.5L17 17',
   download: 'M10 3v9M6 8.5l4 4 4-4M4 16h12',
 }
 export const icon = (path) =>
