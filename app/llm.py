@@ -195,13 +195,13 @@ class OpenAILLM:
             except openai.OpenAIError:
                 return []
             listed = {m.id for m in models}
-
-            def wanted(model) -> bool:
+            chat_models = (model for model in models if not _NOT_CHAT.search(model.id))
+            ids = []
+            for model in sorted(chat_models, key=lambda m: (-(getattr(m, "created", 0) or 0), m.id)):
                 snapshot = _SNAPSHOT.match(model.id)
-                return not _NOT_CHAT.search(model.id) and not (snapshot and snapshot["alias"] in listed)
-
-            ids = [m.id for m in sorted(filter(wanted, models),
-                                        key=lambda m: (-(getattr(m, "created", 0) or 0), m.id))]
+                if snapshot and snapshot["alias"] in listed:
+                    continue
+                ids.append(model.id)
             self._models = (time.monotonic(), ids)
             return ids
 
