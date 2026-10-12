@@ -1,15 +1,16 @@
 """The only module that imports openai. Normalizes SDK stream events into ours:
 
-    {"type": "delta", "text": str}
-    {"type": "reasoning_delta", "text": str}          # streamed reasoning summary
-    {"type": "tool_call", "id", "name", "arguments", "status": "running" | "done" | "error",
-        "display": {...} | "error": str}              # a tool the model called, see app/tools/
-    {"type": "compaction", "item": {...}, "after_reply": bool}   # just before "done": OpenAI compacted the context,
-                       # see docs/phase-8.md. `after_reply`: the item also covers this reply's text.
-    {"type": "done"}   # plus "incomplete": reason (hit a limit) and "usage": {input_tokens, output_tokens,
-                       # reasoning_tokens}, when there are any
-    {"type": "error", "message": str}
+{"type": "delta", "text": str}
+{"type": "reasoning_delta", "text": str}          # streamed reasoning summary
+{"type": "tool_call", "id", "name", "arguments", "status": "running" | "done" | "error",
+    "display": {...} | "error": str}              # a tool the model called, see app/tools/
+{"type": "compaction", "item": {...}, "after_reply": bool}   # just before "done": OpenAI compacted the context,
+                   # see docs/phase-8.md. `after_reply`: the item also covers this reply's text.
+{"type": "done"}   # plus "incomplete": reason (hit a limit) and "usage": {input_tokens, output_tokens,
+                   # reasoning_tokens}, when there are any
+{"type": "error", "message": str}
 """
+
 import asyncio
 import base64
 import json
@@ -93,7 +94,7 @@ def _error_message(error: openai.OpenAIError) -> str:
     message = (body.get("message") if isinstance(body, dict) else None) or getattr(error, "message", None) or str(error)
     try:  # some OpenAI-compatible servers nest a whole JSON error inside the message
         message = json.loads(message)["error"]["message"]
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         pass
     return message
 
@@ -128,8 +129,13 @@ def _loads(arguments: str | None) -> dict:
 
 
 def _tool_spec(tool: Tool) -> dict:
-    return {"type": "function", "name": tool.name, "description": tool.description,
-            "parameters": tool.parameters, "strict": True}
+    return {
+        "type": "function",
+        "name": tool.name,
+        "description": tool.description,
+        "parameters": tool.parameters,
+        "strict": True,
+    }
 
 
 async def _run_tool(call, tools: dict[str, Tool], allowed: bool) -> tuple[str, dict]:
@@ -148,8 +154,10 @@ async def _run_tool(call, tools: dict[str, Tool], allowed: bool) -> tuple[str, d
     if tool is None:
         return f"Error: there is no tool called {call.name}.", {**fields, "status": "error", "error": "Unknown tool."}
     if not allowed:
-        return ("Error: the tool call limit for this reply was reached. Answer with what you have.",
-                {**fields, "status": "error", "error": "Tool call limit reached."})
+        return (
+            "Error: the tool call limit for this reply was reached. Answer with what you have.",
+            {**fields, "status": "error", "error": "Tool call limit reached."},
+        )
     started = time.monotonic()
     try:
         result = await tool.run(arguments)
@@ -247,8 +255,12 @@ class OpenAILLM:
             compaction = None  # the last compaction item of the reply, and whether it came after the reply text
             for _ in range(max_tool_calls + 3 if tools else 1):
                 stream = await self.client.responses.create(
-                    model=model, input=items, store=False, stream=True,
-                    max_output_tokens=self.settings.openai_max_output_tokens, **extra,
+                    model=model,
+                    input=items,
+                    store=False,
+                    stream=True,
+                    max_output_tokens=self.settings.openai_max_output_tokens,
+                    **extra,
                 )
                 part = None  # summary part index, so consecutive parts don't run together
                 output, calls, wrote = [], [], False
@@ -298,8 +310,13 @@ class OpenAILLM:
                 break_before_text = wrote
                 for call in calls:
                     calls_run += 1
-                    yield {"type": "tool_call", "id": call.call_id, "name": call.name, "status": "running",
-                           "arguments": _loads(call.arguments)}
+                    yield {
+                        "type": "tool_call",
+                        "id": call.call_id,
+                        "name": call.name,
+                        "status": "running",
+                        "arguments": _loads(call.arguments),
+                    }
                     text, fields = await _run_tool(call, tools or {}, allowed=calls_run <= max_tool_calls)
                     yield {"type": "tool_call", "id": call.call_id, "name": call.name, **fields}
                     items.append({"type": "function_call_output", "call_id": call.call_id, "output": text})
