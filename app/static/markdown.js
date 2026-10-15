@@ -1,5 +1,7 @@
 // Markdown -> sanitized HTML. marked, DOMPurify, highlight.js and KaTeX are loaded as globals (vendor/).
 // highlight.js's "plaintext" language is its HTML escaper: no highlighting, entity-escaped output.
+import { ICONS, icon } from './core.js'
+
 const escapeHtml = (text) =>
   hljs.highlight(text, { language: 'plaintext' }).value
 
@@ -67,7 +69,8 @@ marked.use(
           : escapeHtml(text)
         return (
           `<div class="code" dir="ltr"><div class="code-bar"><span>${escapeHtml(name || 'text')}</span>` +
-          `<button type="button" class="code-copy">Copy</button></div>` +
+          `<button type="button" class="code-copy" aria-label="Copy code" title="Copy code">` +
+          `<i class="copy">${icon(ICONS.copy)}</i><i class="copied">${icon(ICONS.check)}</i></button></div>` +
           `<pre tabindex="0"><code class="hljs">${html}</code></pre></div>`
         )
       },

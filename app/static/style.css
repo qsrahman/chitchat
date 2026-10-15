@@ -942,6 +942,7 @@ main.is-started #recent {
 }
 
 .code {
+  --pad: 16px; /* the left edge of the language label and of the code */
   margin: 1em 0;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
@@ -953,16 +954,34 @@ main.is-started #recent {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 6px 4px 12px;
+  padding: 4px 6px 4px var(--pad);
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: var(--font-size-0);
 }
 .code-copy {
-  padding: 2px 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
   border-radius: var(--r-sm);
-  font-size: var(--font-size-0);
   color: var(--muted);
+}
+.code-copy i {
+  display: grid;
+  font-style: normal;
+}
+.code-copy svg {
+  width: 16px;
+  height: 16px;
+}
+.code-copy .copied,
+.code-copy[data-copied] .copy {
+  display: none;
+}
+.code-copy[data-copied] .copied {
+  display: grid;
+  color: var(--accent);
 }
 .code-copy:hover {
   background: var(--hover);
@@ -970,7 +989,7 @@ main.is-started #recent {
 }
 .code pre {
   margin: 0;
-  padding: 12px 14px;
+  padding: 12px var(--pad);
   overflow-x: auto;
 }
 .code code {

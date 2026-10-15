@@ -117,6 +117,30 @@ def test_code_block_is_highlighted_and_copyable(page, app_url):
     assert page.evaluate("navigator.clipboard.readText()") == "for i in range(3):\n    print(i)"
 
 
+def test_the_copy_button_of_a_code_block_is_an_icon_with_no_text(page, app_url):
+    open_app(page, app_url)
+    send(page, "show code")
+    button = page.locator(".code .code-copy")
+    expect(button).to_be_visible()
+    assert button.evaluate("e => e.innerText.trim()") == ""  # no word on it
+    expect(button.locator("svg:visible")).to_have_count(1)  # one icon at a time
+    expect(button).to_have_accessible_name("Copy code")
+    button.click()
+    expect(button).to_have_accessible_name("Copied")
+    expect(button.locator(".copied svg")).to_be_visible()  # the check mark, for a moment
+    expect(button).to_have_accessible_name("Copy code")
+
+
+def test_the_language_label_and_the_code_start_at_the_same_distance_from_the_edge(page, app_url):
+    open_app(page, app_url)
+    send(page, "show code")
+    box = page.locator(".code").bounding_box()
+    label = page.locator(".code-bar span").bounding_box()
+    code = page.locator(".code code").bounding_box()
+    assert abs(label["x"] - code["x"]) < 1.5
+    assert code["x"] - box["x"] >= 16  # the padding is there (16px, plus the 1px border)
+
+
 def test_code_block_text_is_shown_literally_whatever_the_language(page, app_url):
     open_app(page, app_url)
     send(page, "literal code")

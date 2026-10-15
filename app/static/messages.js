@@ -236,6 +236,10 @@ thread.addEventListener('click', async (e) => {
   await navigator.clipboard.writeText(
     btn.closest('.code').querySelector('code').innerText,
   )
-  btn.textContent = 'Copied'
-  setTimeout(() => (btn.textContent = 'Copy'), 1200)
+  btn.dataset.copied = ''
+  btn.setAttribute('aria-label', 'Copied')
+  setTimeout(() => {
+    delete btn.dataset.copied
+    btn.setAttribute('aria-label', 'Copy code')
+  }, 1200)
 })

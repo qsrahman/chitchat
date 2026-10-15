@@ -60,3 +60,6 @@ The longest single freeze does not change: it is one render of the whole block, 
 
 ## Tables on a narrow screen
 A reply's text may break anywhere (`overflow-wrap: anywhere`, so a long URL never widens the page). In a table that let the browser shrink a column to one letter on a phone ("Reas / onin / g"). Table cells now keep their words whole and a column at least 6rem wide; a table wider than the screen scrolls sideways (it is focusable, see above). `tests/ui/test_layout_ui.py` checks it at 375px.
+
+## Code blocks
+The bar over a code block holds the language and a copy button that is an icon only (`code-copy` in `markdown.js`; its accessible name is "Copy code", and "Copied" with a check mark for a moment after a click). The language label and the code share one left padding, `--pad` (16px) on `.code`, so they start at the same distance from the edge; before, the label was at 12px and the code at 14px.
