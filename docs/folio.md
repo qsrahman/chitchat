@@ -10,6 +10,9 @@ Chosen from the five mocks in `docs/ui-mockups.md` (the mock is `design/mockups/
 - `main` has a bounded grid column, so a very long title ellipsizes instead of widening the sheet.
 - `--muted` (light) and the code number colour were darkened to keep 4.5:1 on the new surfaces.
 
+## Sizes (changed after a look at a 1024px window)
+The first Folio pass made the text large and left the column narrow: replies 17.6px serif in a 46rem column with a 62ch line, a 17px message box. Now: column `--col` 56rem (896px, less on a narrower window), reading line `--measure` 80ch (about 710px of 16px serif), replies 16px/1.7 serif, message box and chat title 16px, the interface 15px. Tables, code and math may use the whole column. To change them, edit `--col`, `--measure` and the `.msg.assistant .body` font in `style.css`.
+
 ## Checked by eye (light mode and a 375px phone)
 - The new-chat screen's "Pick up where you left off" list is serif with the age on the right ("4 hours ago", "yesterday"; the date past a week). Found on the way: a long title stretched the grid column and pushed the ages out of view (the list's column is now `minmax(0, 1fr)`).
 - On a phone the header was too tight with the Sources button: the chat title shrank to one letter. The model name now stops at 6rem, the button shows only the site letters (two of them) and the title keeps about 75px with sources, 135px without.

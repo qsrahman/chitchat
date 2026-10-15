@@ -37,8 +37,8 @@
   /* the model's words and the chat title: OS fonts, no download */
   --serif: 'Iowan Old Style', Charter, 'Palatino Linotype', Georgia, serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --col: 46rem;
-  --measure: 62ch; /* the longest line of answer text; code, tables and math may run to the column */
+  --col: 56rem;
+  --measure: 80ch; /* the longest line of answer text (about 710px at 16px); code, tables and math may run to the column */
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -389,7 +389,7 @@ main {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font: 600 1.05rem var(--serif);
+  font: 600 1rem var(--serif);
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -737,7 +737,7 @@ main.is-started #recent {
   overflow-wrap: anywhere;
 }
 .msg.assistant .body {
-  font: 1.1rem/1.72 var(--serif);
+  font: 1rem/1.7 var(--serif);
   overflow-wrap: anywhere;
 }
 .msg.assistant .body :is(p, ul, ol, blockquote) {
@@ -1323,7 +1323,7 @@ dialog[open]::backdrop {
   outline: 0;
   padding: 5px 4px;
   font: inherit;
-  font-size: 1.0625rem;
+  font-size: 1rem;
   line-height: 1.5;
   background: none;
   color: var(--ink);

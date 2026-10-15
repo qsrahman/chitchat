@@ -65,5 +65,5 @@ def test_paragraphs_stop_at_the_reading_measure_but_the_column_can_be_wider(page
     expect(page.locator(".msg.assistant .body p").first).to_be_visible()
     width = page.locator(".msg.assistant .body p").first.evaluate("e => e.getBoundingClientRect().width")
     column = page.locator("#thread").evaluate("e => e.getBoundingClientRect().width")
-    assert width <= 640 and width < column
+    assert width <= 720 and width < column  # 80ch of 16px serif is about 710px
     page.keyboard.press("Escape")
