@@ -74,12 +74,10 @@ export const capital = (/** @type {string} */ e) =>
   e[0].toUpperCase() + e.slice(1)
 
 /** The thinking-effort choice that stores nothing, named for what it gives: `none` if no default effort is chosen in
- * Settings, else "Default (High)". The composer and the chat's own dialog both show it, so what Settings says is
- * visible where the effort is chosen. */
+ * Settings, else that effort ("High"). The composer's select shows it, so what Settings says is visible where the
+ * effort is chosen. (The chat's own dialog spells it out, "Default (high)", in `openSettings`.) */
 export const defaultEffortLabel = (/** @type {string} */ none) =>
-  defaults.reasoning_effort
-    ? `Default (${capital(defaults.reasoning_effort)})`
-    : none
+  defaults.reasoning_effort ? capital(defaults.reasoning_effort) : none
 
 export const newChatSettings = () => ({
   ...DEFAULT_SETTINGS,

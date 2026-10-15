@@ -5,14 +5,17 @@ import {
   capital,
   currentModel,
   defaultEffortLabel,
+  defaults,
   modelInfo,
   saveSettings,
 } from './settings.js'
 
 // ---- thinking effort ----
 // A select in the composer, shown for models that take a reasoning effort (the others take a temperature, which
-// stays in the chat settings). The first choice stores null: "Auto", or the default chosen in Settings (that is what
-// a chat that picks none gets, so it says which).
+// stays in the chat settings). The first choice stores null: "Auto", or the default chosen in Settings, which it is
+// named after ("Medium", not "Default (Medium)": the select shows the choice made, and a chat that picks none gets
+// that one). The list then has no second "Medium": picking it would mean the same, except that it would stay when
+// the default changes, and a chat saved with that explicit choice shows as following it.
 const effortSelect = $('effort')
 
 function syncEffort() {
@@ -20,18 +23,23 @@ function syncEffort() {
   $('effort-wrap').hidden = !modelInfo.models.find(
     (m) => m.id === currentModel(),
   )?.reasoning
-  if (effortSelect.options.length !== efforts.length + 1) {
-    const group = document.createElement('optgroup')
-    group.label = 'Thinking effort'
-    group.append(
-      new Option('Auto', ''),
-      ...efforts.map((e) => new Option(capital(e), e)),
-    )
-    effortSelect.replaceChildren(group)
-  }
-  effortSelect.options[0].text = defaultEffortLabel('Auto')
-  effortSelect.value = state.settings.reasoning_effort ?? ''
-  effortSelect.title = `Thinking effort: ${effortSelect.selectedOptions[0].text}`
+  const group = document.createElement('optgroup')
+  group.label = 'Thinking effort'
+  group.append(
+    new Option(defaultEffortLabel('Auto'), ''),
+    ...efforts
+      .filter((e) => e !== defaults.reasoning_effort)
+      .map((e) => new Option(capital(e), e)),
+  )
+  effortSelect.replaceChildren(group)
+  const chosen = state.settings.reasoning_effort
+  effortSelect.value =
+    chosen === defaults.reasoning_effort ? '' : (chosen ?? '')
+  effortSelect.title = `Thinking effort: ${effortSelect.selectedOptions[0].text}${
+    effortSelect.value === '' && defaults.reasoning_effort
+      ? ' (the default from Settings)'
+      : ''
+  }`
   $('effort-wrap').title = effortSelect.title
   $('effort-wrap').toggleAttribute('data-active', effortSelect.value !== '')
 }

@@ -85,8 +85,12 @@ def test_the_default_effort_from_settings_names_the_first_choice_in_the_composer
     open_app(page, app_url)
     choose_default_effort(page)
     expect(effort(page)).to_be_visible()  # the default model is now a thinking one
-    expect(effort(page).locator("option").first).to_have_text("Default (High)")
-    expect(page.locator("#effort-wrap")).to_have_attribute("title", "Thinking effort: Default (High)")
+    expect(effort(page).locator("option").first).to_have_text("High")  # named for what it gives, not "Default (High)"
+    expect(effort(page).locator("option:checked")).to_have_text("High")  # what the closed select shows
+    expect(effort(page).locator("option")).to_have_text(
+        ["High", "None", "Minimal", "Low", "Medium", "Xhigh", "Max"])  # and no second "High" in the list
+    expect(page.locator("#effort-wrap")).to_have_attribute(
+        "title", "Thinking effort: High (the default from Settings)")
     expect(page.locator("#effort-wrap")).not_to_have_attribute("data-active", "")  # not an override of its own
     effort(page).select_option("low")
     expect(page.locator("#effort-wrap")).to_have_attribute("data-active", "")
@@ -97,9 +101,9 @@ def test_an_open_chat_that_follows_the_default_shows_a_new_default_at_once_and_n
     choose_default_effort(page, "medium")
     send(page, "think")
     expect(page.locator(".msg.assistant .body")).to_contain_text("[effort=medium]")  # what it really used
-    expect(effort(page).locator("option").first).to_have_text("Default (Medium)")
+    expect(effort(page).locator("option").first).to_have_text("Medium")
     choose_default_effort(page, "low")
-    expect(effort(page).locator("option").first).to_have_text("Default (Low)")  # the open chat follows it
+    expect(effort(page).locator("option").first).to_have_text("Low")  # the open chat follows it
     page.get_by_role("button", name="Settings", exact=True).click()
     dialog = page.get_by_role("dialog", name="Settings", exact=True)
     dialog.get_by_label("Thinking effort").select_option("")  # Auto
@@ -114,3 +118,18 @@ def test_the_chats_own_dialog_says_what_default_means_for_the_effort(page, app_u
     choose_default_effort(page)
     dialog = open_chat_settings(page)
     expect(dialog.get_by_label("Reasoning effort").locator("option").first).to_have_text("Default (high)")
+
+
+def test_a_chat_saved_with_the_effort_that_is_now_the_default_shows_as_following_it(page, app_url):
+    open_app(page, app_url)
+    pick(page, "gpt-5-mini")
+    effort(page).select_option("high")  # an explicit choice, saved with the chat
+    send(page, "think")
+    expect(page.locator(".msg.assistant .body")).to_contain_text("[effort=high]")
+    choose_default_effort(page, "high")
+    expect(effort(page).locator("option:checked")).to_have_text("High")
+    expect(effort(page)).to_have_value("")  # the first choice: the list has no other High
+    expect(page.locator("#effort-wrap")).not_to_have_attribute("data-active", "")
+    choose_default_effort(page, "low")  # the default moves on: the chat's own High is back as a choice of its own
+    expect(effort(page)).to_have_value("high")
+    expect(effort(page).locator("option:checked")).to_have_text("High")
