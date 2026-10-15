@@ -136,9 +136,13 @@ def test_the_language_label_and_the_code_start_at_the_same_distance_from_the_edg
     send(page, "show code")
     box = page.locator(".code").bounding_box()
     label = page.locator(".code-bar span").bounding_box()
-    code = page.locator(".code code").bounding_box()
-    assert abs(label["x"] - code["x"]) < 1.5
-    assert code["x"] - box["x"] >= 16  # the padding is there (16px, plus the 1px border)
+    text_x = page.locator(".code code").evaluate("""e => {
+        const range = document.createRange()
+        range.selectNodeContents(e)
+        return range.getClientRects()[0].x
+    }""")
+    assert abs(label["x"] - text_x) < 1.5
+    assert text_x - box["x"] >= 16  # the padding is there (16px, plus the 1px border)
 
 
 def test_code_block_text_is_shown_literally_whatever_the_language(page, app_url):
@@ -475,3 +479,19 @@ def test_follows_system_color_scheme(page, app_url):
     expect(page.locator("body")).to_have_css("background-color", "rgb(236, 235, 229)")
     page.emulate_media(color_scheme="dark")
     expect(page.locator("body")).to_have_css("background-color", "rgb(19, 20, 23)")
+
+
+def test_a_wide_code_block_keeps_its_right_padding_when_scrolled_to_the_end(page, app_url):
+    open_app(page, app_url)
+    send(page, "widereply")
+    pre = page.locator(".msg.assistant .code pre").first
+    expect(pre).to_be_visible()
+    assert pre.evaluate("e => e.scrollWidth > e.clientWidth")  # it does scroll
+    gap = pre.evaluate("""e => {
+        e.scrollLeft = e.scrollWidth
+        const range = document.createRange()
+        range.selectNodeContents(e.querySelector('code'))
+        const right = Math.max(...[...range.getClientRects()].map((r) => r.right))
+        return e.getBoundingClientRect().right - right
+    }""")
+    assert gap >= 15, gap  # the 16px padding, less the border: the text does not touch the edge

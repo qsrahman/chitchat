@@ -989,10 +989,16 @@ main.is-started #recent {
 }
 .code pre {
   margin: 0;
-  padding: 12px var(--pad);
+  padding: 12px 0; /* the sides are the code's own padding, below */
   overflow-x: auto;
 }
 .code code {
+  /* A block as wide as its longest line plus its own padding: the right padding is then part of what scrolls, in
+     every browser (padding on the scrolling <pre> itself is left out of the scroll width by some). */
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  padding-inline: var(--pad);
   font: 0.875rem/1.55 var(--mono);
   background: none;
 }

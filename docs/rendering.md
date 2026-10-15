@@ -63,3 +63,4 @@ A reply's text may break anywhere (`overflow-wrap: anywhere`, so a long URL neve
 
 ## Code blocks
 The bar over a code block holds the language and a copy button that is an icon only (`code-copy` in `markdown.js`; its accessible name is "Copy code", and "Copied" with a check mark for a moment after a click). The language label and the code share one left padding, `--pad` (16px) on `.code`, so they start at the same distance from the edge; before, the label was at 12px and the code at 14px.
+The code's sides are padding on the `<code>` element itself (a block as wide as its longest line, at least as wide as the box), not on the `<pre>` that scrolls: padding at the end of a scrolling container is left out of the scrollable width by some browsers, which puts the end of a long line against the edge of the box. `tests/ui/test_chat_ui.py` scrolls a wide block to its end and checks the gap (Chromium only; the other engines are not in the suite).
