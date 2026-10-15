@@ -35,6 +35,7 @@ async function openConversation(id) {
   state.abort?.abort() // a reply still streaming is saved as stopped
   state.id = id
   state.stick = true
+  $('jump').hidden = true // the new thread starts at its end: no scroll event comes to hide it
   thread.replaceChildren()
   bus.dispatchEvent(new Event('thread-reset')) // sources and find start over
   clearPending()

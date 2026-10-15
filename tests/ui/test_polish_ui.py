@@ -274,3 +274,20 @@ def test_after_a_failed_reply_retry_has_its_word(page, app_url):
     retry.click()
     expect(page.locator(".msg.assistant")).to_contain_text("Reply")
     expect(page.get_by_role("button", name="Regenerate")).to_have_text("")  # a normal reply keeps the bare icon
+
+
+def test_the_jump_button_goes_when_another_chat_or_a_new_chat_is_opened(page, app_url):
+    page.set_viewport_size({"width": 1100, "height": 520})
+    open_app(page, app_url)
+    send(page, "long answer please")
+    expect(page.locator(".msg.assistant .actions button").first).to_be_visible(timeout=15000)
+    jump = page.get_by_role("button", name="Jump to latest")
+    page.locator("#messages").evaluate("e => { e.scrollTop = 0 }")
+    expect(jump).to_be_visible()
+    page.get_by_role("button", name="New chat").click()
+    expect(page.get_by_role("heading", name="What are you working on?")).to_be_visible()
+    expect(jump).to_be_hidden()
+    page.get_by_role("navigation", name="Recent chats").get_by_role("link").first.click()  # the long chat again
+    expect(page.locator(".msg.assistant").first).to_be_visible()
+    page.wait_for_function("() => document.getElementById('messages').scrollTop > 0")  # it opens at its end
+    expect(jump).to_be_hidden()
