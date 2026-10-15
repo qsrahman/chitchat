@@ -6,14 +6,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # model can't know or guess: today's date and how replies are displayed. It sets no persona or style
 # (see docs/default-prompt.md). {date} is replaced when a request is made.
 DEFAULT_SYSTEM_PROMPT = (
-    "You are a helpful assistant in a chat app. Answer directly and accurately, and say so when you are unsure.\n"
+    "You are an expert AI assistant in a chat app. Answer directly and accurately, and say so when you are unsure.\n"
     "Replies are shown as Markdown. Write math with \\( ... \\) inline and \\[ ... \\] for display, put code in "
     "fenced blocks with a language, and don't use Markdown images.\n"
     "Today's date is {date}."
 )
 
 
-OPENAI_TITLE_MODEL = "gpt-5.4-nano"
+OPENAI_TITLE_MODEL = "gpt-5.4-mini"
 CUSTOM_ENDPOINT_CONTEXT = 32_000  # a common size for local models; raise it with CONTEXT_TOKENS if yours is larger
 
 

@@ -163,7 +163,7 @@ async def titled_with(client, llm, **settings):
 
 
 async def test_titles_use_a_small_openai_model_not_the_one_chosen_for_the_chat(client, llm):
-    assert await titled_with(client, llm, model="big-model") == ["gpt-5.4-nano"]
+    assert await titled_with(client, llm, model="big-model") == ["gpt-5.4-mini"]
 
 
 async def test_titles_use_the_main_model_on_a_custom_endpoint(client, llm, app):
@@ -179,7 +179,7 @@ async def test_titles_follow_the_default_model_chosen_in_settings_on_a_custom_en
 
 async def test_the_default_model_chosen_in_settings_does_not_change_titles_on_openai(client, llm):
     await client.put("/api/defaults", json={"model": "gpt-5-mini"})
-    assert await titled_with(client, llm) == ["gpt-5.4-nano"]
+    assert await titled_with(client, llm) == ["gpt-5.4-mini"]
 
 
 async def test_the_title_model_can_be_set(client, llm, app):

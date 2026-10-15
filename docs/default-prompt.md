@@ -12,11 +12,11 @@
 No prompt is *necessary*, so the default is small and holds only what the model can't know or guess:
 - **Today's date.** Models don't know it. A live check with `gpt-5.5` and no instructions answered "October 2, 2026" on October 3; with the prompt it was right. It also matters for "latest" questions and for choosing a web search freshness.
 - **How replies are displayed:** Markdown, math as `\( \)` and `\[ \]` (the forms the renderer handles most reliably; a bare `$` is also supported but is ambiguous with prices), code in fenced blocks with a language, no Markdown images (images are stripped by the sanitizer, see `docs/rendering.md`).
-- One sentence of identity, "a helpful assistant in a chat app", and to say so when unsure. No persona, tone, length or refusal rules: those are the user's to set through custom instructions or a conversation's system prompt, and the models' own defaults are good.
+- One sentence of identity, "an expert AI assistant in a chat app" (it said "a helpful assistant" at first), and to say so when unsure. No persona, tone, length or refusal rules: those are the user's to set through custom instructions or a conversation's system prompt, and the models' own defaults are good.
 
 The final text, in `app/config.py` (`DEFAULT_SYSTEM_PROMPT`):
 
-> You are a helpful assistant in a chat app. Answer directly and accurately, and say so when you are unsure.
+> You are an expert AI assistant in a chat app. Answer directly and accurately, and say so when you are unsure.
 > Replies are shown as Markdown. Write math with \( ... \) inline and \[ ... \] for display, put code in fenced blocks with a language, and don't use Markdown images.
 > Today's date is {date}.
 

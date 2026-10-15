@@ -39,7 +39,7 @@ async def test_it_comes_first_then_custom_instructions_then_the_conversation_pro
     await client.put("/api/custom-instructions", json={"text": "I am Que."})
     sent = await instructions(client, app, system_prompt="Be brief.")
     assert sent.endswith("\n\nI am Que.\n\nBe brief.")
-    assert sent.startswith("You are a helpful assistant")
+    assert sent.startswith("You are an expert AI assistant")
 
 
 async def test_an_empty_default_sends_no_instructions_at_all(client, llm):
