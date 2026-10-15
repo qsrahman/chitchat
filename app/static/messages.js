@@ -4,6 +4,7 @@ import {
   $,
   ICONS,
   bodyOf,
+  copyText,
   icon,
   main,
   messagesEl,
@@ -233,13 +234,16 @@ export function renderFresh(el) {
 thread.addEventListener('click', async (e) => {
   const btn = e.target.closest('.code-copy')
   if (!btn) return
-  await navigator.clipboard.writeText(
+  const ok = await copyText(
     btn.closest('.code').querySelector('code').innerText,
   )
-  btn.dataset.copied = ''
-  btn.setAttribute('aria-label', 'Copied')
+  const label = ok ? 'Copied' : "Couldn't copy"
+  if (ok) btn.dataset.copied = ''
+  btn.setAttribute('aria-label', label)
+  btn.title = label
   setTimeout(() => {
     delete btn.dataset.copied
     btn.setAttribute('aria-label', 'Copy code')
+    btn.title = 'Copy code'
   }, 1200)
 })

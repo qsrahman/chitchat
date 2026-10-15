@@ -140,6 +140,36 @@ export function iconButton(label, path, onclick) {
   return b
 }
 
+/**
+ * Put text on the clipboard; false if the browser would not. The clipboard API is only there on a secure page
+ * (https, or localhost: not http://192.168...) and can be refused by the browser's permission; selecting text and
+ * copying it, which is older and deprecated but needs neither, is the fallback. Nothing else covers those cases.
+ * @param {string} text
+ */
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    const before = /** @type {HTMLElement | null} */ (document.activeElement)
+    const area = Object.assign(document.createElement('textarea'), {
+      value: text,
+      readOnly: true,
+    })
+    area.style.cssText = 'position: fixed; top: 0; left: 0; opacity: 0'
+    document.body.append(area)
+    area.select()
+    try {
+      return document.execCommand('copy')
+    } catch {
+      return false
+    } finally {
+      area.remove()
+      before?.focus() // selecting moved the focus
+    }
+  }
+}
+
 // ---- dialogs ----
 export function showDialog(dlg) {
   dlg.returnValue = ''

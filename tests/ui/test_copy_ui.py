@@ -78,3 +78,67 @@ def test_a_message_with_only_an_attachment_has_no_copy_button(page, app_url):
     expect(page.locator(".msg.assistant").locator(".actions button").first).to_be_visible()  # saved
     expect(copy_button(page, page.locator(".msg.user"))).to_have_count(0)
     expect(copy_button(page, page.locator(".msg.assistant"))).to_have_count(1)
+
+
+# ---- when the clipboard API will not do it ----
+
+# What the page copies by selecting text, as the old way does: recorded, and still really done.
+RECORD_OLD_COPY = """
+window.__copied = []
+const real = document.execCommand.bind(document)
+document.execCommand = (command) => {
+  const ok = real(command)
+  if (command === 'copy') window.__copied.push(document.getSelection().toString() || document.activeElement?.value)
+  return ok
+}
+"""
+REFUSED = "navigator.clipboard.writeText = () => Promise.reject(new DOMException('denied', 'NotAllowedError'))"
+ABSENT = "Object.defineProperty(navigator, 'clipboard', { value: undefined })"  # as on http://192.168...
+CODE = "for i in range(3):\n    print(i)"
+
+
+def test_the_code_copy_button_works_when_the_browser_refuses_the_clipboard_api(page, app_url):
+    page.add_init_script(REFUSED + RECORD_OLD_COPY)
+    open_app(page, app_url)
+    send(page, "show code")
+    button = page.locator(".code .code-copy")
+    button.click()
+    expect(button).to_have_accessible_name("Copied")
+    assert page.evaluate("window.__copied") == [CODE]
+
+
+def test_the_code_copy_button_works_on_a_page_that_has_no_clipboard_api(page, app_url):
+    page.add_init_script(ABSENT + ";" + RECORD_OLD_COPY)
+    open_app(page, app_url)
+    send(page, "show code")
+    button = page.locator(".code .code-copy")
+    button.click()
+    expect(button).to_have_accessible_name("Copied")
+    assert page.evaluate("window.__copied") == [CODE]
+
+
+def test_a_message_copy_button_works_without_the_clipboard_api_and_keeps_the_focus(page, app_url):
+    page.add_init_script(ABSENT + ";" + RECORD_OLD_COPY)
+    open_app(page, app_url)
+    send(page, "hello there")
+    expect(page.locator(".msg.assistant")).to_contain_text("Reply #1")
+    expect(copy_button(page, page.locator(".msg.user").first)).to_be_visible()
+    button = page.locator(".msg.user").first.locator(".actions button").first  # still the one when it is renamed
+    button.click()
+    expect(button).to_have_accessible_name("Copied")
+    assert page.evaluate("window.__copied") == ["hello there"]
+    expect(button).to_be_focused()  # selecting the copy did not take the focus away
+
+
+def test_when_nothing_can_copy_the_buttons_say_so_instead_of_doing_nothing(page, app_url):
+    page.add_init_script(REFUSED + ";document.execCommand = () => false")
+    open_app(page, app_url)
+    send(page, "show code")
+    button = page.locator(".code .code-copy")
+    button.click()
+    expect(button).to_have_accessible_name("Couldn't copy")
+    expect(button).to_have_accessible_name("Copy code")  # and is itself again a moment later
+    expect(page.locator("#composer-note")).to_be_hidden()
+    expect(page.locator(".msg.assistant")).to_contain_text("print")
+    copy_button(page, page.locator(".msg.user").first).click()
+    expect(page.locator("#composer-note")).to_contain_text("Couldn't copy")

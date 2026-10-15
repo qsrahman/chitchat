@@ -5,6 +5,7 @@ import {
   api,
   bodyOf,
   bus,
+  copyText,
   form,
   iconButton,
   input,
@@ -30,6 +31,7 @@ import {
   pending,
   saveDraft,
   scheduleComposer,
+  showNote,
   syncSend,
 } from './composer.js'
 import { refreshList } from './list.js'
@@ -66,8 +68,11 @@ export function updateActions() {
       (m.classList.contains('assistant') || m.classList.contains('user')),
   )) {
     const copy = iconButton('Copy', ICONS.copy, async () => {
-      await navigator.clipboard.writeText(m._text)
-      confirmed(copy)
+      if (await copyText(m._text)) confirmed(copy)
+      else
+        showNote(
+          "Couldn't copy: the browser would not let the page use the clipboard.",
+        )
     })
     actionsOf(m).append(copy)
     if (m.classList.contains('user'))
